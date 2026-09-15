@@ -19,7 +19,8 @@ android {
         applicationId = "ru.socialworld.social_world"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 26
+        // Yandex MapKit Android SDK requires API 26+, keep Flutter's floor if it rises later.
+        minSdk = maxOf(flutter.minSdkVersion, 26)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
