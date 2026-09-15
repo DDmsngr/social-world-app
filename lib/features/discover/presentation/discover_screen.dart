@@ -67,7 +67,7 @@ class DiscoverScreen extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         builder: (context) => Padding(
           padding: const EdgeInsets.all(AppSpacing.gutter),
-          child: GlassCard(
+          child: SheetCard(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../feed/presentation/providers/feed_providers.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -61,6 +62,8 @@ class ProfileScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 26),
+          const _MyPosts(),
           const SizedBox(height: 24),
           const PhaseList(),
           const SizedBox(height: 24),
@@ -70,6 +73,87 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MyPosts extends ConsumerWidget {
+  const _MyPosts();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final posts = ref.watch(myPostsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SectionLabel('Публикации'),
+        const SizedBox(height: 12),
+        posts.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (_, _) => Text(
+            'Не удалось загрузить публикации',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          data: (items) {
+            if (items.isEmpty) {
+              return Text(
+                'Вы ещё ничего не опубликовали.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              );
+            }
+            return Column(
+              children: [
+                for (final post in items)
+                  GlassCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.body ?? 'Публикация',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.favorite_border,
+                              size: 15,
+                              color: AppColors.textFaint,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${post.likeCount}',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(fontSize: 12),
+                            ),
+                            if (post.placeTitle != null) ...[
+                              const SizedBox(width: 12),
+                              Flexible(
+                                child: Text(
+                                  post.placeTitle!,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(fontSize: 12),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -84,9 +168,9 @@ class PhaseList extends StatelessWidget {
       children: const [
         SectionLabel('Дальше'),
         SizedBox(height: 12),
-        _Row('Публикации и статистика', 'Фаза 1'),
         _Row('Настройки приватности геолокации', 'Фаза 2'),
-        _Row('Жалобы и заблокированные', 'Фаза 1'),
+        _Row('Список заблокированных', 'Фаза 2'),
+        _Row('События и push', 'Фаза 3'),
       ],
     );
   }

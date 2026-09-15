@@ -56,6 +56,34 @@ class GlassCard extends StatelessWidget {
   }
 }
 
+/// Карточка модального листа.
+///
+/// Отдельно от [GlassCard] именно из-за фона: у стеклянной карточки он
+/// полупрозрачный, и поверх ленты сквозь лист читается чужой текст.
+class SheetCard extends StatelessWidget {
+  const SheetCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(20),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppColors.ink2,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.hairStrong),
+      ),
+      child: child,
+    );
+  }
+}
+
 /// Пустой экран-заглушка для разделов, которые появятся в следующих фазах.
 /// Держим их в навигации с первого дня, чтобы каркас был проходимым целиком.
 class PhasePlaceholder extends StatelessWidget {
