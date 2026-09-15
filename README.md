@@ -19,6 +19,15 @@ flutter analyze
 flutter test
 ```
 
+Веб — это площадка для разработки и демо, а не отдельный продукт. Приложение мобильное, но в браузере его удобно гонять и показывать: карту на вебе всё равно придётся делать отдельно, плагин Яндекс MapKit туда не умеет.
+
+```bash
+flutter build web
+cd build/web && python -m http.server 8765 --bind 127.0.0.1
+```
+
+Автоматический обход всех экранов со скриншотами — `tool/README.md`.
+
 ## Структура
 
 ```
@@ -49,7 +58,7 @@ supabase/
 
 | | |
 |---|---|
-| Flutter | 3.44, Dart 3.12 |
+| Flutter | 3.44, Dart 3.12 — Android, iOS, web (web только для разработки) |
 | Состояние | Riverpod 3 |
 | Навигация | go_router 18 |
 | Бэкенд | Supabase (self-hosted, см. `supabase/README.md`) |

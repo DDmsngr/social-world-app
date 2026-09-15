@@ -81,8 +81,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 28),
+              // Ключи обязательны: оба поля стоят в одной позиции дерева, и без
+              // них Flutter переиспользует состояние — в поле кода остаётся
+              // текст почты, а контроллер расходится с тем, что видно.
               if (!_codeSent)
                 TextField(
+                  key: const ValueKey('sign-in-email'),
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
@@ -90,6 +94,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 )
               else
                 TextField(
+                  key: const ValueKey('sign-in-code'),
                   controller: _codeController,
                   keyboardType: TextInputType.number,
                   autofocus: true,

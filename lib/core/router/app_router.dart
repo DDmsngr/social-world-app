@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/domain/entities/app_user.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
@@ -20,27 +21,47 @@ abstract final class Routes {
   static const discover = '/discover';
   static const create = '/create';
   static const profile = '/profile';
+
+  static const authFlow = {splash, signIn, onboarding};
+}
+
+/// Роутеру нужно синхронно знать, кто вошёл, прямо в момент редиректа.
+/// Читать это из провайдера нельзя: `ref.read` в redirect отдаёт закешированное
+/// значение, и после входа редирект видит старый null. Поэтому состояние
+/// сессии живёт здесь — обновляется из подписки и сразу дёргает роутер.
+class AuthRouterState extends ChangeNotifier {
+  AsyncValue<AppUser?> _value = const AsyncValue.loading();
+
+  AsyncValue<AppUser?> get value => _value;
+
+  set value(AsyncValue<AppUser?> next) {
+    _value = next;
+    notifyListeners();
+  }
+
+  bool get isResolving => _value.isLoading && !_value.hasValue;
+  AppUser? get user => _value.value;
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  // Роутер создаём один раз; о смене сессии он узнаёт через refreshListenable,
-  // а не через пересборку провайдера.
-  final refresh = ValueNotifier<int>(0);
-  ref.listen(authStateProvider, (_, _) => refresh.value++);
-  ref.onDispose(refresh.dispose);
+  ref.keepAlive();
+
+  final auth = AuthRouterState();
+  ref.listen(authStateProvider, (_, next) => auth.value = next,
+      fireImmediately: true);
+  ref.onDispose(auth.dispose);
 
   return GoRouter(
     initialLocation: Routes.splash,
-    refreshListenable: refresh,
+    refreshListenable: auth,
     redirect: (context, state) {
-      final authState = ref.read(authStateProvider);
       final location = state.matchedLocation;
 
-      if (authState.isLoading && !authState.hasValue) {
+      if (auth.isResolving) {
         return location == Routes.splash ? null : Routes.splash;
       }
 
-      final user = ref.read(currentUserProvider);
+      final user = auth.user;
       if (user == null) {
         return location == Routes.signIn ? null : Routes.signIn;
       }
@@ -48,8 +69,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         return location == Routes.onboarding ? null : Routes.onboarding;
       }
 
-      const authFlow = {Routes.splash, Routes.signIn, Routes.onboarding};
-      return authFlow.contains(location) ? Routes.feed : null;
+      return Routes.authFlow.contains(location) ? Routes.feed : null;
     },
     routes: [
       GoRoute(

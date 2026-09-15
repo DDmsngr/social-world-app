@@ -7,18 +7,22 @@ import '../../data/supabase_auth_repository.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 
+/// keepAlive обязателен: в Riverpod 3 провайдеры по умолчанию авто-диспозятся,
+/// а репозиторий держит сессию в памяти — пересоздание означает разлогин.
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  ref.keepAlive();
   if (!Env.isConfigured) return LocalAuthRepository();
   return SupabaseAuthRepository(Supabase.instance.client);
 });
 
 final authStateProvider = StreamProvider<AppUser?>((ref) {
+  ref.keepAlive();
   return ref.watch(authRepositoryProvider).authStateChanges();
 });
 
-/// Синхронный срез для редиректов роутера — стрим может ещё грузиться,
-/// а решение о маршруте нужно прямо сейчас.
+/// Для виджетов: они подписываются через watch и получают свежее значение.
+/// В redirect роутера этим пользоваться нельзя — см. AuthRouterState.
 final currentUserProvider = Provider<AppUser?>((ref) {
-  return ref.watch(authStateProvider).value ??
-      ref.watch(authRepositoryProvider).currentUser;
+  ref.keepAlive();
+  return ref.watch(authStateProvider).value;
 });
