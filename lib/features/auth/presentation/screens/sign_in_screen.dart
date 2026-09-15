@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/env.dart';
+import '../../../../core/config/dev_mode.dart';
+import '../../../../core/dev/dev_sign_in_panel.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
+import '../../data/local_auth_repository.dart';
 import '../providers/auth_providers.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
@@ -23,6 +25,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   bool _codeSent = false;
   bool _busy = false;
   String? _error;
+  String? _devCode;
 
   @override
   void dispose() {
@@ -43,6 +46,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String _subtitle() {
+    if (!_codeSent) {
+      return 'Войдите по почте — пароль не нужен, пришлём одноразовый код.';
+    }
+    // Врать, что письмо ушло, нельзя — почты за заглушкой нет.
+    return _devCode != null
+        ? 'Почта пока не подключена, код подставлен ниже.'
+        : 'Отправили код на ${_emailController.text.trim()}';
   }
 
   String _readable(Object error) {
@@ -75,9 +88,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               ),
               const SizedBox(height: 14),
               Text(
-                _codeSent
-                    ? 'Отправили код на ${_emailController.text.trim()}'
-                    : 'Войдите по почте — пароль не нужен, пришлём одноразовый код.',
+                _subtitle(),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 28),
@@ -121,7 +132,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           if (!_codeSent) {
                             await repo
                                 .requestEmailCode(_emailController.text);
-                            if (mounted) setState(() => _codeSent = true);
+                            if (!mounted) return;
+                            // Письма нет — подставляем выданный код сами,
+                            // чтобы не переписывать его руками из панели.
+                            final issued = repo is LocalAuthRepository
+                                ? repo.issuedCode
+                                : null;
+                            setState(() {
+                              _codeSent = true;
+                              _devCode = issued;
+                              if (issued != null) _codeController.text = issued;
+                            });
                           } else {
                             await repo.verifyEmailCode(
                               email: _emailController.text,
@@ -146,22 +167,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ? null
                       : () => setState(() {
                             _codeSent = false;
+                            _devCode = null;
                             _codeController.clear();
                           }),
                   child: const Text('Другая почта'),
                 ),
               const Spacer(),
-              if (!Env.isConfigured)
+              if (DevMode.enabled)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    'Бэкенд не подключён — вход работает локально, '
-                    'код подтверждения любой из шести цифр.',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(fontSize: 12, color: AppColors.sage),
-                  ),
+                  child: DevSignInPanel(issuedCode: _devCode),
                 ),
             ],
           ),

@@ -1,15 +1,24 @@
 import 'dart:async';
+import 'dart:math';
 
 import '../domain/entities/app_user.dart';
 import '../domain/repositories/auth_repository.dart';
 
 /// Заглушка на время, пока self-hosted Supabase не поднят.
-/// Позволяет собирать и гонять UI целиком, не дожидаясь сервера.
-/// Код подтверждения — любой из шести цифр.
+///
+/// Письмо никуда не уходит — код генерируется здесь и показывается в интерфейсе
+/// через [issuedCode]. Поведение остальной части экрана при этом такое же, как
+/// с настоящим бэкендом: код надо ввести, неверный не пройдёт.
 class LocalAuthRepository implements AuthRepository {
   final _controller = StreamController<AppUser?>.broadcast();
+  final _random = Random();
+
   AppUser? _user;
   String? _pendingEmail;
+  String? _issuedCode;
+
+  /// Последний выданный код — только для режима разработки.
+  String? get issuedCode => _issuedCode;
 
   @override
   Stream<AppUser?> authStateChanges() async* {
@@ -24,6 +33,7 @@ class LocalAuthRepository implements AuthRepository {
   Future<void> requestEmailCode(String email) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
     _pendingEmail = email.trim();
+    _issuedCode = (100000 + _random.nextInt(900000)).toString();
   }
 
   @override
@@ -32,17 +42,32 @@ class LocalAuthRepository implements AuthRepository {
     required String code,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (code.trim().length != 6) {
-      throw Exception('Код из шести цифр');
+    if (code.trim() != _issuedCode) {
+      throw Exception('Неверный код');
     }
-    _user = AppUser(id: 'local-user', email: _pendingEmail ?? email.trim());
-    _controller.add(_user);
-    return _user!;
+    return _openSession(
+      AppUser(id: 'local-user', email: _pendingEmail ?? email.trim()),
+    );
+  }
+
+  /// Вход мимо почты и кода — кнопка в dev-панели.
+  /// [displayName] пустой означает «показать онбординг».
+  Future<AppUser> devSignIn({String? displayName}) async {
+    return _openSession(
+      AppUser(
+        id: 'dev-user',
+        email: 'dev@socialworld.ru',
+        displayName: displayName,
+        socialScore: displayName == null ? 0 : 128,
+      ),
+    );
   }
 
   @override
   Future<void> signOut() async {
     _user = null;
+    _issuedCode = null;
+    _pendingEmail = null;
     _controller.add(null);
   }
 
@@ -50,8 +75,12 @@ class LocalAuthRepository implements AuthRepository {
   Future<AppUser> completeProfile({required String displayName}) async {
     final current = _user;
     if (current == null) throw Exception('Нет активной сессии');
-    _user = current.copyWith(displayName: displayName.trim());
-    _controller.add(_user);
-    return _user!;
+    return _openSession(current.copyWith(displayName: displayName.trim()));
+  }
+
+  AppUser _openSession(AppUser user) {
+    _user = user;
+    _controller.add(user);
+    return user;
   }
 }

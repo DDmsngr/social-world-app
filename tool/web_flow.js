@@ -50,7 +50,7 @@ const artifactDir = process.env.PW_ARTIFACT_DIR || 'D:\\temp\\sw-shots';
     await tap('Получить код');
     await shot('02-code');
 
-    await typeInto('______', '123456');
+    // Код подставляется сам, пока почта не подключена — печатать нечего.
     await tap('Войти');
     await shot('03-onboarding');
 
