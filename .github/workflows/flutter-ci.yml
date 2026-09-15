@@ -104,7 +104,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: social-world-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
