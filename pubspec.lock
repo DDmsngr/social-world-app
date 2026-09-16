@@ -161,14 +161,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.1"
-  equatable:
-    dependency: transitive
-    description:
-      name: equatable
-      sha256: "3bce007a596ff8b3119c45d68aaef631272537c03d30e5d4534dd24bf4c5eaa2"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.0"
   fake_async:
     dependency: transitive
     description:
@@ -1010,14 +1002,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.4"
-  yandex_mapkit:
+  yandex_maps_mapkit:
     dependency: "direct main"
     description:
-      name: yandex_mapkit
-      sha256: "90bf334d2bb6c21fe6569efed2017215854ea8ccd3423bfb1467dd5b978f2543"
+      name: yandex_maps_mapkit
+      sha256: e5e51aa977a126ddd95a3ea95ca04e4e7b69c61fee61d2b861ef5bfd3508d950
       url: "https://pub.dev"
     source: hosted
-    version: "4.3.0"
+    version: "4.42.0"
   yet_another_json_isolate:
     dependency: transitive
     description:

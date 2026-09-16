@@ -43,7 +43,10 @@ dependencies:
   intl: ^0.20.2
   flutter_localizations:
     sdk: flutter
-  yandex_mapkit: ^4.3.0
+  # Официальный плагин Яндекса. Community-плагин yandex_mapkit заброшен и
+  # не работает с нативным SDK 4.4x — карта на нём просто не отрисовывается
+  # (та же грабля была в SLED, см. его pubspec).
+  yandex_maps_mapkit: ^4.41.0
   cryptography: ^2.9.0
   flutter_secure_storage: ^11.1.1
   uuid: ^4.6.0

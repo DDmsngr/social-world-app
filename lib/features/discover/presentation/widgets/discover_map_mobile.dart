@@ -1,16 +1,18 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:yandex_mapkit/yandex_mapkit.dart';
+import 'package:yandex_maps_mapkit/mapkit.dart' as ymk;
+import 'package:yandex_maps_mapkit/mapkit_factory.dart';
+import 'package:yandex_maps_mapkit/yandex_map.dart';
 
-import '../../../../core/config/env.dart';
+import '../../../../core/config/mapkit_boot.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
 import '../../domain/entities/discover_snapshot.dart';
 import '../../domain/entities/place.dart';
 
-class DiscoverMap extends StatelessWidget {
+class DiscoverMap extends StatefulWidget {
   const DiscoverMap({
     super.key,
     required this.data,
@@ -23,6 +25,137 @@ class DiscoverMap extends StatelessWidget {
   final ValueChanged<Place> onPlaceTap;
 
   @override
+  State<DiscoverMap> createState() => _DiscoverMapState();
+}
+
+class _DiscoverMapState extends State<DiscoverMap> {
+  late final AppLifecycleListener _lifecycle;
+  ymk.MapObjectCollection? _objects;
+
+  // Слушатели тапов живут ровно столько же, сколько метки: MapKit держит
+  // на них слабую ссылку, и без своего списка они собираются сборщиком,
+  // а метки молча перестают нажиматься.
+  final _tapListeners = <_PlaceTapListener>[];
+
+  bool _mapkitRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startMapkit();
+    _lifecycle = AppLifecycleListener(
+      onResume: _startMapkit,
+      onInactive: _stopMapkit,
+    );
+  }
+
+  @override
+  void didUpdateWidget(DiscoverMap old) {
+    super.didUpdateWidget(old);
+    if (widget.data != old.data || widget.places != old.places) {
+      _rebuildObjects();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopMapkit();
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _startMapkit() {
+    if (_mapkitRunning) return;
+    _mapkitRunning = true;
+    mapkit.onStart();
+  }
+
+  void _stopMapkit() {
+    if (!_mapkitRunning) return;
+    _mapkitRunning = false;
+    mapkit.onStop();
+  }
+
+  void _onMapCreated(ymk.MapWindow window) {
+    window.map.nightModeEnabled = true;
+    _objects = window.map.mapObjects.addCollection();
+
+    window.map.move(
+      ymk.CameraPosition(
+        ymk.Point(
+          latitude: widget.data.centerLatitude,
+          longitude: widget.data.centerLongitude,
+        ),
+        zoom: 14.5,
+        azimuth: 0,
+        tilt: 0,
+      ),
+    );
+
+    _rebuildObjects();
+  }
+
+  void _rebuildObjects() {
+    final collection = _objects;
+    if (collection == null) return;
+
+    collection.clear();
+    _tapListeners.clear();
+
+    final center = ymk.Point(
+      latitude: widget.data.centerLatitude,
+      longitude: widget.data.centerLongitude,
+    );
+
+    collection.addCircle(
+        ymk.Circle(center, radius: 280 + widget.data.people.length * 55),
+      )
+      ..strokeColor = AppColors.primary.withValues(alpha: 0.55)
+      ..strokeWidth = 2
+      ..fillColor = AppColors.primary.withValues(
+        alpha: 0.035 + widget.data.pulseLevel * 0.025,
+      );
+
+    for (final person in widget.data.people) {
+      // Зоны людей — холодным geo: бордовый на карте занят пульсом района,
+      // и если красить им же метки, они читаются как кнопки.
+      collection.addCircle(
+          ymk.Circle(
+            ymk.Point(
+              latitude: person.blurredLatitude,
+              longitude: person.blurredLongitude,
+            ),
+            radius: person.blurRadiusMeters,
+          ),
+        )
+        ..strokeColor = AppColors.geo.withValues(alpha: 0.7)
+        ..strokeWidth = 1.5
+        ..fillColor = AppColors.geo.withValues(alpha: 0.18);
+    }
+
+    for (final place in widget.places) {
+      final listener = _PlaceTapListener(() => widget.onPlaceTap(place));
+      _tapListeners.add(listener);
+
+      collection
+          .addPlacemarkWithPoint(
+            ymk.Point(latitude: place.latitude, longitude: place.longitude),
+          )
+        ..setText(place.title)
+        ..setTextStyle(
+          const ymk.TextStyle(
+            size: 11,
+            color: AppColors.text,
+            outlineColor: AppColors.ink,
+            placement: ymk.TextStylePlacement.Bottom,
+            offset: 8,
+          ),
+        )
+        ..addTapListener(listener);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return const _MobileMapUnavailable(
@@ -30,90 +163,32 @@ class DiscoverMap extends StatelessWidget {
         text: 'Откройте этот раздел в мобильном приложении.',
       );
     }
-    if (Env.yandexMapkitApiKey.isEmpty) {
-      return const _MobileMapUnavailable(
-        title: 'Карта почти готова',
-        text:
-            'Добавьте YANDEX_MAPKIT_API_KEY в .env и перезапустите приложение.',
+    if (!MapkitBoot.isReady) {
+      return _MobileMapUnavailable(
+        title: 'Карта не запустилась',
+        text: MapkitBoot.status == 'no_key'
+            ? 'Добавьте YANDEX_MAPKIT_API_KEY в .env и перезапустите приложение.'
+            : 'MapKit не инициализировался: ${MapkitBoot.status}',
       );
     }
 
     return YandexMap(
-      nightModeEnabled: true,
-      mode2DEnabled: true,
-      mapObjects: _mapObjects(),
-      onMapCreated: (controller) => controller.moveCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: Point(
-              latitude: data.centerLatitude,
-              longitude: data.centerLongitude,
-            ),
-            zoom: 14.5,
-          ),
-        ),
-        animation: const MapAnimation(
-          type: MapAnimationType.smooth,
-          duration: 0.6,
-        ),
-      ),
+      onMapCreated: _onMapCreated,
+      platformViewType: PlatformViewType.Hybrid,
     );
   }
+}
 
-  List<MapObject> _mapObjects() => [
-    CircleMapObject(
-      mapId: const MapObjectId('district-pulse'),
-      circle: Circle(
-        center: Point(
-          latitude: data.centerLatitude,
-          longitude: data.centerLongitude,
-        ),
-        radius: 280 + data.people.length * 55,
-      ),
-      strokeColor: AppColors.primary.withValues(alpha: 0.55),
-      strokeWidth: 2,
-      fillColor: AppColors.primary.withValues(
-        alpha: 0.035 + data.pulseLevel * 0.025,
-      ),
-      zIndex: 0,
-    ),
-    for (final person in data.people)
-      CircleMapObject(
-        mapId: MapObjectId('person-${person.id}'),
-        circle: Circle(
-          center: Point(
-            latitude: person.blurredLatitude,
-            longitude: person.blurredLongitude,
-          ),
-          radius: person.blurRadiusMeters,
-        ),
-        // Зоны людей — холодным geo: бордовый на карте занят пульсом района,
-        // и если красить им же метки, они читаются как кнопки.
-        strokeColor: AppColors.geo.withValues(alpha: 0.7),
-        strokeWidth: 1.5,
-        fillColor: AppColors.geo.withValues(alpha: 0.18),
-        zIndex: 1,
-      ),
-    for (final place in places)
-      PlacemarkMapObject(
-        mapId: MapObjectId('place-${place.id}'),
-        point: Point(latitude: place.latitude, longitude: place.longitude),
-        opacity: 1,
-        zIndex: 3,
-        consumeTapEvents: true,
-        text: PlacemarkText(
-          text: place.title,
-          style: const PlacemarkTextStyle(
-            placement: TextStylePlacement.bottom,
-            offset: 8,
-            size: 11,
-            color: AppColors.text,
-            outlineColor: AppColors.ink,
-          ),
-        ),
-        onTap: (_, _) => onPlaceTap(place),
-      ),
-  ];
+class _PlaceTapListener extends ymk.MapObjectTapListener {
+  _PlaceTapListener(this.onTap);
+
+  final VoidCallback onTap;
+
+  @override
+  bool onMapObjectTap(ymk.MapObject mapObject, ymk.Point point) {
+    onTap();
+    return true;
+  }
 }
 
 class _MobileMapUnavailable extends StatelessWidget {

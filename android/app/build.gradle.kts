@@ -73,7 +73,3 @@ kotlin {
 flutter {
     source = "../.."
 }
-
-dependencies {
-    implementation("com.yandex.android:maps.mobile:4.39.1-lite")
-}
