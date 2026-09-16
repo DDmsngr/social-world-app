@@ -104,13 +104,17 @@ jobs:
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
+      # В релизной сборке ключи боевые: без них APK поднимался на заглушках —
+      # с дев-входом и моковыми людьми на карте вместо реальных данных.
       - name: Prepare local env asset
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           YANDEX_MAPKIT_API_KEY: ${{ secrets.YANDEX_MAPKIT_API_KEY }}
         run: |
           {
-            echo "SUPABASE_URL="
-            echo "SUPABASE_ANON_KEY="
+            echo "SUPABASE_URL=${SUPABASE_URL}"
+            echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
             echo "YANDEX_MAPKIT_API_KEY=${YANDEX_MAPKIT_API_KEY}"
           } > .env
 
