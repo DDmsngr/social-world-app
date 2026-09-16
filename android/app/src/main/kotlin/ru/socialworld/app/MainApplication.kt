@@ -1,4 +1,4 @@
-package ru.socialworld.social_world
+package ru.socialworld.app
 
 import android.app.Application
 import com.yandex.mapkit.MapKitFactory

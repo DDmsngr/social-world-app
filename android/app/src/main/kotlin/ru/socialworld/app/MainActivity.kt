@@ -1,4 +1,4 @@
-package ru.socialworld.social_world
+package ru.socialworld.app
 
 import io.flutter.embedding.android.FlutterActivity
 
