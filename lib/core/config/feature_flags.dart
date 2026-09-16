@@ -1,3 +1,5 @@
+import 'dev_mode.dart';
+
 /// Функции, которые собраны, но не выходят в релиз.
 abstract final class Features {
   /// Личные сообщения.
@@ -11,6 +13,9 @@ abstract final class Features {
   /// Код при этом пишется заранее — чтобы потом не переделывать архитектуру
   /// под уже живой продукт.
   ///
-  /// Включить для разработки: `--dart-define=FEATURE_CHAT=true`.
-  static const chat = bool.fromEnvironment('FEATURE_CHAT');
+  /// Включить принудительно: `--dart-define=FEATURE_CHAT=true`.
+  static const _chatOverride = bool.fromEnvironment('FEATURE_CHAT');
+
+  /// В dev-режиме чат работает на локальном репозитории без Supabase.
+  static bool get chat => DevMode.enabled || _chatOverride;
 }
