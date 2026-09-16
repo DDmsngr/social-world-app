@@ -37,6 +37,11 @@ class HomeShell extends StatelessWidget {
               label: 'Карта',
             ),
             const NavigationDestination(
+              icon: Icon(Icons.event_outlined),
+              selectedIcon: Icon(Icons.event),
+              label: 'События',
+            ),
+            const NavigationDestination(
               icon: Icon(Icons.add_circle_outline),
               selectedIcon: Icon(Icons.add_circle),
               label: 'Создать',

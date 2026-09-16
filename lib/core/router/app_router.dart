@@ -12,6 +12,7 @@ import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/create/presentation/create_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
+import '../../features/events/presentation/events_screen.dart';
 import '../../features/feed/presentation/feed_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
@@ -23,6 +24,7 @@ abstract final class Routes {
   static const onboarding = '/onboarding';
   static const feed = '/feed';
   static const discover = '/discover';
+  static const events = '/events';
   static const create = '/create';
   static const chats = '/chats';
   static const profile = '/profile';
@@ -112,6 +114,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: Routes.discover,
                 builder: (_, _) => const DiscoverScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.events,
+                builder: (_, _) => const EventsScreen(),
               ),
             ],
           ),

@@ -67,12 +67,16 @@ const artifactDir = process.env.PW_ARTIFACT_DIR || 'D:\\temp\\sw-shots';
     );
     console.log('--- дерево на ленте ---\n' + tree.join('\n'));
 
-    // Вкладки нижней панели: четыре равные колонки, бьём мышью по центрам.
-    const tabCenters = [0, 1, 2, 3].map((i) => (390 / 4) * i + 390 / 8);
+    // Вкладки нижней панели: в dev-режиме чат тоже включён (см. Features.chat),
+    // итого шесть колонок — Лента/Карта/События/Создать/Чаты/Профиль.
+    const tabCount = 6;
+    const tabCenters = Array.from({ length: tabCount }, (_, i) => (390 / tabCount) * i + 390 / (tabCount * 2));
     for (const [index, name] of [
       [1, '06-discover'],
-      [2, '07-create'],
-      [3, '08-profile'],
+      [2, '07-events'],
+      [3, '08-create'],
+      [4, '09-chats'],
+      [5, '10-profile'],
     ]) {
       await page.mouse.click(tabCenters[index], 844 - 30);
       await page.waitForTimeout(1500);
