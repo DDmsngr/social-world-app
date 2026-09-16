@@ -8,6 +8,8 @@ import '../entities/conversation.dart';
 /// заменить с заглушки на боевую (X25519 + ChaCha20-Poly1305 + Ed25519,
 /// как в DDChat) не трогая ни одного экрана.
 abstract interface class ChatRepository {
+  bool get endToEndEncryptionEnabled;
+
   Future<List<Conversation>> loadConversations();
 
   /// Поток сообщений одного диалога: история плюс входящие в реальном времени.

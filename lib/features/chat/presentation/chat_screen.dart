@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/chat_message.dart';
 import 'providers/chat_providers.dart';
@@ -25,6 +27,8 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  bool _sending = false;
+  String? _sendError;
 
   @override
   void initState() {
@@ -44,13 +48,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _sending) return;
 
-    _controller.clear();
-    setState(() {});
-    await ref
-        .read(chatRepositoryProvider)
-        .send(conversationId: widget.conversationId, text: text);
+    setState(() {
+      _sending = true;
+      _sendError = null;
+    });
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .send(conversationId: widget.conversationId, text: text);
+      _controller.clear();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _sendError = 'Не удалось отправить защищённое сообщение';
+        });
+      }
+      return;
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
 
     if (!mounted || !_scrollController.hasClients) return;
     await _scrollController.animateTo(
@@ -69,6 +87,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         title: Text(widget.peerName),
         titleTextStyle: Theme.of(context).textTheme.titleLarge,
+        actions: [
+          IconButton(
+            onPressed: _showSecurityCode,
+            tooltip: 'Код безопасности',
+            icon: const Icon(Icons.verified_user_outlined),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -103,9 +128,67 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _Composer(
             controller: _controller,
             onChanged: (_) => setState(() {}),
-            onSend: _controller.text.trim().isEmpty ? null : _send,
+            error: _sendError,
+            onSend: _controller.text.trim().isEmpty || _sending ? null : _send,
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showSecurityCode() async {
+    final code = ref
+        .read(chatRepositoryProvider)
+        .securityCode(widget.conversationId);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.ink2,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            8,
+            AppSpacing.gutter,
+            28,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Код безопасности', style: AppTypography.serif(28)),
+              const SizedBox(height: 10),
+              Text(
+                'Сверьте этот код с собеседником голосом или при встрече. '
+                'Совпадение исключает подмену ключей.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 18),
+              GlassCard(
+                child: FutureBuilder<String>(
+                  future: code,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Text('Код пока недоступен');
+                    }
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return SelectableText(
+                      snapshot.data!,
+                      style: const TextStyle(
+                        color: AppColors.primaryTint,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.4,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -115,11 +198,13 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.onChanged,
+    required this.error,
     required this.onSend,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
+  final String? error;
   final VoidCallback? onSend;
 
   @override
@@ -131,36 +216,51 @@ class _Composer extends StatelessWidget {
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.hair)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                onChanged: onChanged,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  hintText: 'Написать сообщение',
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
+            if (error != null) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  error!,
+                  style: const TextStyle(color: AppColors.danger, fontSize: 12),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              onPressed: onSend,
-              tooltip: 'Отправить',
-              style: IconButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.onPrimary,
-                disabledBackgroundColor: AppColors.card,
-                disabledForegroundColor: AppColors.textFaint,
-                minimumSize: const Size(46, 46),
-              ),
-              icon: const Icon(Icons.send, size: 19),
+              const SizedBox(height: 6),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    onChanged: onChanged,
+                    minLines: 1,
+                    maxLines: 4,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      hintText: 'Написать сообщение',
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: onSend,
+                  tooltip: 'Отправить',
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.onPrimary,
+                    disabledBackgroundColor: AppColors.card,
+                    disabledForegroundColor: AppColors.textFaint,
+                    minimumSize: const Size(46, 46),
+                  ),
+                  icon: const Icon(Icons.send, size: 19),
+                ),
+              ],
             ),
           ],
         ),
@@ -169,7 +269,7 @@ class _Composer extends StatelessWidget {
   }
 }
 
-/// Пока крипто не подключено, статус доставки — единственная честная метка.
+/// Человекочитаемая подпись состояния доставки.
 String messageStatusLabel(MessageStatus status) => switch (status) {
   MessageStatus.sending => 'отправляется',
   MessageStatus.sent => 'отправлено',

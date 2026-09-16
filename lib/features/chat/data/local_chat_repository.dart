@@ -23,6 +23,9 @@ class LocalChatRepository implements ChatRepository {
   var _nextId = 0;
 
   @override
+  bool get endToEndEncryptionEnabled => false;
+
+  @override
   Future<List<Conversation>> loadConversations() async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     return List.unmodifiable(_conversations);

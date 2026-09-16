@@ -15,6 +15,9 @@ class ConversationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final conversations = ref.watch(conversationsProvider);
+    final encryptionEnabled = ref
+        .watch(chatRepositoryProvider)
+        .endToEndEncryptionEnabled;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Чаты')),
@@ -47,8 +50,10 @@ class ConversationsScreen extends ConsumerWidget {
               24,
             ),
             children: [
-              const _EncryptionNotice(),
-              const SizedBox(height: 14),
+              if (!encryptionEnabled) ...[
+                const _EncryptionNotice(),
+                const SizedBox(height: 14),
+              ],
               for (final conversation in items)
                 GlassCard(
                   padding: const EdgeInsets.all(14),
@@ -103,8 +108,9 @@ class ConversationsScreen extends ConsumerWidget {
                             const SizedBox(height: 2),
                             Text(
                               conversation.lastMessage?.text ?? 'Нет сообщений',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(fontSize: 13),
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.copyWith(fontSize: 13),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
