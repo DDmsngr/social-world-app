@@ -56,7 +56,14 @@ jobs:
         run: flutter --version
 
       - name: Prepare local env asset
-        run: cp .env.example .env
+        env:
+          YANDEX_MAPKIT_API_KEY: ${{ secrets.YANDEX_MAPKIT_API_KEY }}
+        run: |
+          {
+            echo "SUPABASE_URL="
+            echo "SUPABASE_ANON_KEY="
+            echo "YANDEX_MAPKIT_API_KEY=${YANDEX_MAPKIT_API_KEY}"
+          } > .env
 
       - name: Install dependencies
         run: flutter pub get
@@ -95,7 +102,14 @@ jobs:
           cache: true
 
       - name: Prepare local env asset
-        run: cp .env.example .env
+        env:
+          YANDEX_MAPKIT_API_KEY: ${{ secrets.YANDEX_MAPKIT_API_KEY }}
+        run: |
+          {
+            echo "SUPABASE_URL="
+            echo "SUPABASE_ANON_KEY="
+            echo "YANDEX_MAPKIT_API_KEY=${YANDEX_MAPKIT_API_KEY}"
+          } > .env
 
       - name: Install dependencies
         run: flutter pub get
