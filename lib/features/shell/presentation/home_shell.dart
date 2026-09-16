@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/feature_flags.dart';
 import '../../../core/theme/app_colors.dart';
 
 class HomeShell extends StatelessWidget {
@@ -24,23 +25,30 @@ class HomeShell extends StatelessWidget {
             index,
             initialLocation: index == navigationShell.currentIndex,
           ),
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(Icons.dynamic_feed_outlined),
               selectedIcon: Icon(Icons.dynamic_feed),
               label: 'Лента',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.map_outlined),
               selectedIcon: Icon(Icons.map),
               label: 'Карта',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.add_circle_outline),
               selectedIcon: Icon(Icons.add_circle),
               label: 'Создать',
             ),
-            NavigationDestination(
+            // Порядок вкладок должен совпадать с порядком веток роутера.
+            if (Features.chat)
+              const NavigationDestination(
+                icon: Icon(Icons.forum_outlined),
+                selectedIcon: Icon(Icons.forum),
+                label: 'Чаты',
+              ),
+            const NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person),
               label: 'Профиль',

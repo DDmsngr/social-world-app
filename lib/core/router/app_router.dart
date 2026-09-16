@@ -1,8 +1,12 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../config/feature_flags.dart';
+
 import '../../features/auth/domain/entities/app_user.dart';
+import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/chat/presentation/conversations_screen.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
@@ -20,6 +24,7 @@ abstract final class Routes {
   static const feed = '/feed';
   static const discover = '/discover';
   static const create = '/create';
+  static const chats = '/chats';
   static const profile = '/profile';
 
   static const authFlow = {splash, signIn, onboarding};
@@ -56,6 +61,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: auth,
     redirect: (context, state) {
       final location = state.matchedLocation;
+
+      // Выключённую функцию нельзя открыть и по прямой ссылке: без ветки
+      // роутера такой адрес иначе упирается в экран ошибки.
+      if (!Features.chat && location.startsWith(Routes.chats)) {
+        return Routes.feed;
+      }
 
       if (auth.isResolving) {
         return location == Routes.splash ? null : Routes.splash;
@@ -112,6 +123,26 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          // Ветка чатов существует только при включённом флаге: в релизе
+          // переписки в продукте нет, см. Features.chat.
+          if (Features.chat)
+            StatefulShellBranch(
+              routes: [
+                GoRoute(
+                  path: Routes.chats,
+                  builder: (_, _) => const ConversationsScreen(),
+                  routes: [
+                    GoRoute(
+                      path: ':conversationId',
+                      builder: (_, state) => ChatScreen(
+                        conversationId: state.pathParameters['conversationId']!,
+                        peerName: state.extra as String? ?? 'Чат',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           StatefulShellBranch(
             routes: [
               GoRoute(
