@@ -1,3 +1,6 @@
+# Infra secrets (SSH keys for backend VM)
+/infra/ssh/
+
 # Miscellaneous
 *.class
 *.log
