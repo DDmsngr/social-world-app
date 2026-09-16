@@ -10,12 +10,12 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: "Опубликовать debug APK в GitHub Release"
+        description: "Опубликовать release APK в GitHub Release"
         required: true
         type: boolean
         default: true
       release_tag:
-        description: "Тег релиза; пусто = android-debug-<номер запуска>"
+        description: "Тег релиза; пусто = android-release-<номер запуска>"
         required: false
         type: string
         default: ""
@@ -80,8 +80,8 @@ jobs:
       - name: Build web with chats enabled
         run: flutter build web --dart-define=FEATURE_CHAT=true
 
-  android-apk:
-    name: Android Debug APK
+  android-release:
+    name: Android Release APK
     runs-on: ubuntu-latest
     needs: checks
     if: github.event_name != 'pull_request'
@@ -114,19 +114,38 @@ jobs:
             echo "YANDEX_MAPKIT_API_KEY=${YANDEX_MAPKIT_API_KEY}"
           } > .env
 
+      # Один и тот же ключ на каждой сборке — иначе Android считает
+      # обновление другим приложением и требует сначала удалить старую
+      # версию. Ключ и пароль живут только в секретах репозитория.
+      - name: Restore signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/social-world-release.jks
+          cat > android/key.properties <<EOF
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=../social-world-release.jks
+          EOF
+
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      # versionCode = номер запуска workflow — растёт с каждой сборкой,
+      # поэтому Android всегда видит новую версию и ставит поверх старой.
+      - name: Build release APK
+        run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
 
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: social-world-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: social-world-release-apk
+          path: build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
       - name: Resolve release tag
         id: release
@@ -135,7 +154,7 @@ jobs:
         run: |
           tag="${{ inputs.release_tag }}"
           if [ -z "$tag" ]; then
-            tag="android-debug-${GITHUB_RUN_NUMBER}"
+            tag="android-release-${GITHUB_RUN_NUMBER}"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
@@ -145,9 +164,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.release.outputs.tag }}" \
-            build/app/outputs/flutter-apk/app-debug.apk \
+            build/app/outputs/flutter-apk/*.apk \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "Social World Android debug ${{ steps.release.outputs.tag }}" \
-            --notes "Debug APK собран GitHub Actions из коммита ${{ github.sha }}. Для живой карты нужен YANDEX_MAPKIT_API_KEY в .env; без ключа приложение работает на dev/mock-данных." \
+            --title "Social World Android release ${{ steps.release.outputs.tag }}" \
+            --notes "Release APK (arm64/armeabi-v7a/x86_64), подписан постоянным ключом — ставится поверх предыдущей версии без удаления. versionCode ${{ github.run_number }}. Собран из коммита ${{ github.sha }}." \
             --prerelease
