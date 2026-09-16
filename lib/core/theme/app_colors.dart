@@ -1,23 +1,51 @@
 import 'package:flutter/material.dart';
 
-/// Палитра взята один в один с питч-сайта, чтобы лендинг и приложение
-/// читались как один продукт.
+/// Бордово-платиновая палитра.
+///
+/// Пропорция: графит держит ~80% экрана, платина ~15%, бордовый ~5%.
+/// Бордовый — цвет действия и принадлежности приложению: активная кнопка,
+/// выбранная вкладка, включённый элемент. Фоном карточек он не бывает,
+/// иначе интерфейс становится дешёвым.
 abstract final class AppColors {
-  static const ink = Color(0xFF0A0608);
-  static const ink2 = Color(0xFF120C0F);
-  static const paper = Color(0xFFF5EFE4);
+  // ── фон и поверхности ─────────────────────────────────────────────────
+  static const ink = Color(0xFF151417);
+  static const ink2 = Color(0xFF211F22);
+  static const card = Color(0xFF211F22);
 
-  static const clay = Color(0xFFD97757);
-  static const sage = Color(0xFF8FA27F);
-  static const blue = Color(0xFF7EA3C4);
+  /// Платиновая заливка для редких светлых пятен.
+  static const paper = Color(0xFFE7E4E2);
 
-  static const text = Color(0xFFECE7DE);
-  static const textDim = Color(0x9EECE7DE);
-  static const textFaint = Color(0x61ECE7DE);
+  // ── действие ──────────────────────────────────────────────────────────
+  static const primary = Color(0xFF7A2436);
 
-  static const hair = Color(0x1AFFFFFF);
-  static const hairStrong = Color(0x2EFFFFFF);
-  static const card = Color(0x0AFFFFFF);
+  /// Только для hover / pressed / focus — чтобы нажатие было заметно.
+  static const primaryHover = Color(0xFF963148);
 
-  static const danger = Color(0xFFE05C4B);
+  /// Бордовый для текста, иконок и тонких линий на графите.
+  ///
+  /// [primary] годится как заливка под платиновой подписью, но сам по себе
+  /// на тёмном фоне даёт контраст 1,8:1 — подпись активной вкладки выглядит
+  /// грязным пятном. Этот оттенок даёт 4,8:1 и остаётся в той же семье.
+  static const primaryTint = Color(0xFFC4677C);
+
+  /// Бордовый тёмный, чёрный текст на нём даёт 2:1 и не читается.
+  /// Всё, что лежит поверх [primary], красится этим.
+  static const onPrimary = Color(0xFFE7E4E2);
+
+  // ── статусы ───────────────────────────────────────────────────────────
+  static const success = Color(0xFF4FA77A);
+  static const danger = Color(0xFFD45A63);
+
+  /// Гео и карта держатся отдельной холодной веткой: если метки красить
+  /// бордовым, они сливаются с кнопками и перестают читаться как «место».
+  static const geo = Color(0xFF6E9BC4);
+
+  // ── текст ─────────────────────────────────────────────────────────────
+  static const text = Color(0xFFE7E4E2);
+  static const textDim = Color(0xFFAAA5A6);
+  static const textFaint = Color(0x8AAAA5A6);
+
+  // ── линии ─────────────────────────────────────────────────────────────
+  static const hair = Color(0x59403B3E);
+  static const hairStrong = Color(0xFF403B3E);
 }

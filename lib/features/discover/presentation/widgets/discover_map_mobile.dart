@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:yandex_mapkit/yandex_mapkit.dart';
@@ -70,9 +70,9 @@ class DiscoverMap extends StatelessWidget {
         ),
         radius: 280 + data.people.length * 55,
       ),
-      strokeColor: AppColors.clay.withValues(alpha: 0.55),
+      strokeColor: AppColors.primary.withValues(alpha: 0.55),
       strokeWidth: 2,
-      fillColor: AppColors.clay.withValues(
+      fillColor: AppColors.primary.withValues(
         alpha: 0.035 + data.pulseLevel * 0.025,
       ),
       zIndex: 0,
@@ -87,9 +87,11 @@ class DiscoverMap extends StatelessWidget {
           ),
           radius: person.blurRadiusMeters,
         ),
-        strokeColor: AppColors.sage.withValues(alpha: 0.65),
+        // Зоны людей — холодным geo: бордовый на карте занят пульсом района,
+        // и если красить им же метки, они читаются как кнопки.
+        strokeColor: AppColors.geo.withValues(alpha: 0.7),
         strokeWidth: 1.5,
-        fillColor: AppColors.sage.withValues(alpha: 0.16),
+        fillColor: AppColors.geo.withValues(alpha: 0.18),
         zIndex: 1,
       ),
     for (final place in places)

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -27,7 +27,7 @@ class ProfileScreen extends ConsumerWidget {
                 backgroundColor: AppColors.card,
                 child: Text(
                   (user?.displayName ?? '?').characters.first.toUpperCase(),
-                  style: AppTypography.serif(28, color: AppColors.clay),
+                  style: AppTypography.serif(28, color: AppColors.primaryTint),
                 ),
               ),
               const SizedBox(width: 16),
@@ -57,7 +57,7 @@ class ProfileScreen extends ConsumerWidget {
                 const Text('Social Score'),
                 Text(
                   '${user?.socialScore ?? 0}',
-                  style: AppTypography.serif(24, color: AppColors.sage),
+                  style: AppTypography.serif(24, color: AppColors.success),
                 ),
               ],
             ),

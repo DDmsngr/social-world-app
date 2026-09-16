@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -108,7 +108,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
                         reason.label,
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
-                      activeColor: AppColors.clay,
+                      activeColor: AppColors.primaryTint,
                       contentPadding: EdgeInsets.zero,
                       dense: true,
                     ),
@@ -124,7 +124,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: AppColors.ink,
+                        color: AppColors.onPrimary,
                       ),
                     )
                   : const Text('Отправить'),

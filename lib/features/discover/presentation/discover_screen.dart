@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -39,7 +39,7 @@ class DiscoverScreen extends ConsumerWidget {
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: ref.watch(discoverSearchProvider).isEmpty
                       ? null
-                      : const Icon(Icons.tune, color: AppColors.clay),
+                      : const Icon(Icons.tune, color: AppColors.primaryTint),
                 ),
               ),
             ),
@@ -97,7 +97,7 @@ class _PulseBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = level >= 2 ? AppColors.clay : AppColors.sage;
+    final color = level >= 2 ? AppColors.primaryTint : AppColors.geo;
     return Material(
       color: AppColors.ink2.withValues(alpha: 0.92),
       borderRadius: BorderRadius.circular(AppRadius.chip),

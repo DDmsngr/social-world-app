@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+﻿import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -45,7 +45,7 @@ class PostCard extends StatelessWidget {
                       ? null
                       : Text(
                           post.authorName.characters.first.toUpperCase(),
-                          style: AppTypography.serif(16, color: AppColors.clay),
+                          style: AppTypography.serif(16, color: AppColors.primaryTint),
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -120,7 +120,7 @@ class PostCard extends StatelessWidget {
                     post.likedByMe ? Icons.favorite : Icons.favorite_border,
                     size: 20,
                     color: post.likedByMe
-                        ? AppColors.clay
+                        ? AppColors.primaryTint
                         : AppColors.textFaint,
                   ),
                 ),

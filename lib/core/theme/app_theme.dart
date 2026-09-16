@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
@@ -23,9 +23,9 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: AppColors.ink,
       canvasColor: AppColors.ink,
       colorScheme: const ColorScheme.dark(
-        primary: AppColors.clay,
-        onPrimary: AppColors.ink,
-        secondary: AppColors.sage,
+        primary: AppColors.primary,
+        onPrimary: AppColors.onPrimary,
+        secondary: AppColors.success,
         surface: AppColors.ink2,
         onSurface: AppColors.text,
         error: AppColors.danger,
@@ -46,13 +46,25 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.clay,
-          foregroundColor: AppColors.ink,
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.onPrimary,
+          disabledBackgroundColor: AppColors.card,
+          disabledForegroundColor: AppColors.textFaint,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.chip),
           ),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ).copyWith(
+          // Нажатие должно быть видно: бордовый светлеет, а не темнеет.
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed) ||
+                states.contains(WidgetState.hovered) ||
+                states.contains(WidgetState.focused)) {
+              return AppColors.primaryHover;
+            }
+            return null;
+          }),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -74,7 +86,7 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.field),
-          borderSide: const BorderSide(color: AppColors.clay),
+          borderSide: const BorderSide(color: AppColors.primaryTint),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -88,7 +100,7 @@ abstract final class AppTheme {
             fontSize: 11,
             letterSpacing: 0.4,
             color: states.contains(WidgetState.selected)
-                ? AppColors.clay
+                ? AppColors.primaryTint
                 : AppColors.textFaint,
           ),
         ),
@@ -96,7 +108,7 @@ abstract final class AppTheme {
           (states) => IconThemeData(
             size: 24,
             color: states.contains(WidgetState.selected)
-                ? AppColors.clay
+                ? AppColors.primaryTint
                 : AppColors.textFaint,
           ),
         ),

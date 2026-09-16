@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
@@ -117,7 +117,7 @@ class PhasePlaceholder extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('— ', style: TextStyle(color: AppColors.clay)),
+                    const Text('— ', style: TextStyle(color: AppColors.primaryTint)),
                     Expanded(
                       child: Text(
                         item,

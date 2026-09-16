@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -100,11 +100,11 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                   ),
                   showCheckmark: false,
                   backgroundColor: AppColors.card,
-                  selectedColor: AppColors.clay,
+                  selectedColor: AppColors.primary,
                   labelStyle: TextStyle(
                     fontSize: 13,
                     color: _placeTitle == place.title
-                        ? AppColors.ink
+                        ? AppColors.onPrimary
                         : AppColors.textDim,
                   ),
                   side: const BorderSide(color: AppColors.hair),
@@ -120,7 +120,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: AppColors.ink,
+                      color: AppColors.onPrimary,
                     ),
                   )
                 : const Text('Опубликовать'),

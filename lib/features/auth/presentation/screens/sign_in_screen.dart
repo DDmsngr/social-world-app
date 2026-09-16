@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -82,7 +82,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 'узнаёт.',
                 style: AppTypography.serif(
                   40,
-                  color: AppColors.clay,
+                  color: AppColors.primaryTint,
                   style: FontStyle.italic,
                 ),
               ),
@@ -156,7 +156,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.ink,
+                          color: AppColors.onPrimary,
                         ),
                       )
                     : Text(_codeSent ? 'Войти' : 'Получить код'),

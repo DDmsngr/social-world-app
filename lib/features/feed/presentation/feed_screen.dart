@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -47,7 +47,7 @@ class FeedScreen extends ConsumerWidget {
           }
 
           return RefreshIndicator(
-            color: AppColors.clay,
+            color: AppColors.primaryTint,
             backgroundColor: AppColors.ink2,
             onRefresh: () => ref.read(feedProvider.notifier).refresh(),
             child: ListView.builder(

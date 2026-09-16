@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/location/geo_privacy.dart';
@@ -65,14 +65,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   children: [
                     Text(
                       _radiusLabel(_radius),
-                      style: AppTypography.serif(22, color: AppColors.clay),
+                      style: AppTypography.serif(22, color: AppColors.primaryTint),
                     ),
                     Slider(
                       value: GeoPrivacy.radiusOptions.indexOf(_radius).toDouble(),
                       min: 0,
                       max: (GeoPrivacy.radiusOptions.length - 1).toDouble(),
                       divisions: GeoPrivacy.radiusOptions.length - 1,
-                      activeColor: AppColors.clay,
+                      activeColor: AppColors.primaryTint,
                       inactiveColor: AppColors.hairStrong,
                       onChanged: (value) => setState(
                         () => _radius = GeoPrivacy.radiusOptions[value.round()],

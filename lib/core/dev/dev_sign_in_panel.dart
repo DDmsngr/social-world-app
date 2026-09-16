@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/data/local_auth_repository.dart';
@@ -24,7 +24,7 @@ class DevSignInPanel extends ConsumerWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
-          color: AppColors.sage.withValues(alpha: 0.45),
+          color: AppColors.success.withValues(alpha: 0.45),
           style: BorderStyle.solid,
         ),
       ),
@@ -33,14 +33,14 @@ class DevSignInPanel extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.construction, size: 15, color: AppColors.sage),
+              const Icon(Icons.construction, size: 15, color: AppColors.success),
               const SizedBox(width: 8),
               Text(
                 'РЕЖИМ РАЗРАБОТКИ',
                 style: Theme.of(context)
                     .textTheme
                     .labelSmall
-                    ?.copyWith(color: AppColors.sage),
+                    ?.copyWith(color: AppColors.success),
               ),
             ],
           ),
@@ -90,8 +90,8 @@ class _DevButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.sage,
-        side: BorderSide(color: AppColors.sage.withValues(alpha: 0.5)),
+        foregroundColor: AppColors.success,
+        side: BorderSide(color: AppColors.success.withValues(alpha: 0.5)),
         padding: const EdgeInsets.symmetric(vertical: 10),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.chip),

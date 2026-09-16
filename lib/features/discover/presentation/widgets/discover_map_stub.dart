@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -74,7 +74,7 @@ class DiscoverMap extends StatelessWidget {
                 onTap: () => onPlaceTap(place),
                 child: Row(
                   children: [
-                    const Icon(Icons.place_outlined, color: AppColors.clay),
+                    const Icon(Icons.place_outlined, color: AppColors.primaryTint),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -112,7 +112,7 @@ class _PulseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = data.pulseLevel >= 2;
-    final color = active ? AppColors.clay : AppColors.sage;
+    final color = active ? AppColors.primaryTint : AppColors.geo;
     return GlassCard(
       padding: const EdgeInsets.all(16),
       child: Row(
