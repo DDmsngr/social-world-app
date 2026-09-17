@@ -6,6 +6,7 @@ import 'package:yandex_maps_mapkit/mapkit_factory.dart';
 import 'package:yandex_maps_mapkit/yandex_map.dart';
 
 import '../../../../core/config/mapkit_boot.dart';
+import '../../../../core/debug/app_log.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
@@ -68,15 +69,21 @@ class _DiscoverMapState extends State<DiscoverMap> {
     if (_mapkitRunning) return;
     _mapkitRunning = true;
     mapkit.onStart();
+    AppLog.add('DiscoverMap: mapkit.onStart()');
   }
 
   void _stopMapkit() {
     if (!_mapkitRunning) return;
     _mapkitRunning = false;
     mapkit.onStop();
+    AppLog.add('DiscoverMap: mapkit.onStop()');
   }
 
   void _onMapCreated(ymk.MapWindow window) {
+    AppLog.add(
+      'DiscoverMap: onMapCreated, центр ${widget.data.centerLatitude},'
+      ' ${widget.data.centerLongitude}',
+    );
     window.map.nightModeEnabled = true;
     _objects = window.map.mapObjects.addCollection();
 
@@ -172,9 +179,34 @@ class _DiscoverMapState extends State<DiscoverMap> {
       );
     }
 
-    return YandexMap(
-      onMapCreated: _onMapCreated,
-      platformViewType: PlatformViewType.Hybrid,
+    return Stack(
+      children: [
+        YandexMap(
+          onMapCreated: _onMapCreated,
+          platformViewType: PlatformViewType.Hybrid,
+        ),
+        // Пока тайлы не гарантированно грузятся (см. заметку в
+        // mapkit_boot_native.dart) — виден статус и префикс ключа, чтобы не
+        // гадать вслепую при следующем баг-репорте с телефона. DevMode тут
+        // не подходит: он гаснет ровно тогда, когда бэкенд настоящий — то
+        // есть в каждой боевой сборке. Убрать после того, как тайлы точно
+        // заработают на устройстве.
+        Positioned(
+            left: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'mapkit: ${MapkitBoot.status}',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

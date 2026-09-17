@@ -1,15 +1,30 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/config/env.dart';
 import 'core/config/mapkit_boot.dart';
+import 'core/debug/app_log.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: binding);
+
+  // Adb недоступен на телефоне тестировщика — единственный способ увидеть
+  // Dart-ошибки (не нативные, те видны только в logcat) это свой буфер,
+  // открывается 5 тапами по заголовку "Рядом".
+  FlutterError.onError = (details) {
+    AppLog.add('FlutterError: ${details.exceptionAsString()}');
+    FlutterError.presentError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLog.add('Uncaught: $error');
+    return false;
+  };
 
   await Env.load();
   if (Env.isConfigured) {
@@ -29,6 +44,8 @@ Future<void> main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
+
+  FlutterNativeSplash.remove();
 
   runApp(const ProviderScope(child: SocialWorldApp()));
 }

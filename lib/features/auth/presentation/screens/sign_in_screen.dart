@@ -29,6 +29,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   String? _error;
   String? _devCode;
 
+  // 406-ФЗ: для боевого продукта в РФ основной вход — VK ID/Яндекс ID,
+  // почта — служебный резервный путь, скрытый со стартового экрана.
+  bool _showEmailFlow = false;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -50,7 +54,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
+  // Почта — служебный резервный путь: показываем её либо по запросу
+  // пользователя, либо когда бэкенд не настроен (дев-режим без Supabase).
+  bool get _emailVisible => _showEmailFlow || !Env.isConfigured;
+
   String _subtitle() {
+    if (!_emailVisible) {
+      return 'Войдите через VK ID или Яндекс ID — это быстро и без пароля.';
+    }
     if (!_codeSent) {
       return 'Войдите по почте — пароль не нужен, пришлём одноразовый код.';
     }
@@ -94,111 +105,117 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 28),
-              // Ключи обязательны: оба поля стоят в одной позиции дерева, и без
-              // них Flutter переиспользует состояние — в поле кода остаётся
-              // текст почты, а контроллер расходится с тем, что видно.
-              if (!_codeSent)
-                TextField(
-                  key: const ValueKey('sign-in-email'),
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  autocorrect: false,
-                  decoration: const InputDecoration(hintText: 'почта'),
-                )
-              else
-                TextField(
-                  key: const ValueKey('sign-in-code'),
-                  controller: _codeController,
-                  keyboardType: TextInputType.number,
-                  autofocus: true,
-                  maxLength: 6,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(fontSize: 22, letterSpacing: 8),
-                  decoration: const InputDecoration(
-                    hintText: '______',
-                    counterText: '',
-                  ),
-                ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: const TextStyle(color: AppColors.danger, fontSize: 13),
-                ),
-              ],
-              const SizedBox(height: 18),
-              FilledButton(
-                onPressed: _busy
-                    ? null
-                    : () => _run(() async {
-                          if (!_codeSent) {
-                            await repo
-                                .requestEmailCode(_emailController.text);
-                            if (!mounted) return;
-                            // Письма нет — подставляем выданный код сами,
-                            // чтобы не переписывать его руками из панели.
-                            final issued = repo is LocalAuthRepository
-                                ? repo.issuedCode
-                                : null;
-                            setState(() {
-                              _codeSent = true;
-                              _devCode = issued;
-                              if (issued != null) _codeController.text = issued;
-                            });
-                          } else {
-                            await repo.verifyEmailCode(
-                              email: _emailController.text,
-                              code: _codeController.text,
-                            );
-                          }
-                        }),
-                child: _busy
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.onPrimary,
-                        ),
-                      )
-                    : Text(_codeSent ? 'Войти' : 'Получить код'),
-              ),
-              if (_codeSent)
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () => setState(() {
-                            _codeSent = false;
-                            _devCode = null;
-                            _codeController.clear();
-                          }),
-                  child: const Text('Другая почта'),
-                ),
-              // Почта — служебный путь входа, для boевого продукта в РФ
-              // основной вход обязан быть по телефону или через VK/Яндекс ID
-              // (406-ФЗ). Пока телефона нет — эти кнопки и есть основной путь.
-              if (Env.isConfigured && !_codeSent) ...[
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: AppColors.hair)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('или', style: Theme.of(context).textTheme.bodyMedium),
-                    ),
-                    Expanded(child: Divider(color: AppColors.hair)),
-                  ],
-                ),
-                const SizedBox(height: 14),
+              // Основной вход в РФ обязан быть через VK ID/Яндекс ID или
+              // телефон (406-ФЗ) — почта только по явному запросу пользователя.
+              if (!_emailVisible) ...[
                 OutlinedButton(
                   onPressed: () => startOAuthSignIn(OAuthBridgeProvider.vk),
                   child: const Text('Войти через VK ID'),
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton(
-                  onPressed: () => startOAuthSignIn(OAuthBridgeProvider.yandex),
+                  onPressed: () =>
+                      startOAuthSignIn(OAuthBridgeProvider.yandex),
                   child: const Text('Войти через Яндекс ID'),
                 ),
+                const SizedBox(height: 14),
+                Center(
+                  child: TextButton(
+                    onPressed: () => setState(() => _showEmailFlow = true),
+                    child: const Text('Войти по почте'),
+                  ),
+                ),
+              ] else ...[
+                // Ключи обязательны: оба поля стоят в одной позиции дерева, и
+                // без них Flutter переиспользует состояние — в поле кода
+                // остаётся текст почты, а контроллер расходится с тем, что
+                // видно.
+                if (!_codeSent)
+                  TextField(
+                    key: const ValueKey('sign-in-email'),
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    decoration: const InputDecoration(hintText: 'почта'),
+                  )
+                else
+                  TextField(
+                    key: const ValueKey('sign-in-code'),
+                    controller: _codeController,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: const TextStyle(fontSize: 22, letterSpacing: 8),
+                    decoration: const InputDecoration(
+                      hintText: '______',
+                      counterText: '',
+                    ),
+                  ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style:
+                        const TextStyle(color: AppColors.danger, fontSize: 13),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: _busy
+                      ? null
+                      : () => _run(() async {
+                            if (!_codeSent) {
+                              await repo
+                                  .requestEmailCode(_emailController.text);
+                              if (!mounted) return;
+                              // Письма нет — подставляем выданный код сами,
+                              // чтобы не переписывать его руками из панели.
+                              final issued = repo is LocalAuthRepository
+                                  ? repo.issuedCode
+                                  : null;
+                              setState(() {
+                                _codeSent = true;
+                                _devCode = issued;
+                                if (issued != null) {
+                                  _codeController.text = issued;
+                                }
+                              });
+                            } else {
+                              await repo.verifyEmailCode(
+                                email: _emailController.text,
+                                code: _codeController.text,
+                              );
+                            }
+                          }),
+                  child: _busy
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.onPrimary,
+                          ),
+                        )
+                      : Text(_codeSent ? 'Войти' : 'Получить код'),
+                ),
+                if (_codeSent)
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() {
+                              _codeSent = false;
+                              _devCode = null;
+                              _codeController.clear();
+                            }),
+                    child: const Text('Другая почта'),
+                  ),
+                if (Env.isConfigured && !_codeSent)
+                  TextButton(
+                    onPressed: () =>
+                        setState(() => _showEmailFlow = false),
+                    child: const Text('Назад к VK ID / Яндекс ID'),
+                  ),
               ],
               const Spacer(),
               if (DevMode.enabled)

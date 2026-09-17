@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/debug/log_viewer_screen.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
@@ -9,15 +10,49 @@ import '../domain/entities/place.dart';
 import 'providers/discover_providers.dart';
 import 'widgets/discover_map.dart';
 
-class DiscoverScreen extends ConsumerWidget {
+class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DiscoverScreen> createState() => _DiscoverScreenState();
+}
+
+class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
+  int _titleTaps = 0;
+  DateTime? _firstTapAt;
+
+  // 5 тапов по заголовку за 2 секунды — открывает лог-панель. adb до
+  // телефона тестировщика не дотянуться, а спрятанный жест не мозолит
+  // глаза обычному пользователю.
+  void _onTitleTap() {
+    final now = DateTime.now();
+    if (_firstTapAt == null ||
+        now.difference(_firstTapAt!) > const Duration(seconds: 2)) {
+      _firstTapAt = now;
+      _titleTaps = 1;
+      return;
+    }
+    _titleTaps++;
+    if (_titleTaps >= 5) {
+      _titleTaps = 0;
+      _firstTapAt = null;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final data = ref.watch(discoverDataProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Рядом')),
+      appBar: AppBar(
+        title: GestureDetector(
+          onTap: _onTitleTap,
+          child: const Text('Рядом'),
+        ),
+      ),
       body: data.when(
         data: (snapshot) => Stack(
           children: [
