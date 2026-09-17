@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
@@ -110,6 +112,11 @@ class _MyPosts extends ConsumerWidget {
                 for (final post in items)
                   GlassCard(
                     padding: const EdgeInsets.all(14),
+                    // Маршрут в списке публикаций — это строка с названием,
+                    // и без перехода открыть свою же прогулку было бы негде.
+                    onTap: post.isRoute
+                        ? () => context.push('${Routes.routes}/${post.routeId}')
+                        : null,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -122,10 +129,14 @@ class _MyPosts extends ConsumerWidget {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(
-                              Icons.favorite_border,
+                            Icon(
+                              post.isRoute
+                                  ? Icons.timeline
+                                  : Icons.favorite_border,
                               size: 15,
-                              color: AppColors.textFaint,
+                              color: post.isRoute
+                                  ? AppColors.primaryTint
+                                  : AppColors.textFaint,
                             ),
                             const SizedBox(width: 6),
                             Text(

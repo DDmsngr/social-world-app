@@ -91,7 +91,6 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
       ref.read(routeRecorderProvider.notifier).reset();
       ref.read(feedProvider.notifier).prepend(post);
       ref.invalidate(myPostsProvider);
-      ref.invalidate(authorRoutesProvider(route.authorId));
 
       if (!mounted) return;
       context.go('${Routes.routes}/${route.id}');

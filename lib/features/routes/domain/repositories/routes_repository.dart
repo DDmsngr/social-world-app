@@ -6,7 +6,5 @@ abstract interface class RoutesRepository {
 
   Future<CityRoute> loadRoute(String routeId);
 
-  Future<List<RouteSummary>> loadAuthorRoutes(String authorId, {int limit = 50});
-
   Future<void> deleteRoute(String routeId);
 }

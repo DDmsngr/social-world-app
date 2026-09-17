@@ -56,28 +56,6 @@ class CityRoute {
   final List<RoutePhoto> photos;
 }
 
-/// Короткая карточка для списков: путь здесь упрощён на стороне SQL, полную
-/// геометрию прогулки в список тянуть незачем.
-class RouteSummary {
-  const RouteSummary({
-    required this.id,
-    required this.title,
-    required this.preview,
-    required this.distanceMeters,
-    required this.duration,
-    required this.createdAt,
-    this.photoCount = 0,
-  });
-
-  final String id;
-  final String title;
-  final List<RouteCoordinate> preview;
-  final int distanceMeters;
-  final Duration duration;
-  final DateTime createdAt;
-  final int photoCount;
-}
-
 /// Фото, снятое во время записи и ещё не загруженное на сервер.
 class PendingRoutePhoto {
   const PendingRoutePhoto({

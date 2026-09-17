@@ -27,9 +27,3 @@ final routeProvider = FutureProvider.family<CityRoute, String>((ref, id) {
   ref.keepAlive();
   return ref.watch(routesRepositoryProvider).loadRoute(id);
 });
-
-/// Маршруты автора — вкладка в профиле.
-final authorRoutesProvider =
-    FutureProvider.family<List<RouteSummary>, String>((ref, authorId) {
-  return ref.watch(routesRepositoryProvider).loadAuthorRoutes(authorId);
-});

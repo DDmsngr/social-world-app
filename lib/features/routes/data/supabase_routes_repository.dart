@@ -90,33 +90,6 @@ class SupabaseRoutesRepository implements RoutesRepository {
   }
 
   @override
-  Future<List<RouteSummary>> loadAuthorRoutes(
-    String authorId, {
-    int limit = 50,
-  }) async {
-    final rows = await _client.rpc(
-      'author_routes',
-      params: {'in_author': authorId, 'in_limit': limit},
-    ) as List<dynamic>;
-
-    return [
-      for (final raw in rows)
-        if (raw is Map<String, dynamic>)
-          RouteSummary(
-            id: raw['id'] as String,
-            title: raw['title'] as String,
-            preview: RouteGeometry.fromGeoJson(raw['preview']),
-            distanceMeters: (raw['distance_m'] as num?)?.toInt() ?? 0,
-            duration: Duration(
-              seconds: (raw['duration_s'] as num?)?.toInt() ?? 0,
-            ),
-            createdAt: DateTime.parse(raw['created_at'] as String),
-            photoCount: (raw['photo_count'] as num?)?.toInt() ?? 0,
-          ),
-    ];
-  }
-
-  @override
   Future<void> deleteRoute(String routeId) =>
       _client.from('routes').delete().eq('id', routeId);
 

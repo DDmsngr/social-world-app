@@ -188,35 +188,9 @@ $$;
 revoke all on function route_detail from public;
 grant execute on function route_detail to authenticated;
 
--- Список маршрутов автора для профиля. Линия отдаётся упрощённой: карточке
--- хватает силуэта, а полная геометрия прогулки — это лишние килобайты на строку.
-create function author_routes(in_author uuid, in_limit integer default 50)
-returns table (
-  id          uuid,
-  title       text,
-  preview     jsonb,
-  distance_m  integer,
-  duration_s  integer,
-  created_at  timestamptz,
-  photo_count bigint
-)
-language sql stable security definer set search_path = public as $$
-  select r.id,
-         r.title,
-         st_asgeojson(st_simplify(r.path::geometry, 0.0002))::jsonb,
-         r.distance_m,
-         r.duration_s,
-         r.created_at,
-         (select count(*) from route_photos rp where rp.route_id = r.id)
-  from routes r
-  where r.author_id = in_author
-    and r.status <> 'blocked'
-  order by r.created_at desc
-  limit least(in_limit, 100);
-$$;
-
-revoke all on function author_routes from public;
-grant execute on function author_routes to authenticated;
+-- Отдельного списка «мои маршруты» здесь нет намеренно: маршрут публикуется
+-- постом, а список постов автора уже отдаёт city_feed(in_author) — второй
+-- источник той же правды пришлось бы держать синхронным без всякой пользы.
 
 -- ── хранилище фотографий ────────────────────────────────────────────────────
 -- Бакет публичный на чтение: фото маршрута и так виден всем, кто видит сам

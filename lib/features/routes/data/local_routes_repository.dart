@@ -55,29 +55,6 @@ class LocalRoutesRepository implements RoutesRepository {
   }
 
   @override
-  Future<List<RouteSummary>> loadAuthorRoutes(
-    String authorId, {
-    int limit = 50,
-  }) async {
-    final mine = _routes.values.where((route) => route.authorId == authorId);
-    final sorted = mine.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    return [
-      for (final route in sorted.take(limit))
-        RouteSummary(
-          id: route.id,
-          title: route.title,
-          preview: route.path,
-          distanceMeters: route.distanceMeters,
-          duration: route.duration,
-          createdAt: route.createdAt,
-          photoCount: route.photos.length,
-        ),
-    ];
-  }
-
-  @override
   Future<void> deleteRoute(String routeId) async {
     _routes.remove(routeId);
   }

@@ -53,22 +53,14 @@ void main() {
       expect(route.photos.first.photoUrl, '/tmp/photo-0.jpg');
     });
 
-    test('список автора отдаёт свежие маршруты первыми', () async {
+    test('каждая публикация получает свой id', () async {
       final repository = build();
       final first = await repository.publishRoute(draft(title: 'Первый'));
       final second = await repository.publishRoute(draft(title: 'Второй'));
 
-      final mine = await repository.loadAuthorRoutes('me');
-
-      expect(mine.map((route) => route.id).toList(), [second.id, first.id]);
-      expect(mine.first.title, 'Второй');
-    });
-
-    test('чужие маршруты в список не попадают', () async {
-      final repository = build();
-      await repository.publishRoute(draft());
-
-      expect(await repository.loadAuthorRoutes('someone-else'), isEmpty);
+      expect(first.id, isNot(second.id));
+      expect((await repository.loadRoute(first.id)).title, 'Первый');
+      expect((await repository.loadRoute(second.id)).title, 'Второй');
     });
 
     test('удалённый маршрут больше не открывается', () async {
