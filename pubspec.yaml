@@ -59,6 +59,13 @@ dependencies:
   # Запись маршрута: поток координат с устройства и фото-метки на пути.
   geolocator: ^13.0.2
   image_picker: ^1.1.2
+  # Автообновление APK в обход Google Play: узнать версию на устройстве,
+  # скачать новый APK с прогрессом, открыть системный установщик.
+  http: ^1.2.2
+  package_info_plus: ^10.2.1
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.3
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:

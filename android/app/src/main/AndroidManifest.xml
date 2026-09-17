@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Фото-метки на маршруте снимаются камерой прямо во время прогулки. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Приложение раздаётся APK мимо Google Play, поэтому обновляет себя само:
+         скачивает новый файл и отдаёт его системному установщику. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
         android:label="Social World"
         android:name=".MainApplication"

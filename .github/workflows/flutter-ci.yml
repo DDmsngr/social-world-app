@@ -174,3 +174,54 @@ jobs:
             --title "Social World Android release ${{ steps.release.outputs.tag }}" \
             --notes "Release APK (arm64/armeabi-v7a/x86_64), подписан постоянным ключом — ставится поверх предыдущей версии без удаления. versionCode ${{ github.run_number }}. Собран из коммита ${{ github.sha }}." \
             --prerelease
+
+      # Автообновление внутри приложения качает один APK по прямой ссылке,
+      # поэтому здесь собирается универсальная сборка без --split-per-abi:
+      # иначе клиенту пришлось бы самому определять ABI устройства.
+      - name: Build universal APK for in-app updates
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        run: flutter build apk --release --build-number=${{ github.run_number }}
+
+      # APK и манифест кладём в публичный на чтение бакет self-hosted Supabase
+      # (см. supabase/migrations/0007_app_updates.sql). GitHub Releases для этого
+      # не годятся: репозиторий приватный, и приложению пришлось бы носить в себе
+      # токен с доступом к исходникам.
+      - name: Publish update manifest to Supabase Storage
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VERSION_CODE: ${{ github.run_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          apk_name="social-world-${VERSION_CODE}.apk"
+          version_name=$(sed -n 's/^version: \([0-9.]*\).*/\1/p' pubspec.yaml)
+
+          upload() {
+            curl --fail --silent --show-error \
+              -X POST "${SUPABASE_URL}/storage/v1/object/app-releases/$1" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+              -H "Content-Type: $2" \
+              -H "Cache-Control: $3" \
+              -H "x-upsert: true" \
+              --data-binary @"$4" > /dev/null
+          }
+
+          upload "${apk_name}" "application/vnd.android.package-archive" \
+            "max-age=31536000" "build/app/outputs/flutter-apk/app-release.apk"
+
+          # Манифест перезаписывается каждым релизом, поэтому кешировать его
+          # надолго нельзя — иначе телефон ещё сутки не увидит новую версию.
+          cat > manifest.json <<EOF
+          {
+            "versionCode": ${VERSION_CODE},
+            "versionName": "${version_name}",
+            "apkUrl": "${SUPABASE_URL}/storage/v1/object/public/app-releases/${apk_name}",
+            "notes": "Сборка ${{ steps.release.outputs.tag }}"
+          }
+          EOF
+
+          upload "manifest.json" "application/json" "max-age=60" "manifest.json"
