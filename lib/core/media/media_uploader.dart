@@ -3,12 +3,12 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
-/// Загрузка фотографий в Supabase Storage.
+/// Загрузка фотографий и видео в Supabase Storage.
 ///
 /// Путь всегда начинается с id пользователя: политика бакета разрешает запись
 /// только в свою папку, так что чужое имя в пути просто не пройдёт.
-class PhotoUploader {
-  PhotoUploader(this._client, {required this.bucket});
+class MediaUploader {
+  MediaUploader(this._client, {required this.bucket});
 
   final SupabaseClient _client;
   final String bucket;

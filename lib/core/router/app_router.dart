@@ -13,7 +13,9 @@ import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/create/presentation/create_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
 import '../../features/events/presentation/events_screen.dart';
+import '../../features/feed/domain/entities/post.dart';
 import '../../features/feed/presentation/feed_screen.dart';
+import '../../features/feed/presentation/post_detail_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/routes/presentation/route_detail_screen.dart';
 import '../../features/routes/presentation/route_recorder_screen.dart';
@@ -35,6 +37,9 @@ abstract final class Routes {
   /// навигация только мешает, а открытый чужой маршрут — это отдельный экран.
   static const routeRecorder = '/route-recorder';
   static const routes = '/routes';
+
+  /// Обсуждение поста — тоже отдельный экран: ветки требуют всей высоты.
+  static const posts = '/posts';
 
   static const authFlow = {splash, signIn, onboarding};
 }
@@ -112,6 +117,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '${Routes.routes}/:routeId',
         builder: (_, state) =>
             RouteDetailScreen(routeId: state.pathParameters['routeId']!),
+      ),
+      GoRoute(
+        path: '${Routes.posts}/:postId',
+        builder: (_, state) => PostDetailScreen(
+          postId: state.pathParameters['postId']!,
+          post: state.extra as Post?,
+        ),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../routes/presentation/widgets/route_post_preview.dart';
 import '../../domain/entities/post.dart';
+import 'post_media.dart';
 
 class PostCard extends StatelessWidget {
   const PostCard({
@@ -13,11 +14,13 @@ class PostCard extends StatelessWidget {
     required this.post,
     required this.onLike,
     required this.onReport,
+    required this.onComment,
   });
 
   final Post post;
   final VoidCallback onLike;
   final VoidCallback onReport;
+  final VoidCallback onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -93,24 +96,7 @@ class PostCard extends StatelessWidget {
               ),
             ),
           if (post.isRoute) RoutePostPreview(routeId: post.routeId!),
-          if (post.hasMedia)
-            AspectRatio(
-              aspectRatio: 4 / 3,
-              child: CachedNetworkImage(
-                imageUrl: post.mediaUrls.first,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => const ColoredBox(color: AppColors.ink2),
-                errorWidget: (_, _, _) => const ColoredBox(
-                  color: AppColors.ink2,
-                  child: Center(
-                    child: Icon(
-                      Icons.image_not_supported_outlined,
-                      color: AppColors.textFaint,
-                    ),
-                  ),
-                ),
-              ),
-            ),
+          if (post.hasMedia) PostMedia(urls: post.mediaUrls),
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 16, 6),
             child: Row(
@@ -128,6 +114,20 @@ class PostCard extends StatelessWidget {
                 ),
                 Text(
                   '${post.likeCount}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  onPressed: onComment,
+                  tooltip: 'Обсуждение',
+                  icon: const Icon(
+                    Icons.mode_comment_outlined,
+                    size: 19,
+                    color: AppColors.textFaint,
+                  ),
+                ),
+                Text(
+                  '${post.commentCount}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/media/media_uploader.dart';
 import '../domain/entities/post.dart';
 import '../domain/repositories/feed_repository.dart';
 
@@ -30,10 +31,17 @@ class SupabaseFeedRepository implements FeedRepository {
   Future<Post> createPost({
     required String body,
     PostKind kind = PostKind.text,
-    List<String> mediaUrls = const [],
+    List<String> mediaPaths = const [],
     String? placeTitle,
     String? routeId,
   }) async {
+    // Файлы уезжают в хранилище до записи в базу: если загрузка сорвётся,
+    // в ленте не останется поста с битыми ссылками.
+    final uploader = MediaUploader(_client, bucket: 'post-media');
+    final mediaUrls = <String>[
+      for (final path in mediaPaths) await uploader.upload(path),
+    ];
+
     // Без place_id выбранное в форме место живёт только до перезагрузки ленты:
     // city_feed берёт название джойном по places.
     final placeId = placeTitle == null
@@ -49,7 +57,7 @@ class SupabaseFeedRepository implements FeedRepository {
         .from('posts')
         .insert({
           'author_id': _userId,
-          'kind': (mediaUrls.isEmpty ? kind : PostKind.photo).name,
+          'kind': postKindFor(kind, mediaUrls).name,
           'body': body.trim(),
           'media_urls': mediaUrls,
           'place_id': placeId,
@@ -116,6 +124,7 @@ class SupabaseFeedRepository implements FeedRepository {
     createdAt: DateTime.parse(row['created_at'] as String),
     likeCount: (row['like_count'] as num?)?.toInt() ?? 0,
     likedByMe: row['liked_by_me'] as bool? ?? false,
+    commentCount: (row['comment_count'] as num?)?.toInt() ?? 0,
   );
 
   PostKind _kindFrom(dynamic raw) => PostKind.values.firstWhere(

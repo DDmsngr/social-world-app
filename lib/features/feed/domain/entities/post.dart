@@ -1,4 +1,13 @@
+import '../../../../core/media/media_kind.dart';
+
 enum PostKind { text, photo, video, short }
+
+/// Тип поста определяется вложениями, а не формой: человек выбирает «пост»,
+/// а фото это или видео — видно по тому, что он приложил.
+PostKind postKindFor(PostKind fallback, List<String> media) {
+  if (media.isEmpty) return fallback;
+  return media.any(isVideoUrl) ? PostKind.video : PostKind.photo;
+}
 
 class Post {
   const Post({
@@ -14,6 +23,7 @@ class Post {
     this.routeId,
     this.likeCount = 0,
     this.likedByMe = false,
+    this.commentCount = 0,
   });
 
   final String id;
@@ -36,11 +46,12 @@ class Post {
   final DateTime createdAt;
   final int likeCount;
   final bool likedByMe;
+  final int commentCount;
 
   bool get hasMedia => mediaUrls.isNotEmpty;
   bool get isRoute => routeId != null;
 
-  Post copyWith({int? likeCount, bool? likedByMe}) => Post(
+  Post copyWith({int? likeCount, bool? likedByMe, int? commentCount}) => Post(
     id: id,
     authorId: authorId,
     authorName: authorName,
@@ -53,5 +64,6 @@ class Post {
     createdAt: createdAt,
     likeCount: likeCount ?? this.likeCount,
     likedByMe: likedByMe ?? this.likedByMe,
+    commentCount: commentCount ?? this.commentCount,
   );
 }

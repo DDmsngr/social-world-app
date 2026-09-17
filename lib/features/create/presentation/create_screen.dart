@@ -1,7 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/media/media_kind.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -34,9 +36,15 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   final _bodyController = TextEditingController();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _picker = ImagePicker();
+  final _attachments = <XFile>[];
   String? _placeTitle;
   DateTime? _startsAt;
   bool _busy = false;
+
+  /// Больше четырёх карточка в ленте всё равно не покажет внятно, а вес
+  /// публикации растёт линейно.
+  static const _maxAttachments = 4;
 
   @override
   void dispose() {
@@ -50,15 +58,18 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     setState(() => _busy = true);
     try {
       if (_kind == _CreateKind.post) {
-        final post = await ref
-            .read(feedRepositoryProvider)
-            .createPost(body: _bodyController.text, placeTitle: _placeTitle);
+        final post = await ref.read(feedRepositoryProvider).createPost(
+              body: _bodyController.text,
+              mediaPaths: [for (final file in _attachments) file.path],
+              placeTitle: _placeTitle,
+            );
 
         ref.read(feedProvider.notifier).prepend(post);
         ref.invalidate(myPostsProvider);
 
         if (!mounted) return;
         _bodyController.clear();
+        _attachments.clear();
         context.go(Routes.feed);
       } else {
         final event = await ref.read(eventsRepositoryProvider).createEvent(
@@ -92,6 +103,34 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     }
   }
 
+  int get _freeSlots => _maxAttachments - _attachments.length;
+
+  Future<void> _addPhotos() async {
+    final picked = await _picker.pickMultiImage(imageQuality: 85);
+    if (picked.isEmpty) return;
+    setState(() => _attachments.addAll(picked.take(_freeSlots)));
+  }
+
+  Future<void> _shootPhoto() async {
+    final shot = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+    if (shot == null) return;
+    setState(() => _attachments.add(shot));
+  }
+
+  Future<void> _addVideo() async {
+    // Минута — осознанный потолок: длинное видео на мобильном интернете не
+    // загрузится, а пост с вечным индикатором хуже, чем пост без видео.
+    final video = await _picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 1),
+    );
+    if (video == null) return;
+    setState(() => _attachments.add(video));
+  }
+
   Future<void> _pickStartsAt() async {
     final now = DateTime.now();
     final date = await showDatePicker(
@@ -120,7 +159,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     final places = ref.watch(discoverDataProvider).value?.places ?? const [];
     final canPublish = !_busy &&
         (_kind == _CreateKind.post
-            ? _bodyController.text.trim().length >= 3
+            ? _bodyController.text.trim().length >= 3 || _attachments.isNotEmpty
             : _titleController.text.trim().length >= 3 && _startsAt != null);
 
     return Scaffold(
@@ -204,6 +243,46 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             ),
             onChanged: (_) => setState(() {}),
           ),
+          if (_kind == _CreateKind.post) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                _AttachButton(
+                  icon: Icons.photo_library_outlined,
+                  label: 'Фото',
+                  onTap: _freeSlots == 0 ? null : _addPhotos,
+                ),
+                const SizedBox(width: 8),
+                _AttachButton(
+                  icon: Icons.photo_camera_outlined,
+                  label: 'Снять',
+                  onTap: _freeSlots == 0 ? null : _shootPhoto,
+                ),
+                const SizedBox(width: 8),
+                _AttachButton(
+                  icon: Icons.videocam_outlined,
+                  label: 'Видео',
+                  onTap: _freeSlots == 0 ? null : _addVideo,
+                ),
+              ],
+            ),
+            if (_attachments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 92,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _attachments.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, index) => _AttachmentThumb(
+                    file: _attachments[index],
+                    onRemove: () =>
+                        setState(() => _attachments.removeAt(index)),
+                  ),
+                ),
+              ),
+            ],
+          ],
           if (_kind != _CreateKind.route) ...[
           const SizedBox(height: 10),
           const SectionLabel('Место'),
@@ -254,6 +333,84 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _AttachButton extends StatelessWidget {
+  const _AttachButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        minimumSize: const Size(0, 38),
+      ),
+      icon: Icon(icon, size: 17),
+      label: Text(label, style: const TextStyle(fontSize: 13)),
+    );
+  }
+}
+
+/// Превью читается через readAsBytes: у XFile на вебе путь — blob-ссылка, а на
+/// телефоне обычный файл, и это единственный способ показать оба одинаково.
+class _AttachmentThumb extends StatelessWidget {
+  const _AttachmentThumb({required this.file, required this.onRemove});
+
+  final XFile file;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.field),
+          child: SizedBox(
+            width: 92,
+            height: 92,
+            child: isVideoUrl(file.path)
+                ? const ColoredBox(
+                    color: AppColors.ink2,
+                    child: Center(
+                      child: Icon(
+                        Icons.movie_outlined,
+                        color: AppColors.primaryTint,
+                      ),
+                    ),
+                  )
+                : FutureBuilder(
+                    future: file.readAsBytes(),
+                    builder: (_, snapshot) => snapshot.hasData
+                        ? Image.memory(snapshot.data!, fit: BoxFit.cover)
+                        : const ColoredBox(color: AppColors.ink2),
+                  ),
+          ),
+        ),
+        Positioned(
+          top: 2,
+          right: 2,
+          child: InkWell(
+            onTap: onRemove,
+            customBorder: const CircleBorder(),
+            child: const CircleAvatar(
+              radius: 11,
+              backgroundColor: Color(0xCC151417),
+              child: Icon(Icons.close, size: 13, color: AppColors.paper),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

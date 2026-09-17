@@ -59,7 +59,9 @@ class UpdateController extends Notifier<UpdateState> {
   static const _prefsPathKey = 'pending_update_path';
   static const _prefsManifestKey = 'pending_update_manifest';
 
-  late final UpdateService _service;
+  // Не final: при повторном build на том же объекте присваивание late final
+  // упало бы LateInitializationError.
+  late UpdateService _service;
 
   @override
   UpdateState build() {

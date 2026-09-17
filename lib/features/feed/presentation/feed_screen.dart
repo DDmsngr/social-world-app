@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
@@ -63,6 +65,8 @@ class FeedScreen extends ConsumerWidget {
                 return PostCard(
                   post: post,
                   onLike: () => ref.read(feedProvider.notifier).toggleLike(post),
+                  onComment: () =>
+                      context.push('${Routes.posts}/${post.id}', extra: post),
                   onReport: () async {
                     final sent = await showReportSheet(
                       context,

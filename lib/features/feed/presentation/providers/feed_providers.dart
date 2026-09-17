@@ -53,6 +53,19 @@ class FeedController extends AsyncNotifier<List<Post>> {
     state = AsyncValue.data([post, ...?state.value]);
   }
 
+  /// Счётчик на карточке должен совпадать с тем, что человек только что
+  /// написал в ветке: иначе, вернувшись в ленту, он видит, что комментария
+  /// будто и не было.
+  void bumpCommentCount(String postId, int delta) {
+    state = AsyncValue.data([
+      for (final item in state.value ?? const <Post>[])
+        if (item.id == postId)
+          item.copyWith(commentCount: item.commentCount + delta)
+        else
+          item,
+    ]);
+  }
+
   /// После жалобы контент исчезает сразу, не дожидаясь разбора.
   void hide(String targetId) {
     state = AsyncValue.data([

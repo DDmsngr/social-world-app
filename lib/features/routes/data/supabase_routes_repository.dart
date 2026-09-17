@@ -1,16 +1,16 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../core/media/photo_uploader.dart';
+import '../../../core/media/media_uploader.dart';
 import '../domain/entities/city_route.dart';
 import '../domain/repositories/routes_repository.dart';
 import 'route_geometry.dart';
 
 class SupabaseRoutesRepository implements RoutesRepository {
   SupabaseRoutesRepository(this._client)
-      : _uploader = PhotoUploader(_client, bucket: 'route-photos');
+      : _uploader = MediaUploader(_client, bucket: 'route-photos');
 
   final SupabaseClient _client;
-  final PhotoUploader _uploader;
+  final MediaUploader _uploader;
 
   String get _userId {
     final id = _client.auth.currentUser?.id;

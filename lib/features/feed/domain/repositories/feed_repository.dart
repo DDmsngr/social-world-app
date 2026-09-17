@@ -7,10 +7,13 @@ abstract interface class FeedRepository {
 
   /// [routeId] превращает пост в карточку маршрута: сам маршрут к этому моменту
   /// уже сохранён, лента только делает его видимым.
+  ///
+  /// [mediaPaths] — файлы на устройстве; в хранилище их кладёт репозиторий,
+  /// чтобы экран не знал ни про бакеты, ни про то, что в моках загрузки нет.
   Future<Post> createPost({
     required String body,
     PostKind kind = PostKind.text,
-    List<String> mediaUrls = const [],
+    List<String> mediaPaths = const [],
     String? placeTitle,
     String? routeId,
   });

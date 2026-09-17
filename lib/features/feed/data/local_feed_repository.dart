@@ -27,18 +27,20 @@ class LocalFeedRepository implements FeedRepository {
   Future<Post> createPost({
     required String body,
     PostKind kind = PostKind.text,
-    List<String> mediaUrls = const [],
+    List<String> mediaPaths = const [],
     String? placeTitle,
     String? routeId,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
+    // Хранилища в моках нет, поэтому ссылкой служит сам путь к файлу — этого
+    // хватает, чтобы пройти сценарий публикации целиком.
     final post = Post(
       id: 'local-${_nextId++}',
       authorId: currentUserId(),
       authorName: currentUserName(),
-      kind: mediaUrls.isEmpty ? kind : PostKind.photo,
+      kind: postKindFor(kind, mediaPaths),
       body: body.trim(),
-      mediaUrls: mediaUrls,
+      mediaUrls: mediaPaths,
       placeTitle: placeTitle,
       routeId: routeId,
       createdAt: DateTime.now(),
@@ -77,6 +79,9 @@ class LocalFeedRepository implements FeedRepository {
       placeTitle: 'Приморская набережная',
       createdAt: DateTime.now().subtract(const Duration(minutes: 24)),
       likeCount: 14,
+      // Столько же веток лежит в заглушке комментариев: иначе карточка в ленте
+      // спорит с тем, что видно внутри обсуждения.
+      commentCount: 4,
     ),
     Post(
       id: 'seed-2',
