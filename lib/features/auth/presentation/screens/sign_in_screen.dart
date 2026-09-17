@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/dev_mode.dart';
+import '../../../../core/config/env.dart';
 import '../../../../core/dev/dev_sign_in_panel.dart';
+import '../../../../core/oauth/oauth_sign_in.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -172,6 +174,32 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           }),
                   child: const Text('Другая почта'),
                 ),
+              // Почта — служебный путь входа, для boевого продукта в РФ
+              // основной вход обязан быть по телефону или через VK/Яндекс ID
+              // (406-ФЗ). Пока телефона нет — эти кнопки и есть основной путь.
+              if (Env.isConfigured && !_codeSent) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: AppColors.hair)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text('или', style: Theme.of(context).textTheme.bodyMedium),
+                    ),
+                    Expanded(child: Divider(color: AppColors.hair)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton(
+                  onPressed: () => startOAuthSignIn(OAuthBridgeProvider.vk),
+                  child: const Text('Войти через VK ID'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton(
+                  onPressed: () => startOAuthSignIn(OAuthBridgeProvider.yandex),
+                  child: const Text('Войти через Яндекс ID'),
+                ),
+              ],
               const Spacer(),
               if (DevMode.enabled)
                 Padding(

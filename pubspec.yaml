@@ -50,6 +50,10 @@ dependencies:
   cryptography: ^2.9.0
   flutter_secure_storage: ^11.1.1
   uuid: ^4.6.0
+  # Вход через VK ID/Яндекс ID: открыть системный браузер и поймать редирект
+  # обратно в приложение по кастомной схеме socialworld://auth-callback.
+  url_launcher: ^6.3.1
+  app_links: ^6.3.3
 
 dev_dependencies:
   flutter_test:
