@@ -12,7 +12,9 @@ import '../../domain/repositories/auth_repository.dart';
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   ref.keepAlive();
   if (!Env.isConfigured) return LocalAuthRepository();
-  return SupabaseAuthRepository(Supabase.instance.client);
+  final repo = SupabaseAuthRepository(Supabase.instance.client);
+  ref.onDispose(repo.dispose);
+  return repo;
 });
 
 final authStateProvider = StreamProvider<AppUser?>((ref) {

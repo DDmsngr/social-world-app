@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/debug/app_log.dart';
 import '../../../../core/location/geo_privacy.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -19,6 +20,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _nameController = TextEditingController();
   double _radius = GeoPrivacy.defaultRadiusMeters;
   bool _busy = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -38,7 +40,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SizedBox(height: 24),
               const SectionLabel('Знакомство'),
               const SizedBox(height: 14),
-              Text('Как вас\nзвать?', style: AppTypography.serif(36)),
+              Text('Представьтесь,\nпожалуйста', style: AppTypography.serif(36)),
               const SizedBox(height: 20),
               TextField(
                 controller: _nameController,
@@ -81,18 +83,51 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   ],
                 ),
               ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.danger, fontSize: 13),
+                ),
+              ],
               const SizedBox(height: 28),
               FilledButton(
                 onPressed: _nameController.text.trim().length < 2 || _busy
                     ? null
                     : () async {
-                        setState(() => _busy = true);
-                        await ref
-                            .read(authRepositoryProvider)
-                            .completeProfile(displayName: _nameController.text);
-                        if (mounted) setState(() => _busy = false);
+                        setState(() {
+                          _busy = true;
+                          _error = null;
+                        });
+                        try {
+                          await ref
+                              .read(authRepositoryProvider)
+                              .completeProfile(
+                                displayName: _nameController.text,
+                              );
+                        } catch (e) {
+                          AppLog.add('Onboarding: completeProfile упал — $e');
+                          if (mounted) {
+                            setState(
+                              () => _error = e
+                                  .toString()
+                                  .replaceFirst('Exception: ', ''),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => _busy = false);
+                        }
                       },
-                child: const Text('Продолжить'),
+                child: _busy
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.onPrimary,
+                        ),
+                      )
+                    : const Text('Продолжить'),
               ),
             ],
           ),

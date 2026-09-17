@@ -1,22 +1,33 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../domain/entities/app_user.dart';
 import '../domain/repositories/auth_repository.dart';
 
 class SupabaseAuthRepository implements AuthRepository {
-  SupabaseAuthRepository(this._client);
+  SupabaseAuthRepository(this._client) {
+    // completeProfile меняет только таблицу profiles — GoTrue об этом не
+    // знает и onAuthStateChange не сработает, поэтому роутер (он слушает
+    // именно этот стрим) никогда не узнал бы, что анкета заполнена, и
+    // держал бы пользователя на онбординге навечно. Прокидываем обновление
+    // вручную через свой контроллер.
+    _authSub = _auth.onAuthStateChange.listen((state) async {
+      final user = state.session?.user;
+      _controller.add(user == null ? null : await _withProfile(user));
+    });
+  }
 
   final SupabaseClient _client;
+  final _controller = StreamController<AppUser?>.broadcast();
+  late final StreamSubscription<AuthState> _authSub;
 
   GoTrueClient get _auth => _client.auth;
 
   @override
   Stream<AppUser?> authStateChanges() async* {
     yield currentUser;
-    await for (final state in _auth.onAuthStateChange) {
-      final user = state.session?.user;
-      yield user == null ? null : await _withProfile(user);
-    }
+    yield* _controller.stream;
   }
 
   @override
@@ -60,7 +71,14 @@ class SupabaseAuthRepository implements AuthRepository {
         .upsert({'id': user.id, 'display_name': displayName.trim()})
         .select()
         .single();
-    return _merge(user, row);
+    final merged = _merge(user, row);
+    _controller.add(merged);
+    return merged;
+  }
+
+  void dispose() {
+    _authSub.cancel();
+    _controller.close();
   }
 
   Future<AppUser> _withProfile(User user) async {
