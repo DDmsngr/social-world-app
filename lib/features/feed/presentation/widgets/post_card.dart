@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../routes/presentation/widgets/route_post_preview.dart';
 import '../../domain/entities/post.dart';
 
 class PostCard extends StatelessWidget {
@@ -91,6 +92,7 @@ class PostCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
             ),
+          if (post.isRoute) RoutePostPreview(routeId: post.routeId!),
           if (post.hasMedia)
             AspectRatio(
               aspectRatio: 4 / 3,

@@ -15,6 +15,8 @@ import '../../features/discover/presentation/discover_screen.dart';
 import '../../features/events/presentation/events_screen.dart';
 import '../../features/feed/presentation/feed_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/routes/presentation/route_detail_screen.dart';
+import '../../features/routes/presentation/route_recorder_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 import '../widgets/splash_screen.dart';
 
@@ -28,6 +30,11 @@ abstract final class Routes {
   static const create = '/create';
   static const chats = '/chats';
   static const profile = '/profile';
+
+  /// Запись и просмотр маршрутов живут вне вкладок: во время прогулки нижняя
+  /// навигация только мешает, а открытый чужой маршрут — это отдельный экран.
+  static const routeRecorder = '/route-recorder';
+  static const routes = '/routes';
 
   static const authFlow = {splash, signIn, onboarding};
 }
@@ -96,6 +103,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.onboarding,
         builder: (_, _) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: Routes.routeRecorder,
+        builder: (_, _) => const RouteRecorderScreen(),
+      ),
+      GoRoute(
+        path: '${Routes.routes}/:routeId',
+        builder: (_, state) =>
+            RouteDetailScreen(routeId: state.pathParameters['routeId']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>

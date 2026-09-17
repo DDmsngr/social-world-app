@@ -29,6 +29,7 @@ class LocalFeedRepository implements FeedRepository {
     PostKind kind = PostKind.text,
     List<String> mediaUrls = const [],
     String? placeTitle,
+    String? routeId,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     final post = Post(
@@ -39,6 +40,7 @@ class LocalFeedRepository implements FeedRepository {
       body: body.trim(),
       mediaUrls: mediaUrls,
       placeTitle: placeTitle,
+      routeId: routeId,
       createdAt: DateTime.now(),
     );
     _posts.insert(0, post);

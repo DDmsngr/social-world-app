@@ -26,6 +26,14 @@
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<!-- Запись маршрута: только пока приложение открыто, фоновой
+		     геолокации не просим. -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Чтобы записать ваш маршрут по городу и показать, что рядом.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Чтобы снимать фото и закреплять их точками на маршруте.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Чтобы добавить на маршрут уже снятые фотографии.</string>
 		<!-- Редирект из моста входа (VK ID/Яндекс ID) — см. lib/core/oauth. -->
 		<key>CFBundleURLTypes</key>
 		<array>

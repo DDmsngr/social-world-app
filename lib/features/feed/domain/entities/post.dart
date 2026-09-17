@@ -11,6 +11,7 @@ class Post {
     this.body,
     this.mediaUrls = const [],
     this.placeTitle,
+    this.routeId,
     this.likeCount = 0,
     this.likedByMe = false,
   });
@@ -27,11 +28,17 @@ class Post {
   /// а лишние гео-данные на экране — лишний риск.
   final String? placeTitle;
 
+  /// Заполнен, если пост — обёртка над маршрутом. Тип поста для этого не
+  /// заводили: значение в post_kind нельзя добавить и сразу же использовать
+  /// в одной миграции, а ссылка на маршрут опознаёт его однозначно.
+  final String? routeId;
+
   final DateTime createdAt;
   final int likeCount;
   final bool likedByMe;
 
   bool get hasMedia => mediaUrls.isNotEmpty;
+  bool get isRoute => routeId != null;
 
   Post copyWith({int? likeCount, bool? likedByMe}) => Post(
     id: id,
@@ -42,6 +49,7 @@ class Post {
     body: body,
     mediaUrls: mediaUrls,
     placeTitle: placeTitle,
+    routeId: routeId,
     createdAt: createdAt,
     likeCount: likeCount ?? this.likeCount,
     likedByMe: likedByMe ?? this.likedByMe,

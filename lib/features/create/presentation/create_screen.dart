@@ -11,7 +11,7 @@ import '../../discover/presentation/providers/discover_providers.dart';
 import '../../events/presentation/providers/events_providers.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
 
-enum _CreateKind { post, event }
+enum _CreateKind { post, event, route }
 
 String _formatStartsAt(DateTime time) {
   final dd = time.day.toString().padLeft(2, '0');
@@ -134,16 +134,35 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             segments: const [
               ButtonSegment(value: _CreateKind.post, label: Text('Пост')),
               ButtonSegment(value: _CreateKind.event, label: Text('Событие')),
+              ButtonSegment(value: _CreateKind.route, label: Text('Маршрут')),
             ],
             selected: {_kind},
             onSelectionChanged: (selected) =>
                 setState(() => _kind = selected.first),
           ),
           const SizedBox(height: 18),
+          // Маршрут не пишется формой: его записывает отдельный экран, пока
+          // человек идёт по городу.
+          if (_kind == _CreateKind.route) ...[
+            Text('Пройдите город\nи покажите путь', style: AppTypography.serif(32)),
+            const SizedBox(height: 14),
+            Text(
+              'Приложение запишет ваш путь, пока открыто на экране. По дороге '
+              'можно снимать фото — они встанут метками прямо на маршруте. '
+              'Опубликуется только то, что вы сами отправите в ленту.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 22),
+            FilledButton.icon(
+              onPressed: () => context.push(Routes.routeRecorder),
+              icon: const Icon(Icons.timeline),
+              label: const Text('Начать запись'),
+            ),
+          ],
           if (_kind == _CreateKind.post) ...[
             Text('Что происходит\nв городе?', style: AppTypography.serif(32)),
             const SizedBox(height: 18),
-          ] else ...[
+          ] else if (_kind == _CreateKind.event) ...[
             Text('Соберите\nлюдей на событие', style: AppTypography.serif(32)),
             const SizedBox(height: 18),
             TextField(
@@ -185,6 +204,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             ),
             onChanged: (_) => setState(() {}),
           ),
+          if (_kind != _CreateKind.route) ...[
           const SizedBox(height: 10),
           const SectionLabel('Место'),
           const SizedBox(height: 12),
@@ -231,6 +251,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                   )
                 : const Text('Опубликовать'),
           ),
+          ],
         ],
       ),
     );

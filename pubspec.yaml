@@ -56,6 +56,9 @@ dependencies:
   app_links: ^6.3.3
   # Нативный splash-экран — держит заставку до первого кадра Flutter.
   flutter_native_splash: ^2.4.1
+  # Запись маршрута: поток координат с устройства и фото-метки на пути.
+  geolocator: ^13.0.2
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

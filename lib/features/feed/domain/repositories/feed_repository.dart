@@ -5,11 +5,14 @@ abstract interface class FeedRepository {
   /// этим же запросом живёт вкладка профиля.
   Future<List<Post>> loadFeed({String? authorId, int limit = 50});
 
+  /// [routeId] превращает пост в карточку маршрута: сам маршрут к этому моменту
+  /// уже сохранён, лента только делает его видимым.
   Future<Post> createPost({
     required String body,
     PostKind kind = PostKind.text,
     List<String> mediaUrls = const [],
     String? placeTitle,
+    String? routeId,
   });
 
   /// Возвращает пост с обновлённым счётчиком, чтобы экран не пересчитывал сам.
