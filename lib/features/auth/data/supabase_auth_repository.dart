@@ -66,11 +66,14 @@ class SupabaseAuthRepository implements AuthRepository {
     if (user == null) {
       throw const AuthException('Нет активной сессии');
     }
+    // Без таймаута зависший запрос (плохая сеть/VPN) выглядит как немая
+    // кнопка навечно — экрана ошибки никто не увидит.
     final row = await _client
         .from('profiles')
         .upsert({'id': user.id, 'display_name': displayName.trim()})
         .select()
-        .single();
+        .single()
+        .timeout(const Duration(seconds: 15));
     final merged = _merge(user, row);
     _controller.add(merged);
     return merged;
