@@ -9,6 +9,7 @@ import '../session/session_reset.dart';
 
 import '../../features/auth/domain/entities/app_user.dart';
 import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/chat/presentation/chats_soon_screen.dart';
 import '../../features/chat/presentation/conversations_screen.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
@@ -34,6 +35,9 @@ abstract final class Routes {
   static const onboarding = '/onboarding';
   static const feed = '/feed';
   static const discover = '/discover';
+  static const home = discover;
+
+  /// Список событий открывается с карты («Пульс города»), вкладки у него нет.
   static const events = '/events';
   static const create = '/create';
   static const chats = '/chats';
@@ -99,7 +103,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   // DateTime.now() — под flutter_test часы виртуальные и не двигаются, а вот
   // сам Timer через pumpAndSettle честно "срабатывает".
   var splashElapsed = false;
-  final splashTimer = Timer(const Duration(milliseconds: 700), () {
+  final splashTimer = Timer(const Duration(milliseconds: 1700), () {
     splashElapsed = true;
     auth.value = auth.value;
   });
@@ -111,10 +115,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final location = state.matchedLocation;
 
-      // Выключённую функцию нельзя открыть и по прямой ссылке: без ветки
-      // роутера такой адрес иначе упирается в экран ошибки.
-      if (!Features.chat && location.startsWith(Routes.chats)) {
-        return Routes.feed;
+      // Пока переписка выключена, вкладка «Чаты» показывает заглушку, а
+      // прямая ссылка на конкретный чат ведёт туда же, а не в экран ошибки.
+      if (!Features.chat && location.startsWith('${Routes.chats}/')) {
+        return Routes.chats;
       }
 
       if (auth.isResolving || !splashElapsed) {
@@ -129,7 +133,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         return location == Routes.onboarding ? null : Routes.onboarding;
       }
 
-      return Routes.authFlow.contains(location) ? Routes.feed : null;
+      // Главный экран — карта города: с неё начинается всё остальное.
+      return Routes.authFlow.contains(location) ? Routes.home : null;
     },
     routes: [
       GoRoute(
@@ -171,6 +176,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.settings,
         builder: (_, _) => const SettingsScreen(),
       ),
+      GoRoute(
+        path: Routes.events,
+        builder: (_, _) => const EventsScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>
             HomeShell(navigationShell: navigationShell),
@@ -194,28 +203,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: Routes.events,
-                builder: (_, _) => const EventsScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: Routes.create,
                 builder: (_, _) => const CreateScreen(),
               ),
             ],
           ),
-          // Ветка чатов существует только при включённом флаге: в релизе
-          // переписки в продукте нет, см. Features.chat.
-          if (Features.chat)
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: Routes.chats,
-                  builder: (_, _) => const ConversationsScreen(),
-                  routes: [
+          // Вкладка есть всегда, но сама переписка — только при включённом
+          // флаге (см. Features.chat): до этого там заглушка без запросов к
+          // серверу.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.chats,
+                builder: (_, _) => Features.chat
+                    ? const ConversationsScreen()
+                    : const ChatsSoonScreen(),
+                routes: [
+                  if (Features.chat)
                     GoRoute(
                       path: ':conversationId',
                       builder: (_, state) => ChatScreen(
@@ -223,10 +227,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                         peerName: state.extra as String? ?? 'Чат',
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
+          ),
           StatefulShellBranch(
             routes: [
               GoRoute(

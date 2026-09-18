@@ -65,7 +65,7 @@ class EventCard extends StatelessWidget {
                     IconButton(
                       onPressed: onReport,
                       tooltip: 'Пожаловаться',
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.flag_outlined,
                         size: 19,
                         color: AppColors.textFaint,
@@ -84,7 +84,7 @@ class EventCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.person_outline,
                       size: 16,
                       color: AppColors.textFaint,
@@ -98,7 +98,7 @@ class EventCard extends StatelessWidget {
                     ),
                     if (event.placeTitle != null) ...[
                       const SizedBox(width: 10),
-                      const Icon(
+                      Icon(
                         Icons.place_outlined,
                         size: 16,
                         color: AppColors.textFaint,

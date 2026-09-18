@@ -35,6 +35,7 @@ class _RouteMapState extends State<RouteMap> {
   ymk.MapObjectCollection? _objects;
   bool _mapkitRunning = false;
   bool _framedOnce = false;
+  AppPalette? _appliedPalette;
 
   @override
   void initState() {
@@ -76,9 +77,24 @@ class _RouteMapState extends State<RouteMap> {
 
   void _onMapCreated(ymk.MapWindow window) {
     _window = window;
-    window.map.nightModeEnabled = true;
+    _appliedPalette = AppColors.current;
+    window.map.nightModeEnabled = AppColors.current.isDark;
     _objects = window.map.mapObjects.addCollection();
     _rebuildObjects();
+  }
+
+  // Метки красятся цветами темы в момент создания — после смены темы их
+  // надо перерисовать, а саму карту перевести в дневной/ночной режим.
+  void _followTheme() {
+    if (_window == null || identical(_appliedPalette, AppColors.current)) {
+      return;
+    }
+    _appliedPalette = AppColors.current;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _window?.map.nightModeEnabled = AppColors.current.isDark;
+      _rebuildObjects();
+    });
   }
 
   void _rebuildObjects() {
@@ -95,7 +111,7 @@ class _RouteMapState extends State<RouteMap> {
 
     if (points.length >= 2) {
       collection.addPolylineWithGeometry(ymk.Polyline(points))
-        ..style = const ymk.LineStyle(
+        ..style = ymk.LineStyle(
           strokeWidth: 4,
           outlineWidth: 1,
           outlineColor: AppColors.ink,
@@ -173,8 +189,9 @@ class _RouteMapState extends State<RouteMap> {
 
   @override
   Widget build(BuildContext context) {
+    _followTheme();
     if (!Platform.isAndroid && !Platform.isIOS) {
-      return const ColoredBox(
+      return ColoredBox(
         color: AppColors.ink,
         child: Center(
           child: Text(
@@ -194,7 +211,7 @@ class _RouteMapState extends State<RouteMap> {
             child: Text(
               'Карта не запустилась: ${MapkitBoot.status}',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textDim, fontSize: 13),
+              style: TextStyle(color: AppColors.textDim, fontSize: 13),
             ),
           ),
         ),

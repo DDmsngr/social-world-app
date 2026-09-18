@@ -119,7 +119,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
             FilledButton(
               onPressed: _reason == null || _busy ? null : _submit,
               child: _busy
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(

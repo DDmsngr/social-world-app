@@ -1,51 +1,137 @@
 import 'package:flutter/material.dart';
 
-/// Бордово-платиновая палитра.
+/// Набор цветов одной темы.
 ///
-/// Пропорция: графит держит ~80% экрана, платина ~15%, бордовый ~5%.
-/// Бордовый — цвет действия и принадлежности приложению: активная кнопка,
-/// выбранная вкладка, включённый элемент. Фоном карточек он не бывает,
-/// иначе интерфейс становится дешёвым.
+/// Пропорция та же в обеих темах: фон держит ~80% экрана, текст ~15%,
+/// акцент ~5%. Акцент — цвет действия: активная кнопка, выбранная вкладка,
+/// включённый элемент. Фоном карточек он не бывает.
+@immutable
+class AppPalette {
+  const AppPalette({
+    required this.brightness,
+    required this.ink,
+    required this.ink2,
+    required this.card,
+    required this.paper,
+    required this.primary,
+    required this.primaryHover,
+    required this.primaryTint,
+    required this.onPrimary,
+    required this.success,
+    required this.danger,
+    required this.geo,
+    required this.text,
+    required this.textDim,
+    required this.textFaint,
+    required this.hair,
+    required this.hairStrong,
+  });
+
+  final Brightness brightness;
+
+  /// Фон экрана.
+  final Color ink;
+
+  /// Листы, нижняя навигация, плавающие плашки на карте.
+  final Color ink2;
+  final Color card;
+
+  /// Светлые значки и точки поверх фото — светлые в обеих темах.
+  final Color paper;
+
+  /// Заливка кнопки действия.
+  final Color primary;
+
+  /// Нажатие/фокус: заметно отличается от [primary].
+  final Color primaryHover;
+
+  /// Акцент для текста, иконок и тонких линий на фоне [ink]/[card].
+  final Color primaryTint;
+
+  /// Всё, что лежит поверх [primary].
+  final Color onPrimary;
+
+  final Color success;
+  final Color danger;
+
+  /// Гео и карта — отдельная холодная ветка, иначе метки сливаются с кнопками.
+  final Color geo;
+
+  final Color text;
+  final Color textDim;
+  final Color textFaint;
+
+  final Color hair;
+  final Color hairStrong;
+
+  bool get isDark => brightness == Brightness.dark;
+
+  /// «Бургунди и шампань» — тёмная тема по выбору Левона.
+  static const burgundyChampagne = AppPalette(
+    brightness: Brightness.dark,
+    ink: Color(0xFF21151D),
+    ink2: Color(0xFF2B1C25),
+    card: Color(0xFF302029),
+    paper: Color(0xFFFFF8F0),
+    primary: Color(0xFFE89BBA),
+    primaryHover: Color(0xFFF2B8CE),
+    primaryTint: Color(0xFFE89BBA),
+    onPrimary: Color(0xFF21151D),
+    success: Color(0xFF62C08F),
+    danger: Color(0xFFE8737D),
+    geo: Color(0xFF82AED6),
+    text: Color(0xFFFFF8F0),
+    textDim: Color(0xFFBBA9AF),
+    textFaint: Color(0x99BBA9AF),
+    hair: Color(0x804A3440),
+    hairStrong: Color(0xFF4A3440),
+  );
+
+  /// «Тёплый песок» — светлая тема. Коды сняты со скриншота макета, их
+  /// заменят точные значения, когда придут от Левона.
+  static const warmSand = AppPalette(
+    brightness: Brightness.light,
+    ink: Color(0xFFFBF3EA),
+    ink2: Color(0xFFFFFFFF),
+    card: Color(0xFFFFFFFF),
+    paper: Color(0xFFFFFFFF),
+    primary: Color(0xFFB94E36),
+    primaryHover: Color(0xFFC8573D),
+    primaryTint: Color(0xFFB04A33),
+    onPrimary: Color(0xFFFFFFFF),
+    success: Color(0xFF2E8B5E),
+    danger: Color(0xFFC2414B),
+    geo: Color(0xFF3C74A8),
+    text: Color(0xFF3A2A24),
+    textDim: Color(0xFF7A635A),
+    textFaint: Color(0x997A635A),
+    hair: Color(0x80E3D2C3),
+    hairStrong: Color(0xFFDCC6B4),
+  );
+}
+
+/// Цвета текущей темы.
+///
+/// Геттеры, а не контекст: экраны читают цвет в build(), а при смене темы
+/// app.dart подменяет [current] и один раз пересобирает всё дерево
+/// (см. `rebuildWholeTree`), сохраняя стек навигации и состояние экранов.
 abstract final class AppColors {
-  // ── фон и поверхности ─────────────────────────────────────────────────
-  static const ink = Color(0xFF151417);
-  static const ink2 = Color(0xFF211F22);
-  static const card = Color(0xFF211F22);
+  static AppPalette current = AppPalette.burgundyChampagne;
 
-  /// Платиновая заливка для редких светлых пятен.
-  static const paper = Color(0xFFE7E4E2);
-
-  // ── действие ──────────────────────────────────────────────────────────
-  static const primary = Color(0xFF7A2436);
-
-  /// Только для hover / pressed / focus — чтобы нажатие было заметно.
-  static const primaryHover = Color(0xFF963148);
-
-  /// Бордовый для текста, иконок и тонких линий на графите.
-  ///
-  /// [primary] годится как заливка под платиновой подписью, но сам по себе
-  /// на тёмном фоне даёт контраст 1,8:1 — подпись активной вкладки выглядит
-  /// грязным пятном. Этот оттенок даёт 4,8:1 и остаётся в той же семье.
-  static const primaryTint = Color(0xFFC4677C);
-
-  /// Бордовый тёмный, чёрный текст на нём даёт 2:1 и не читается.
-  /// Всё, что лежит поверх [primary], красится этим.
-  static const onPrimary = Color(0xFFE7E4E2);
-
-  // ── статусы ───────────────────────────────────────────────────────────
-  static const success = Color(0xFF4FA77A);
-  static const danger = Color(0xFFD45A63);
-
-  /// Гео и карта держатся отдельной холодной веткой: если метки красить
-  /// бордовым, они сливаются с кнопками и перестают читаться как «место».
-  static const geo = Color(0xFF6E9BC4);
-
-  // ── текст ─────────────────────────────────────────────────────────────
-  static const text = Color(0xFFE7E4E2);
-  static const textDim = Color(0xFFAAA5A6);
-  static const textFaint = Color(0x8AAAA5A6);
-
-  // ── линии ─────────────────────────────────────────────────────────────
-  static const hair = Color(0x59403B3E);
-  static const hairStrong = Color(0xFF403B3E);
+  static Color get ink => current.ink;
+  static Color get ink2 => current.ink2;
+  static Color get card => current.card;
+  static Color get paper => current.paper;
+  static Color get primary => current.primary;
+  static Color get primaryHover => current.primaryHover;
+  static Color get primaryTint => current.primaryTint;
+  static Color get onPrimary => current.onPrimary;
+  static Color get success => current.success;
+  static Color get danger => current.danger;
+  static Color get geo => current.geo;
+  static Color get text => current.text;
+  static Color get textDim => current.textDim;
+  static Color get textFaint => current.textFaint;
+  static Color get hair => current.hair;
+  static Color get hairStrong => current.hairStrong;
 }

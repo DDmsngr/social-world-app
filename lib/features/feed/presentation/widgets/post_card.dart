@@ -78,7 +78,7 @@ class PostCard extends StatelessWidget {
                 IconButton(
                   onPressed: onReport,
                   tooltip: 'Пожаловаться',
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.flag_outlined,
                     size: 19,
                     color: AppColors.textFaint,
@@ -120,7 +120,7 @@ class PostCard extends StatelessWidget {
                 IconButton(
                   onPressed: onComment,
                   tooltip: 'Обсуждение',
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.mode_comment_outlined,
                     size: 19,
                     color: AppColors.textFaint,

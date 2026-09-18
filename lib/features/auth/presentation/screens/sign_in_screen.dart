@@ -157,7 +157,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   Text(
                     _error!,
                     style:
-                        const TextStyle(color: AppColors.danger, fontSize: 13),
+                        TextStyle(color: AppColors.danger, fontSize: 13),
                   ),
                 ],
                 const SizedBox(height: 18),
@@ -189,7 +189,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                             }
                           }),
                   child: _busy
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(

@@ -211,7 +211,7 @@ class _Row extends StatelessWidget {
           Text(title, style: Theme.of(context).textTheme.bodyLarge),
           Text(
             phase,
-            style: const TextStyle(fontSize: 12, color: AppColors.textFaint),
+            style: TextStyle(fontSize: 12, color: AppColors.textFaint),
           ),
         ],
       ),

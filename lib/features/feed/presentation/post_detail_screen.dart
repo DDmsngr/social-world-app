@@ -216,7 +216,7 @@ class _Composer extends StatelessWidget {
     return SafeArea(
       top: false,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.ink2,
           border: Border(top: BorderSide(color: AppColors.hair)),
         ),
@@ -228,7 +228,7 @@ class _Composer extends StatelessWidget {
               if (replyTo != null)
                 Row(
                   children: [
-                    const Icon(Icons.reply, size: 14, color: AppColors.primaryTint),
+                    Icon(Icons.reply, size: 14, color: AppColors.primaryTint),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -271,7 +271,7 @@ class _Composer extends StatelessWidget {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.send, color: AppColors.primaryTint),
+                        : Icon(Icons.send, color: AppColors.primaryTint),
                   ),
                 ],
               ),

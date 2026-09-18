@@ -106,7 +106,7 @@ class _UpdateSheet extends ConsumerWidget {
                 ? 'Свежая сборка Social World. Скачивание идёт в фоне — '
                     'приложением можно пользоваться дальше.'
                 : info.notes,
-            style: const TextStyle(color: AppColors.textDim),
+            style: TextStyle(color: AppColors.textDim),
           ),
           const SizedBox(height: 20),
           FilledButton(
@@ -135,7 +135,7 @@ class _UpdateSheet extends ConsumerWidget {
           Text(
             '${(state.progress * 100).round()}% — окно можно закрыть, '
             'скачивание не прервётся.',
-            style: const TextStyle(color: AppColors.textDim),
+            style: TextStyle(color: AppColors.textDim),
           ),
         ];
 
@@ -143,7 +143,7 @@ class _UpdateSheet extends ConsumerWidget {
         return [
           Text('Обновление скачано', style: AppTypography.serif(24)),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Обновить сейчас? Android покажет своё окно установки — '
             'там нужно подтвердить, дальше всё произойдёт само.',
             style: TextStyle(color: AppColors.textDim),
@@ -177,7 +177,7 @@ class _UpdateSheet extends ConsumerWidget {
           const SizedBox(height: 10),
           Text(
             state.error ?? 'Неизвестная ошибка',
-            style: const TextStyle(color: AppColors.textDim),
+            style: TextStyle(color: AppColors.textDim),
           ),
           const SizedBox(height: 20),
           FilledButton(

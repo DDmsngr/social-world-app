@@ -56,7 +56,7 @@ class RoutePostPreview extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.timeline,
                           size: 15,
                           color: AppColors.primaryTint,
@@ -66,7 +66,7 @@ class RoutePostPreview extends ConsumerWidget {
                           '${formatRouteDistance(data.distanceMeters)} · '
                           '${formatRouteDuration(data.duration)}'
                           '${data.photos.isEmpty ? '' : ' · ${data.photos.length} фото'}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.text,
                           ),
@@ -78,7 +78,7 @@ class RoutePostPreview extends ConsumerWidget {
               ),
             ],
           ),
-          loading: () => const ColoredBox(
+          loading: () => ColoredBox(
             color: AppColors.ink,
             child: Center(
               child: SizedBox(
@@ -91,7 +91,7 @@ class RoutePostPreview extends ConsumerWidget {
               ),
             ),
           ),
-          error: (_, _) => const ColoredBox(
+          error: (_, _) => ColoredBox(
             color: AppColors.ink,
             child: Center(
               child: Text(

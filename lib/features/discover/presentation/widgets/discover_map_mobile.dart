@@ -11,6 +11,7 @@ import '../../../../core/debug/app_log.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
+import '../../../events/domain/entities/event.dart';
 import '../../domain/entities/discover_snapshot.dart';
 import '../../domain/entities/place.dart';
 
@@ -20,12 +21,18 @@ class DiscoverMap extends StatefulWidget {
     required this.data,
     required this.places,
     required this.onPlaceTap,
+    this.events = const [],
+    this.onEventTap,
     this.filterActive = false,
   });
 
   final DiscoverSnapshot data;
   final List<Place> places;
   final ValueChanged<Place> onPlaceTap;
+
+  /// Только события с координатами места — остальные на карту не попадают.
+  final List<Event> events;
+  final ValueChanged<Event>? onEventTap;
 
   /// true, пока в поиске есть непустой текст — тогда камера подстраивается
   /// под найденные места вместо того, чтобы держать исходный центр района.
@@ -50,6 +57,7 @@ class _DiscoverMapState extends State<DiscoverMap> {
   final _tapListeners = <_PlaceTapListener>[];
 
   bool _mapkitRunning = false;
+  AppPalette? _appliedPalette;
 
   @override
   void initState() {
@@ -64,7 +72,9 @@ class _DiscoverMapState extends State<DiscoverMap> {
   @override
   void didUpdateWidget(DiscoverMap old) {
     super.didUpdateWidget(old);
-    if (widget.data != old.data || widget.places != old.places) {
+    if (widget.data != old.data ||
+        widget.places != old.places ||
+        widget.events != old.events) {
       _rebuildObjects();
     }
 
@@ -107,7 +117,8 @@ class _DiscoverMapState extends State<DiscoverMap> {
       'DiscoverMap: onMapCreated, центр ${widget.data.centerLatitude},'
       ' ${widget.data.centerLongitude}',
     );
-    window.map.nightModeEnabled = true;
+    _appliedPalette = AppColors.current;
+    window.map.nightModeEnabled = AppColors.current.isDark;
     _window = window;
     _objects = window.map.mapObjects.addCollection();
 
@@ -281,7 +292,7 @@ class _DiscoverMapState extends State<DiscoverMap> {
           )
         ..setText(place.title)
         ..setTextStyle(
-          const ymk.TextStyle(
+          ymk.TextStyle(
             size: 11,
             color: AppColors.text,
             outlineColor: AppColors.ink,
@@ -291,10 +302,56 @@ class _DiscoverMapState extends State<DiscoverMap> {
         )
         ..addTapListener(listener);
     }
+
+    // События подписаны временем и акцентным цветом — так они с первого
+    // взгляда отличаются от обычных мест, даже если стоят в той же точке.
+    final onEventTap = widget.onEventTap;
+    for (final event in widget.events) {
+      if (!event.hasLocation) continue;
+      final listener = _PlaceTapListener(() => onEventTap?.call(event));
+      _tapListeners.add(listener);
+
+      collection
+          .addPlacemarkWithPoint(
+            ymk.Point(latitude: event.latitude!, longitude: event.longitude!),
+          )
+        ..setText('${_hhmm(event.startsAt)} · ${event.title}')
+        ..setTextStyle(
+          ymk.TextStyle(
+            size: 12,
+            color: AppColors.primaryTint,
+            outlineColor: AppColors.ink,
+            placement: ymk.TextStylePlacement.Top,
+            offset: 8,
+          ),
+        )
+        ..addTapListener(listener);
+    }
+  }
+
+  static String _hhmm(DateTime moment) {
+    final local = moment.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  // Метки красятся цветами темы в момент создания — после смены темы их
+  // надо перерисовать, а саму карту перевести в дневной/ночной режим.
+  void _followTheme() {
+    if (_window == null || identical(_appliedPalette, AppColors.current)) {
+      return;
+    }
+    _appliedPalette = AppColors.current;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _window?.map.nightModeEnabled = AppColors.current.isDark;
+      _rebuildObjects();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    _followTheme();
     if (!Platform.isAndroid && !Platform.isIOS) {
       return const _MobileMapUnavailable(
         title: 'Карта доступна на Android и iOS',
@@ -339,7 +396,7 @@ class _DiscoverMapState extends State<DiscoverMap> {
           ),
         Positioned(
           right: 16,
-          bottom: 90,
+          bottom: 108,
           child: Semantics(
             button: true,
             label: _locatingSelf
@@ -362,7 +419,7 @@ class _DiscoverMapState extends State<DiscoverMap> {
                             padding: EdgeInsets.all(12),
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.my_location, color: AppColors.primaryTint),
+                        : Icon(Icons.my_location, color: AppColors.primaryTint),
                   ),
                 ),
               ),

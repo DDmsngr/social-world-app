@@ -33,7 +33,7 @@ class DevSignInPanel extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.construction, size: 15, color: AppColors.success),
+              Icon(Icons.construction, size: 15, color: AppColors.success),
               const SizedBox(width: 8),
               Text(
                 'РЕЖИМ РАЗРАБОТКИ',

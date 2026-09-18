@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'app_colors.dart';
@@ -16,81 +16,99 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppTheme {
-  static ThemeData dark() {
-    final base = ThemeData.dark(useMaterial3: true);
+  static ThemeData build(AppPalette p) {
+    final base = p.isDark
+        ? ThemeData.dark(useMaterial3: true)
+        : ThemeData.light(useMaterial3: true);
+
+    final scheme = p.isDark
+        ? ColorScheme.dark(
+            primary: p.primary,
+            onPrimary: p.onPrimary,
+            secondary: p.success,
+            surface: p.ink2,
+            onSurface: p.text,
+            error: p.danger,
+          )
+        : ColorScheme.light(
+            primary: p.primary,
+            onPrimary: p.onPrimary,
+            secondary: p.success,
+            surface: p.ink2,
+            onSurface: p.text,
+            error: p.danger,
+          );
 
     return base.copyWith(
-      scaffoldBackgroundColor: AppColors.ink,
-      canvasColor: AppColors.ink,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.primary,
-        onPrimary: AppColors.onPrimary,
-        secondary: AppColors.success,
-        surface: AppColors.ink2,
-        onSurface: AppColors.text,
-        error: AppColors.danger,
-      ),
-      textTheme: AppTypography.textTheme(),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.hair,
-        thickness: 1,
-        space: 1,
-      ),
+      scaffoldBackgroundColor: p.ink,
+      canvasColor: p.ink,
+      colorScheme: scheme,
+      textTheme: AppTypography.textTheme(p),
+      iconTheme: IconThemeData(color: p.text),
+      dividerTheme: DividerThemeData(color: p.hair, thickness: 1, space: 1),
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.ink,
+        backgroundColor: p.ink,
+        foregroundColor: p.text,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: AppTypography.serif(24),
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        titleTextStyle: AppTypography.serif(24, color: p.text),
+        systemOverlayStyle: p.isDark
+            ? SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: Colors.transparent,
+              )
+            : SystemUiOverlayStyle.dark.copyWith(
+                statusBarColor: Colors.transparent,
+              ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.onPrimary,
-          disabledBackgroundColor: AppColors.card,
-          disabledForegroundColor: AppColors.textFaint,
+          backgroundColor: p.primary,
+          foregroundColor: p.onPrimary,
+          disabledBackgroundColor: p.card,
+          disabledForegroundColor: p.textFaint,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.chip),
           ),
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ).copyWith(
-          // Нажатие должно быть видно: бордовый светлеет, а не темнеет.
           overlayColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.pressed) ||
                 states.contains(WidgetState.hovered) ||
                 states.contains(WidgetState.focused)) {
-              return AppColors.primaryHover;
+              return p.primaryHover;
             }
             return null;
           }),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: AppColors.textDim),
+        style: TextButton.styleFrom(foregroundColor: p.textDim),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.card,
+        fillColor: p.card,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        hintStyle: const TextStyle(color: AppColors.textFaint),
+        hintStyle: TextStyle(color: p.textFaint),
+        prefixIconColor: p.textDim,
+        suffixIconColor: p.textDim,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.field),
-          borderSide: const BorderSide(color: AppColors.hair),
+          borderSide: BorderSide(color: p.hair),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.field),
-          borderSide: const BorderSide(color: AppColors.hair),
+          borderSide: BorderSide(color: p.hair),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.field),
-          borderSide: const BorderSide(color: AppColors.primaryTint),
+          borderSide: BorderSide(color: p.primaryTint),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.ink2,
+        backgroundColor: p.ink2,
         surfaceTintColor: Colors.transparent,
         indicatorColor: Colors.transparent,
         height: 64,
@@ -100,22 +118,29 @@ abstract final class AppTheme {
             fontSize: 11,
             letterSpacing: 0.4,
             color: states.contains(WidgetState.selected)
-                ? AppColors.primaryTint
-                : AppColors.textFaint,
+                ? p.primaryTint
+                : p.textFaint,
           ),
         ),
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
             size: 24,
             color: states.contains(WidgetState.selected)
-                ? AppColors.primaryTint
-                : AppColors.textFaint,
+                ? p.primaryTint
+                : p.textFaint,
           ),
         ),
       ),
-      snackBarTheme: const SnackBarThemeData(
-        backgroundColor: AppColors.ink2,
-        contentTextStyle: TextStyle(color: AppColors.text),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? p.primaryTint
+              : p.textFaint,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: p.ink2,
+        contentTextStyle: TextStyle(color: p.text),
         behavior: SnackBarBehavior.floating,
       ),
     );

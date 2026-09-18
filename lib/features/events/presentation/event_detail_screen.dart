@@ -40,7 +40,7 @@ class EventDetailScreen extends ConsumerWidget {
         title: const Text('Событие'),
         leading: IconButton(
           onPressed: () =>
-              context.canPop() ? context.pop() : context.go(Routes.events),
+              context.canPop() ? context.pop() : context.go(Routes.home),
           tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
         ),
@@ -102,8 +102,8 @@ class _EventDetailBody extends ConsumerWidget {
               child: CachedNetworkImage(
                 imageUrl: event.coverUrl!,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => const ColoredBox(color: AppColors.ink2),
-                errorWidget: (_, _, _) => const ColoredBox(color: AppColors.ink2),
+                placeholder: (_, _) => ColoredBox(color: AppColors.ink2),
+                errorWidget: (_, _, _) => ColoredBox(color: AppColors.ink2),
               ),
             ),
           ),

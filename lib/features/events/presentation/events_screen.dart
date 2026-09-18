@@ -22,11 +22,17 @@ class EventsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('События'),
+        leading: IconButton(
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go(Routes.home),
+          tooltip: 'Назад',
+          icon: const Icon(Icons.arrow_back),
+        ),
         actions: [
           IconButton(
             onPressed: () => ref.read(eventsProvider.notifier).refresh(),
             tooltip: 'Обновить',
-            icon: const Icon(Icons.refresh, color: AppColors.textDim),
+            icon: Icon(Icons.refresh, color: AppColors.textDim),
           ),
           const SizedBox(width: 8),
         ],
@@ -43,7 +49,7 @@ class EventsScreen extends ConsumerWidget {
           if (list.isEmpty) {
             return const _EventsMessage(
               title: 'Пока ничего не запланировано',
-              text: 'Создайте первое событие во вкладке «Создать».',
+              text: 'Создайте первое событие через «Создать» внизу экрана.',
             );
           }
 

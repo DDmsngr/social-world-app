@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
+import '../../../events/domain/entities/event.dart';
 import '../../domain/entities/discover_snapshot.dart';
 import '../../domain/entities/place.dart';
 
@@ -13,12 +14,18 @@ class DiscoverMap extends StatelessWidget {
     required this.data,
     required this.places,
     required this.onPlaceTap,
+    this.events = const [],
+    this.onEventTap,
     this.filterActive = false,
   });
 
   final DiscoverSnapshot data;
   final List<Place> places;
   final ValueChanged<Place> onPlaceTap;
+
+  /// Веб показывает события отдельным списком в «Пульсе города».
+  final List<Event> events;
+  final ValueChanged<Event>? onEventTap;
 
   /// Веб и так показывает список без карты — камеры для наведения нет,
   /// поле принято только ради одинаковой сигнатуры с мобильной реализацией.
@@ -27,11 +34,11 @@ class DiscoverMap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: RadialGradient(
           center: Alignment(0.4, -0.45),
           radius: 1.15,
-          colors: [Color(0xFF26322D), AppColors.ink],
+          colors: [AppColors.card, AppColors.ink],
         ),
       ),
       child: ListView(
@@ -79,7 +86,7 @@ class DiscoverMap extends StatelessWidget {
                 onTap: () => onPlaceTap(place),
                 child: Row(
                   children: [
-                    const Icon(Icons.place_outlined, color: AppColors.primaryTint),
+                    Icon(Icons.place_outlined, color: AppColors.primaryTint),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -97,7 +104,7 @@ class DiscoverMap extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right, color: AppColors.textFaint),
+                    Icon(Icons.chevron_right, color: AppColors.textFaint),
                   ],
                 ),
               ),

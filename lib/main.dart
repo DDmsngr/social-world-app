@@ -9,6 +9,7 @@ import 'app.dart';
 import 'core/config/env.dart';
 import 'core/config/mapkit_boot.dart';
 import 'core/debug/app_log.dart';
+import 'core/theme/theme_choice.dart';
 
 Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +46,14 @@ Future<void> main() async {
     ),
   );
 
+  final themeChoice = await loadThemeChoice();
+
   FlutterNativeSplash.remove();
 
-  runApp(const ProviderScope(child: SocialWorldApp()));
+  runApp(
+    ProviderScope(
+      overrides: [initialThemeChoiceProvider.overrideWithValue(themeChoice)],
+      child: const SocialWorldApp(),
+    ),
+  );
 }

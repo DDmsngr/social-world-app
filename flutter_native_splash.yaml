@@ -1,17 +1,17 @@
 flutter_native_splash:
-  # Тот же фон, что у Scaffold (AppColors.ink) — переход в первый кадр
-  # Flutter должен быть незаметен.
-  color: "#151417"
+  # Тот же фон, что у Scaffold тёмной темы (AppPalette.burgundyChampagne.ink) —
+  # переход в первый кадр Flutter должен быть незаметен.
+  color: "#21151D"
   image: assets/images/splash_full.png
 
-  color_dark: "#151417"
+  color_dark: "#21151D"
   image_dark: assets/images/splash_full.png
 
   android_12:
     image: assets/images/splash_logo.png
-    icon_background_color: "#151417"
+    icon_background_color: "#21151D"
     image_dark: assets/images/splash_logo.png
-    icon_background_color_dark: "#151417"
+    icon_background_color_dark: "#21151D"
 
   android: true
   ios: true

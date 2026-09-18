@@ -10,6 +10,8 @@ class Event {
     this.description,
     this.endsAt,
     this.placeTitle,
+    this.latitude,
+    this.longitude,
     this.coverUrl,
     this.participantCount = 0,
     this.joinedByMe = false,
@@ -26,6 +28,12 @@ class Event {
 
   /// Название места, а не координаты — тот же принцип, что и у постов.
   final String? placeTitle;
+
+  /// Точка места, к которому привязано событие. Нет места — нет и метки на
+  /// карте, событие остаётся только в списке.
+  final double? latitude;
+  final double? longitude;
+
   final String? coverUrl;
 
   final DateTime createdAt;
@@ -34,7 +42,14 @@ class Event {
 
   bool get isPast => (endsAt ?? startsAt).isBefore(DateTime.now());
 
-  Event copyWith({int? participantCount, bool? joinedByMe}) => Event(
+  bool get hasLocation => latitude != null && longitude != null;
+
+  Event copyWith({
+    int? participantCount,
+    bool? joinedByMe,
+    double? latitude,
+    double? longitude,
+  }) => Event(
     id: id,
     authorId: authorId,
     authorName: authorName,
@@ -44,6 +59,8 @@ class Event {
     startsAt: startsAt,
     endsAt: endsAt,
     placeTitle: placeTitle,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
     coverUrl: coverUrl,
     createdAt: createdAt,
     participantCount: participantCount ?? this.participantCount,

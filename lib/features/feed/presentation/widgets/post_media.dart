@@ -91,15 +91,15 @@ class _MediaItem extends StatelessWidget {
       return Image.network(
         url,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => const ColoredBox(color: AppColors.ink2),
+        errorBuilder: (_, _, _) => ColoredBox(color: AppColors.ink2),
       );
     }
 
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
-      placeholder: (_, _) => const ColoredBox(color: AppColors.ink2),
-      errorWidget: (_, _, _) => const ColoredBox(
+      placeholder: (_, _) => ColoredBox(color: AppColors.ink2),
+      errorWidget: (_, _, _) => ColoredBox(
         color: AppColors.ink2,
         child: Center(
           child: Icon(
@@ -153,7 +153,7 @@ class _VideoItemState extends State<_VideoItem> {
   @override
   Widget build(BuildContext context) {
     if (!_ready) {
-      return const ColoredBox(
+      return ColoredBox(
         color: AppColors.ink2,
         child: Center(
           child: SizedBox(
@@ -180,7 +180,7 @@ class _VideoItemState extends State<_VideoItem> {
             ),
           ),
           if (!_controller.value.isPlaying)
-            const Center(
+            Center(
               child: CircleAvatar(
                 radius: 26,
                 backgroundColor: Color(0x99151417),
@@ -194,7 +194,7 @@ class _VideoItemState extends State<_VideoItem> {
             child: VideoProgressIndicator(
               _controller,
               allowScrubbing: true,
-              colors: const VideoProgressColors(
+              colors: VideoProgressColors(
                 playedColor: AppColors.primaryTint,
                 bufferedColor: AppColors.hairStrong,
                 backgroundColor: AppColors.hair,

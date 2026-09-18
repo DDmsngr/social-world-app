@@ -26,7 +26,7 @@ class RouteSketch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (path.length < 2) {
-      return const ColoredBox(
+      return ColoredBox(
         color: AppColors.ink,
         child: Center(
           child: Text(

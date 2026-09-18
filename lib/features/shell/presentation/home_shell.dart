@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/config/feature_flags.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update/update_badge.dart';
 import '../../../core/update/update_controller.dart';
@@ -37,7 +36,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ],
       ),
       bottomNavigationBar: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.hair)),
         ),
         child: NavigationBar(
@@ -48,35 +47,29 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             index,
             initialLocation: index == widget.navigationShell.currentIndex,
           ),
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.dynamic_feed_outlined),
-              selectedIcon: Icon(Icons.dynamic_feed),
-              label: 'Лента',
+          // Порядок вкладок должен совпадать с порядком веток роутера.
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.photo_library_outlined),
+              selectedIcon: Icon(Icons.photo_library),
+              label: 'Моменты',
             ),
-            const NavigationDestination(
+            NavigationDestination(
               icon: Icon(Icons.map_outlined),
               selectedIcon: Icon(Icons.map),
               label: 'Карта',
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.event_outlined),
-              selectedIcon: Icon(Icons.event),
-              label: 'События',
-            ),
-            const NavigationDestination(
-              icon: Icon(Icons.add_circle_outline),
-              selectedIcon: Icon(Icons.add_circle),
+            NavigationDestination(
+              icon: Icon(Icons.add_circle_outline, size: 30),
+              selectedIcon: Icon(Icons.add_circle, size: 30),
               label: 'Создать',
             ),
-            // Порядок вкладок должен совпадать с порядком веток роутера.
-            if (Features.chat)
-              const NavigationDestination(
-                icon: Icon(Icons.forum_outlined),
-                selectedIcon: Icon(Icons.forum),
-                label: 'Чаты',
-              ),
-            const NavigationDestination(
+            NavigationDestination(
+              icon: Icon(Icons.forum_outlined),
+              selectedIcon: Icon(Icons.forum),
+              label: 'Чаты',
+            ),
+            NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person),
               label: 'Профиль',

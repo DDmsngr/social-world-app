@@ -51,7 +51,7 @@ class CommentTile extends StatelessWidget {
         decoration: BoxDecoration(
           border: comment.depth == 0
               ? null
-              : const Border(left: BorderSide(color: AppColors.hairStrong)),
+              : Border(left: BorderSide(color: AppColors.hairStrong)),
         ),
         padding: EdgeInsets.only(left: comment.depth == 0 ? 0 : 10),
         child: Column(
@@ -93,7 +93,7 @@ class CommentTile extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       _relativeTime(comment.createdAt),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         color: AppColors.textFaint,
                       ),
@@ -102,7 +102,7 @@ class CommentTile extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         '+$hiddenReplies',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           color: AppColors.primaryTint,
                         ),
@@ -116,7 +116,7 @@ class CommentTile extends StatelessWidget {
               Text(
                 comment.deleted ? 'Комментарий удалён' : comment.body ?? '',
                 style: comment.deleted
-                    ? const TextStyle(
+                    ? TextStyle(
                         color: AppColors.textFaint,
                         fontStyle: FontStyle.italic,
                       )

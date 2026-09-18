@@ -49,13 +49,13 @@ class MessageBubble extends StatelessWidget {
               children: [
                 // Подделанную подпись нельзя показывать как обычное сообщение.
                 if (message.signatureValid == false) ...[
-                  const Icon(
+                  Icon(
                     Icons.gpp_maybe_outlined,
                     size: 13,
                     color: AppColors.danger,
                   ),
                   const SizedBox(width: 4),
-                  const Text(
+                  Text(
                     'подпись не сходится',
                     style: TextStyle(fontSize: 11, color: AppColors.danger),
                   ),

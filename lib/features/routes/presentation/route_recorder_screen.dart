@@ -157,7 +157,7 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
                 padding: const EdgeInsets.all(14),
                 child: Text(
                   state.error!,
-                  style: const TextStyle(color: AppColors.danger, fontSize: 13),
+                  style: TextStyle(color: AppColors.danger, fontSize: 13),
                 ),
               ),
             ),
@@ -273,7 +273,7 @@ class _ControlPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           if (publishing)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: CircularProgressIndicator(
                 strokeWidth: 2,
@@ -282,7 +282,7 @@ class _ControlPanel extends StatelessWidget {
             )
           else
             switch (state.status) {
-              RecordingStatus.preparing => const Padding(
+              RecordingStatus.preparing => Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
@@ -359,7 +359,7 @@ class _Stat extends StatelessWidget {
       const SizedBox(height: 2),
       Text(
         label,
-        style: const TextStyle(color: AppColors.textDim, fontSize: 11),
+        style: TextStyle(color: AppColors.textDim, fontSize: 11),
       ),
     ],
   );

@@ -139,8 +139,8 @@ class _RoutePhotoView extends StatelessWidget {
       return CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,
-        placeholder: (_, _) => const ColoredBox(color: AppColors.ink2),
-        errorWidget: (_, _, _) => const ColoredBox(
+        placeholder: (_, _) => ColoredBox(color: AppColors.ink2),
+        errorWidget: (_, _, _) => ColoredBox(
           color: AppColors.ink2,
           child: Center(
             child: Icon(Icons.broken_image_outlined, color: AppColors.textFaint),

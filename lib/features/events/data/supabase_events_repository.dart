@@ -114,6 +114,8 @@ class SupabaseEventsRepository implements EventsRepository {
     startsAt: DateTime.parse(row['starts_at'] as String),
     endsAt: _parseNullable(row['ends_at']),
     placeTitle: row['place_title'] as String?,
+    latitude: (row['place_latitude'] as num?)?.toDouble(),
+    longitude: (row['place_longitude'] as num?)?.toDouble(),
     coverUrl: row['cover_url'] as String?,
     createdAt: DateTime.parse(row['created_at'] as String),
     participantCount: (row['participant_count'] as num?)?.toInt() ?? 0,

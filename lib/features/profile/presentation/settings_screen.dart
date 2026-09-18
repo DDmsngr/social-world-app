@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_choice.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/update/update_controller.dart';
 import '../../../core/widgets/sw_widgets.dart';
@@ -40,6 +41,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.gutter),
         children: [
+          const SectionLabel('Оформление'),
+          const SizedBox(height: 12),
+          const _ThemePicker(),
+          const SizedBox(height: 26),
           const SectionLabel('Приватность'),
           const SizedBox(height: 12),
           GlassCard(
@@ -117,6 +122,61 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
+class _ThemePicker extends ConsumerWidget {
+  const _ThemePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(themeChoiceProvider);
+
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          for (final choice in ThemeChoice.values)
+            Semantics(
+              button: true,
+              selected: choice == current,
+              inMutuallyExclusiveGroup: true,
+              child: InkWell(
+                onTap: () =>
+                    ref.read(themeChoiceProvider.notifier).choose(choice),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(choice.label),
+                            if (choice.hint != null)
+                              Text(
+                                choice.hint!,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textDim,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (choice == current)
+                        Icon(Icons.check, color: AppColors.primaryTint),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _VersionRow extends StatelessWidget {
   const _VersionRow();
 
@@ -135,7 +195,7 @@ class _VersionRow extends StatelessWidget {
                 info == null
                     ? '…'
                     : '${info.version} (${info.buildNumber})',
-                style: const TextStyle(color: AppColors.textDim),
+                style: TextStyle(color: AppColors.textDim),
               ),
             ],
           ),
@@ -168,7 +228,7 @@ class _UpdateRow extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text('Обновления'),
-          Text(label, style: const TextStyle(color: AppColors.textDim)),
+          Text(label, style: TextStyle(color: AppColors.textDim)),
         ],
       ),
     );

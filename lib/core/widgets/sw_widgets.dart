@@ -117,7 +117,7 @@ class PhasePlaceholder extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('— ', style: TextStyle(color: AppColors.primaryTint)),
+                    Text('— ', style: TextStyle(color: AppColors.primaryTint)),
                     Expanded(
                       child: Text(
                         item,

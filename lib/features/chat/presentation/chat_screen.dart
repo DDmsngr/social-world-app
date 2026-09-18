@@ -176,7 +176,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     }
                     return SelectableText(
                       snapshot.data!,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.primaryTint,
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -213,7 +213,7 @@ class _Composer extends StatelessWidget {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.hair)),
         ),
         child: Column(
@@ -224,7 +224,7 @@ class _Composer extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   error!,
-                  style: const TextStyle(color: AppColors.danger, fontSize: 12),
+                  style: TextStyle(color: AppColors.danger, fontSize: 12),
                 ),
               ),
               const SizedBox(height: 6),

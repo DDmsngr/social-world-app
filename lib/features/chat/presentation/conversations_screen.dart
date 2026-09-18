@@ -130,7 +130,7 @@ class ConversationsScreen extends ConsumerWidget {
                           ),
                           child: Text(
                             '${conversation.unreadCount}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: AppColors.onPrimary,
@@ -164,7 +164,7 @@ class _EncryptionNotice extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_open, size: 17, color: AppColors.textFaint),
+          Icon(Icons.lock_open, size: 17, color: AppColors.textFaint),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

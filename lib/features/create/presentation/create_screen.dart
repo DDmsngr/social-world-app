@@ -87,12 +87,34 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               placeTitle: _selectedPlace?.title,
             );
 
-        ref.read(eventsProvider.notifier).append(event);
+        // Координаты места сервер отдаёт только в city_events — подставляем
+        // их из выбранного места, чтобы метка встала на карту сразу.
+        final placed = event.copyWith(
+          latitude: _selectedPlace?.latitude,
+          longitude: _selectedPlace?.longitude,
+        );
+        ref.read(eventsProvider.notifier).append(placed);
 
         if (!mounted) return;
         _titleController.clear();
         _descriptionController.clear();
-        context.go(Routes.events);
+        final messenger = ScaffoldMessenger.of(context);
+        final router = GoRouter.of(context);
+        context.go(Routes.home);
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              placed.hasLocation ? 'Событие на карте' : 'Событие создано',
+            ),
+            action: SnackBarAction(
+              label: 'Открыть',
+              onPressed: () => router.push(
+                '${Routes.eventDetail}/${placed.id}',
+                extra: placed,
+              ),
+            ),
+          ),
+        );
       }
 
       setState(() {
@@ -322,7 +344,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                         ? AppColors.onPrimary
                         : AppColors.textDim,
                   ),
-                  side: const BorderSide(color: AppColors.hair),
+                  side: BorderSide(color: AppColors.hair),
                 ),
             ],
           ),
@@ -330,7 +352,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
           FilledButton(
             onPressed: canPublish ? _publish : null,
             child: _busy
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
@@ -390,7 +412,7 @@ class _AttachmentThumb extends StatelessWidget {
             width: 92,
             height: 92,
             child: isVideoUrl(file.path)
-                ? const ColoredBox(
+                ? ColoredBox(
                     color: AppColors.ink2,
                     child: Center(
                       child: Icon(
@@ -403,7 +425,7 @@ class _AttachmentThumb extends StatelessWidget {
                     future: file.readAsBytes(),
                     builder: (_, snapshot) => snapshot.hasData
                         ? Image.memory(snapshot.data!, fit: BoxFit.cover)
-                        : const ColoredBox(color: AppColors.ink2),
+                        : ColoredBox(color: AppColors.ink2),
                   ),
           ),
         ),
@@ -413,7 +435,7 @@ class _AttachmentThumb extends StatelessWidget {
           child: InkWell(
             onTap: onRemove,
             customBorder: const CircleBorder(),
-            child: const CircleAvatar(
+            child: CircleAvatar(
               radius: 11,
               backgroundColor: Color(0xCC151417),
               child: Icon(Icons.close, size: 13, color: AppColors.paper),

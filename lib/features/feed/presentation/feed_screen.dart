@@ -21,12 +21,12 @@ class FeedScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Сочи'),
+        title: const Text('Моменты'),
         actions: [
           IconButton(
             onPressed: () => ref.read(feedProvider.notifier).refresh(),
             tooltip: 'Обновить',
-            icon: const Icon(Icons.refresh, color: AppColors.textDim),
+            icon: Icon(Icons.refresh, color: AppColors.textDim),
           ),
           const SizedBox(width: 8),
         ],
@@ -34,7 +34,7 @@ class FeedScreen extends ConsumerWidget {
       body: feed.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => _FeedMessage(
-          title: 'Лента не загрузилась',
+          title: 'Моменты не загрузились',
           text: 'Проверьте соединение и попробуйте ещё раз.',
           actionLabel: 'Повторить',
           onAction: () => ref.read(feedProvider.notifier).refresh(),
@@ -112,7 +112,7 @@ class _FeedMessage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionLabel('Лента'),
+            const SectionLabel('Моменты'),
             const SizedBox(height: 14),
             Text(title, style: AppTypography.serif(30)),
             const SizedBox(height: 10),

@@ -1,11 +1,16 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/debug/log_viewer_screen.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
+import '../../events/domain/entities/event.dart';
+import '../../events/presentation/providers/events_providers.dart';
+import '../domain/entities/discover_snapshot.dart';
 import '../domain/entities/place.dart';
 import 'providers/discover_providers.dart';
 import 'widgets/discover_map.dart';
@@ -42,15 +47,23 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     }
   }
 
+  void _openEvent(Event event) =>
+      context.push('${Routes.eventDetail}/${event.id}', extra: event);
+
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(discoverDataProvider);
+    // Прошедшие события карте не нужны: она про то, что происходит сейчас.
+    final upcoming = [
+      for (final event in ref.watch(eventsProvider).value ?? const <Event>[])
+        if (!event.isPast) event,
+    ];
 
     return Scaffold(
       appBar: AppBar(
         title: GestureDetector(
           onTap: _onTitleTap,
-          child: const Text('Рядом'),
+          child: const Text('Сочи'),
         ),
       ),
       body: data.when(
@@ -60,6 +73,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               child: DiscoverMap(
                 data: snapshot,
                 places: ref.watch(filteredPlacesProvider),
+                events: [
+                  for (final event in upcoming)
+                    if (event.hasLocation) event,
+                ],
+                onEventTap: _openEvent,
                 filterActive: ref.watch(discoverSearchProvider).isNotEmpty ||
                     ref.watch(categoryFilterProvider).isNotEmpty,
                 onPlaceTap: (place) => _showPlace(context, place),
@@ -89,11 +107,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               ),
             ),
             Positioned(
+              left: AppSpacing.gutter,
               right: AppSpacing.gutter,
-              bottom: 18,
-              child: _PulseBadge(
-                count: snapshot.people.length,
-                level: snapshot.pulseLevel,
+              bottom: 16,
+              child: _CityPulseCard(
+                data: snapshot,
+                eventCount: upcoming.length,
+                onOpen: () => context.push(Routes.events),
               ),
             ),
           ],
@@ -170,7 +190,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                                   ? AppColors.onPrimary
                                   : AppColors.textDim,
                             ),
-                            side: const BorderSide(color: AppColors.hair),
+                            side: BorderSide(color: AppColors.hair),
                           ),
                       ],
                     ),
@@ -212,39 +232,107 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       );
 }
 
-class _PulseBadge extends StatelessWidget {
-  const _PulseBadge({required this.count, required this.level});
+/// «Пульс города»: что происходит вокруг прямо сейчас, одной строкой.
+/// Тап открывает список событий — отдельной вкладки у них больше нет.
+class _CityPulseCard extends StatelessWidget {
+  const _CityPulseCard({
+    required this.data,
+    required this.eventCount,
+    required this.onOpen,
+  });
 
-  final int count;
-  final int level;
+  final DiscoverSnapshot data;
+  final int eventCount;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final color = level >= 2 ? AppColors.primaryTint : AppColors.geo;
-    return Material(
-      color: AppColors.ink2.withValues(alpha: 0.92),
-      borderRadius: BorderRadius.circular(AppRadius.chip),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.chip),
-          border: Border.all(color: AppColors.hairStrong),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8 + level * 2,
-              height: 8 + level * 2,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    final level = data.pulseLevel;
+    final dot = level >= 2 ? AppColors.primaryTint : AppColors.geo;
+    final summary = [
+      _plural(eventCount, 'событие', 'события', 'событий'),
+      _plural(data.places.length, 'место', 'места', 'мест'),
+      '${data.people.length} рядом',
+    ].join(' · ');
+
+    return Semantics(
+      button: true,
+      label: 'Пульс города: $summary. Открыть события',
+      child: Material(
+        color: AppColors.ink2.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: Border.all(color: AppColors.hairStrong),
             ),
-            const SizedBox(width: 9),
-            Text('$count рядом'),
-          ],
+            child: Row(
+              children: [
+                Container(
+                  width: 10 + level * 3,
+                  height: 10 + level * 3,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: dot,
+                    boxShadow: [
+                      BoxShadow(
+                        color: dot.withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Пульс города',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        summary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  'Смотреть',
+                  style: TextStyle(
+                    color: AppColors.primaryTint,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.primaryTint),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+}
+
+String _plural(int n, String one, String few, String many) {
+  final mod10 = n % 10;
+  final mod100 = n % 100;
+  final word = mod10 == 1 && mod100 != 11
+      ? one
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+      ? few
+      : many;
+  return '$n $word';
 }
 
 class _DiscoverError extends StatelessWidget {

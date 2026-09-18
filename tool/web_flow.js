@@ -11,6 +11,9 @@ const artifactDir = process.env.PW_ARTIFACT_DIR || 'D:\\temp\\sw-shots';
       viewport: { width: 390, height: 844 },
       deviceScaleFactor: 2,
       locale: 'ru-RU',
+      // Тема по умолчанию — «как в системе»: стартуем в тёмной, потом
+      // в настройках явно выбираем светлую.
+      colorScheme: 'dark',
     });
     page.on('pageerror', (e) => console.log('PAGE ERROR:', e.message));
 
@@ -40,48 +43,62 @@ const artifactDir = process.env.PW_ARTIFACT_DIR || 'D:\\temp\\sw-shots';
       console.log(`  ввод «${text}» в поле «${label}»`);
     };
 
+    // Вкладки: Моменты / Карта / Создать / Чаты / Профиль. В дереве это
+    // `tab` без названия — жмём мышью по центрам колонок.
+    const tabCount = 5;
+    const tabX = (i) => (390 / tabCount) * i + 390 / (tabCount * 2);
+    const tabs = async (prefix) => {
+      for (const [index, name] of [
+        [0, 'moments'],
+        [1, 'map'],
+        [2, 'create'],
+        [3, 'chats'],
+        [4, 'profile'],
+      ]) {
+        await page.mouse.click(tabX(index), 844 - 30);
+        await page.waitForTimeout(1500);
+        await shot(`${prefix}-${name}`);
+        console.log('    url:', new URL(page.url()).hash);
+      }
+    };
+
     await page.goto(targetUrl, { waitUntil: 'load' });
     await page.waitForTimeout(9000);
     await page.evaluate(() => document.querySelector('flt-semantics-placeholder')?.click());
     await page.waitForTimeout(2000);
 
     await shot('01-signin');
+    // С настоящим бэкендом по умолчанию вход через VK/Яндекс, почта — за
+    // отдельной кнопкой. На заглушках (пустой .env) форма почты открыта сразу.
+    if (await page.getByRole('button', { name: 'Войти по почте' }).count()) {
+      await tap('Войти по почте');
+    }
     await typeInto('почта', 'lev@socialworld.ru');
     await tap('Получить код');
-    await shot('02-code');
 
     // Код подставляется сам, пока почта не подключена — печатать нечего.
     await tap('Войти');
-    await shot('03-onboarding');
-
     await typeInto('имя', 'Алексей');
-    await shot('04-onboarding-filled');
     await tap('Продолжить');
-    await shot('05-feed');
+    // После входа главный экран — карта.
+    await shot('02-home-map');
 
-    const tree = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('flt-semantics')).map((el) => {
-        const r = el.getBoundingClientRect();
-        return `${el.getAttribute('role') || '-'} "${(el.textContent || '').trim().slice(0, 24)}" @${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}`;
-      }),
-    );
-    console.log('--- дерево на ленте ---\n' + tree.join('\n'));
+    await tap('Пульс города');
+    await shot('03-events');
+    await page.goBack();
+    await page.waitForTimeout(1500);
 
-    // Вкладки нижней панели: в dev-режиме чат тоже включён (см. Features.chat),
-    // итого шесть колонок — Лента/Карта/События/Создать/Чаты/Профиль.
-    const tabCount = 6;
-    const tabCenters = Array.from({ length: tabCount }, (_, i) => (390 / tabCount) * i + 390 / (tabCount * 2));
-    for (const [index, name] of [
-      [1, '06-discover'],
-      [2, '07-events'],
-      [3, '08-create'],
-      [4, '09-chats'],
-      [5, '10-profile'],
-    ]) {
-      await page.mouse.click(tabCenters[index], 844 - 30);
-      await page.waitForTimeout(1500);
-      await shot(name);
-    }
+    await tabs('dark');
+
+    await tap('Настройки');
+    await shot('10-settings-dark');
+    await tap('Светлая');
+    await page.waitForTimeout(800);
+    await shot('11-settings-light');
+    await page.goBack();
+    await page.waitForTimeout(1500);
+
+    await tabs('light');
 
     console.log('url в конце:', page.url());
     console.log('flow complete');
