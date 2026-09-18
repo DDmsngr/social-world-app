@@ -32,17 +32,9 @@ class SupabaseEventsRepository implements EventsRepository {
     required DateTime startsAt,
     String? description,
     DateTime? endsAt,
+    String? placeId,
     String? placeTitle,
   }) async {
-    final placeId = placeTitle == null
-        ? null
-        : await _client
-              .from('places')
-              .select('id')
-              .eq('title', placeTitle)
-              .maybeSingle()
-              .then((row) => row?['id'] as String?);
-
     final row = await _client
         .from('events')
         .insert({

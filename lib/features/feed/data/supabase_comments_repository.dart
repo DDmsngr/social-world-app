@@ -85,11 +85,11 @@ class SupabaseCommentsRepository implements CommentsRepository {
 
   @override
   Future<Comment> deleteComment(Comment comment) async {
-    await _client
-        .from('post_comments')
-        .update({'deleted_at': DateTime.now().toUtc().toIso8601String()})
-        .eq('id', comment.id);
-
+    // RPC, а не update({'deleted_at': ...}) отсюда же: удаление должно
+    // стереть body/media_urls по-настоящему, а не только проставить дату —
+    // иначе текст «удалённого» комментария остаётся читаемым прямым select
+    // к таблице, в обход RPC, которая его маскирует.
+    await _client.rpc('soft_delete_own_comment', params: {'in_comment': comment.id});
     return comment.copyWith(deleted: true);
   }
 

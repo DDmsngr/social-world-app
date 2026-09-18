@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
@@ -26,7 +28,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final blur = (_pendingBlur ?? user?.locationBlurM ?? 500).toDouble();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Настройки')),
+      appBar: AppBar(
+        title: const Text('Настройки'),
+        leading: IconButton(
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go(Routes.profile),
+          tooltip: 'Назад',
+          icon: const Icon(Icons.arrow_back),
+        ),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.gutter),
         children: [

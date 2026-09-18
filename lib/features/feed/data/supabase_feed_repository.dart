@@ -32,6 +32,7 @@ class SupabaseFeedRepository implements FeedRepository {
     required String body,
     PostKind kind = PostKind.text,
     List<String> mediaPaths = const [],
+    String? placeId,
     String? placeTitle,
     String? routeId,
   }) async {
@@ -41,17 +42,6 @@ class SupabaseFeedRepository implements FeedRepository {
     final mediaUrls = <String>[
       for (final path in mediaPaths) await uploader.upload(path),
     ];
-
-    // Без place_id выбранное в форме место живёт только до перезагрузки ленты:
-    // city_feed берёт название джойном по places.
-    final placeId = placeTitle == null
-        ? null
-        : await _client
-              .from('places')
-              .select('id')
-              .eq('title', placeTitle)
-              .maybeSingle()
-              .then((row) => row?['id'] as String?);
 
     final row = await _client
         .from('posts')

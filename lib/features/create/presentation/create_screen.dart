@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
+import '../../discover/domain/entities/place.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
 import '../../events/presentation/providers/events_providers.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
@@ -39,7 +40,9 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   final _descriptionController = TextEditingController();
   final _picker = ImagePicker();
   final _attachments = <XFile>[];
-  String? _placeTitle;
+  // Место храним целиком, а не только название: у places title не уникален
+  // (тем более при краудсорсинге), резолвить id обратно по строке нельзя.
+  Place? _selectedPlace;
   DateTime? _startsAt;
   bool _busy = false;
 
@@ -62,7 +65,8 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
         final post = await ref.read(feedRepositoryProvider).createPost(
               body: _bodyController.text,
               mediaPaths: [for (final file in _attachments) file.path],
-              placeTitle: _placeTitle,
+              placeId: _selectedPlace?.id,
+              placeTitle: _selectedPlace?.title,
             );
 
         ref.read(feedProvider.notifier).prepend(post);
@@ -79,7 +83,8 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                   ? null
                   : _descriptionController.text,
               startsAt: _startsAt!,
-              placeTitle: _placeTitle,
+              placeId: _selectedPlace?.id,
+              placeTitle: _selectedPlace?.title,
             );
 
         ref.read(eventsProvider.notifier).append(event);
@@ -91,7 +96,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
       }
 
       setState(() {
-        _placeTitle = null;
+        _selectedPlace = null;
         _startsAt = null;
         _busy = false;
       });
@@ -304,16 +309,16 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               for (final place in places)
                 ChoiceChip(
                   label: Text(place.title),
-                  selected: _placeTitle == place.title,
+                  selected: _selectedPlace?.id == place.id,
                   onSelected: (selected) => setState(
-                    () => _placeTitle = selected ? place.title : null,
+                    () => _selectedPlace = selected ? place : null,
                   ),
                   showCheckmark: false,
                   backgroundColor: AppColors.card,
                   selectedColor: AppColors.primary,
                   labelStyle: TextStyle(
                     fontSize: 13,
-                    color: _placeTitle == place.title
+                    color: _selectedPlace?.id == place.id
                         ? AppColors.onPrimary
                         : AppColors.textDim,
                   ),

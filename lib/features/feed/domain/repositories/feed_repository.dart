@@ -10,10 +10,15 @@ abstract interface class FeedRepository {
   ///
   /// [mediaPaths] — файлы на устройстве; в хранилище их кладёт репозиторий,
   /// чтобы экран не знал ни про бакеты, ни про то, что в моках загрузки нет.
+  /// [placeId] и [placeTitle] приходят из уже выбранного в UI места одной
+  /// парой: резолвить id по названию в репозитории нельзя — при совпадающих
+  /// названиях (реальный случай при краудсорсинге мест) `maybeSingle()`
+  /// падает на нескольких найденных строках.
   Future<Post> createPost({
     required String body,
     PostKind kind = PostKind.text,
     List<String> mediaPaths = const [],
+    String? placeId,
     String? placeTitle,
     String? routeId,
   });

@@ -30,6 +30,7 @@ class LocalEventsRepository implements EventsRepository {
     required DateTime startsAt,
     String? description,
     DateTime? endsAt,
+    String? placeId,
     String? placeTitle,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));

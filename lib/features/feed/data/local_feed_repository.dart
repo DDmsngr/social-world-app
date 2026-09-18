@@ -28,6 +28,7 @@ class LocalFeedRepository implements FeedRepository {
     required String body,
     PostKind kind = PostKind.text,
     List<String> mediaPaths = const [],
+    String? placeId,
     String? placeTitle,
     String? routeId,
   }) async {

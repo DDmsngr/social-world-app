@@ -122,7 +122,10 @@ class _MyPosts extends ConsumerWidget {
                     // и без перехода открыть свою же прогулку было бы негде.
                     onTap: post.isRoute
                         ? () => context.push('${Routes.routes}/${post.routeId}')
-                        : null,
+                        : () => context.push(
+                              '${Routes.posts}/${post.id}',
+                              extra: post,
+                            ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

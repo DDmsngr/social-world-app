@@ -17,7 +17,18 @@ class SupabaseDiscoverRepository implements DiscoverRepository {
     int radiusMeters = 3000,
   }) async {
     final responses = await Future.wait([
-      _client.from('places').select('id,title,description,category,geo'),
+      // Не .from('places').select('...,geo') — PostgREST отдаёт geography
+      // сырым hex EWKB, а не GeoJSON/WKT, так что клиенту его не разобрать.
+      // RPC возвращает готовые latitude/longitude, как и nearby_profiles.
+      _client.rpc(
+        'nearby_places',
+        params: {
+          'in_lat': centerLatitude,
+          'in_lng': centerLongitude,
+          'in_radius_m': radiusMeters,
+          'in_limit': 200,
+        },
+      ),
       _client.rpc(
         'nearby_profiles',
         params: {
@@ -45,17 +56,14 @@ class SupabaseDiscoverRepository implements DiscoverRepository {
     );
   }
 
-  Place _placeFromRow(Map<String, dynamic> row) {
-    final point = _readPoint(row['geo']);
-    return Place(
-      id: row['id'] as String,
-      title: row['title'] as String,
-      description: row['description'] as String?,
-      category: row['category'] as String?,
-      latitude: point.$1,
-      longitude: point.$2,
-    );
-  }
+  Place _placeFromRow(Map<String, dynamic> row) => Place(
+    id: row['id'] as String,
+    title: row['title'] as String,
+    description: row['description'] as String?,
+    category: row['category'] as String?,
+    latitude: (row['latitude'] as num).toDouble(),
+    longitude: (row['longitude'] as num).toDouble(),
+  );
 
   NearbyPerson _personFromRow(Map<String, dynamic> row) => NearbyPerson(
     id: row['profile_id'] as String,
@@ -65,24 +73,4 @@ class SupabaseDiscoverRepository implements DiscoverRepository {
     blurredLongitude: (row['longitude'] as num).toDouble(),
     blurRadiusMeters: (row['blur_m'] as num).toDouble(),
   );
-
-  (double, double) _readPoint(dynamic geo) {
-    if (geo is Map<String, dynamic>) {
-      final coordinates = geo['coordinates'];
-      if (coordinates is List && coordinates.length >= 2) {
-        return (
-          (coordinates[1] as num).toDouble(),
-          (coordinates[0] as num).toDouble(),
-        );
-      }
-    }
-
-    final match = RegExp(
-      r'^POINT\s*\(([-+\d.eE]+)\s+([-+\d.eE]+)\)$',
-    ).firstMatch(geo?.toString() ?? '');
-    if (match != null) {
-      return (double.parse(match.group(2)!), double.parse(match.group(1)!));
-    }
-    throw const FormatException('Не удалось прочитать координаты места');
-  }
 }
