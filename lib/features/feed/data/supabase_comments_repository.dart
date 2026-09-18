@@ -32,30 +32,41 @@ class SupabaseCommentsRepository implements CommentsRepository {
     required String body,
     Comment? parent,
   }) async {
+    final userId = _userId;
     final row = await _client
         .from('post_comments')
         .insert({
           'post_id': postId,
           'parent_id': parent?.id,
-          'author_id': _userId,
+          'author_id': userId,
           'body': body.trim(),
         })
         .select()
         .single();
 
-    final profile = await _client
-        .from('profiles')
-        .select('display_name,avatar_url')
-        .eq('id', _userId)
-        .single();
+    // Комментарий уже создан — падение этого чтения не должно превращать
+    // успешную отправку в ошибку.
+    String? authorName;
+    String? authorAvatarUrl;
+    try {
+      final profile = await _client
+          .from('profiles')
+          .select('display_name,avatar_url')
+          .eq('id', userId)
+          .single();
+      authorName = profile['display_name'] as String?;
+      authorAvatarUrl = profile['avatar_url'] as String?;
+    } catch (_) {
+      // Молча — комментарий уже отправлен.
+    }
 
     return Comment(
       id: row['id'] as String,
       postId: postId,
       parentId: parent?.id,
-      authorId: _userId,
-      authorName: (profile['display_name'] as String?) ?? 'Без имени',
-      authorAvatarUrl: profile['avatar_url'] as String?,
+      authorId: userId,
+      authorName: authorName ?? 'Без имени',
+      authorAvatarUrl: authorAvatarUrl,
       body: row['body'] as String?,
       createdAt: DateTime.parse(row['created_at'] as String),
       depth: parent == null ? 0 : parent.depth + 1,

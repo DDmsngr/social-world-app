@@ -340,22 +340,31 @@ class _DiscoverMapState extends State<DiscoverMap> {
         Positioned(
           right: 16,
           bottom: 90,
-          child: Material(
-            color: AppColors.ink2,
-            shape: const CircleBorder(),
-            elevation: 4,
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: _recenterOnMe,
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: _locatingSelf
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.my_location, color: AppColors.primaryTint),
+          child: Semantics(
+            button: true,
+            label: _locatingSelf
+                ? 'Определяем местоположение'
+                : 'Показать моё местоположение',
+            child: Tooltip(
+              message: 'Моё местоположение',
+              child: Material(
+                color: AppColors.ink2,
+                shape: const CircleBorder(),
+                elevation: 4,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _recenterOnMe,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: _locatingSelf
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.my_location, color: AppColors.primaryTint),
+                  ),
+                ),
               ),
             ),
           ),

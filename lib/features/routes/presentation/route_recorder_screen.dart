@@ -36,6 +36,7 @@ class RouteRecorderScreen extends ConsumerStatefulWidget {
 class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
   final _picker = ImagePicker();
   bool _publishing = false;
+  bool _confirmingExit = false;
 
   Future<void> _addPhoto() async {
     final recorder = ref.read(routeRecorderProvider.notifier);
@@ -112,16 +113,27 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
     final state = ref.watch(routeRecorderProvider);
     final recorder = ref.read(routeRecorderProvider.notifier);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Маршрут'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Закрыть',
-          onPressed: () => _confirmExit(state),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // Системный «назад» на Android иначе обходил тот же экран
+        // подтверждения, что и кнопка закрытия, и запись оставалась висеть
+        // активной за пределами своего экрана. На iOS Cupertino-жест этот
+        // колбэк не всегда вызывает — поэтому кнопка закрытия в AppBar
+        // остаётся основным путём, а не декорацией.
+        _confirmExit(state);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Маршрут'),
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Закрыть',
+            onPressed: () => _confirmExit(state),
+          ),
         ),
-      ),
-      body: Stack(
+        body: Stack(
         children: [
           Positioned.fill(
             child: RouteMap(
@@ -163,40 +175,59 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
               onFinish: _finish,
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _confirmExit(RouteRecordingState state) async {
+    // Публикация уже идёт — не открываем поверх неё диалог про прерывание
+    // записи, это про два разных действия одновременно.
+    if (_publishing) return;
+    // Системный «назад» может дёрнуть колбэк повторно, пока первый диалог
+    // ещё не закрыт (двойное нажатие) — не открываем второй поверх первого.
+    if (_confirmingExit) return;
+
     if (!state.isActive || state.path.isEmpty) {
       ref.read(routeRecorderProvider.notifier).reset();
-      if (mounted) context.pop();
+      _leave();
       return;
     }
 
-    final drop = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.ink2,
-        title: const Text('Прервать запись?'),
-        content: const Text('Записанный путь не сохранится.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Продолжить запись'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Прервать'),
-          ),
-        ],
-      ),
-    );
+    _confirmingExit = true;
+    final bool? drop;
+    try {
+      drop = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.ink2,
+          title: const Text('Прервать запись?'),
+          content: const Text('Записанный путь не сохранится.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Продолжить запись'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Прервать'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      _confirmingExit = false;
+    }
 
     if (drop != true || !mounted) return;
     ref.read(routeRecorderProvider.notifier).reset();
-    if (mounted) context.pop();
+    _leave();
+  }
+
+  void _leave() {
+    if (!mounted) return;
+    context.canPop() ? context.pop() : context.go(Routes.feed);
   }
 }
 
@@ -271,6 +302,7 @@ class _ControlPanel extends StatelessWidget {
                   IconButton.filled(
                     onPressed: onPhoto,
                     icon: const Icon(Icons.photo_camera_outlined),
+                    tooltip: 'Снять фото на маршруте',
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.ink2,
                       foregroundColor: AppColors.primaryTint,

@@ -27,6 +27,9 @@ class EventsController extends AsyncNotifier<List<Event>> {
   @override
   Future<List<Event>> build() async {
     ref.keepAlive();
+    // См. FeedController.build() — та же защита от запроса без сессии сразу
+    // после выхода, когда resetSessionScopedProviders пересоздаёт провайдер.
+    if (ref.watch(currentUserProvider) == null) return const [];
     final events = await ref.watch(eventsRepositoryProvider).loadEvents();
     return _withoutHidden(events);
   }

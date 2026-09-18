@@ -72,6 +72,21 @@ $$;
 revoke all on function soft_delete_own_comment from public;
 grant execute on function soft_delete_own_comment to authenticated;
 
+-- На случай, если что-то уже было мягко удалено старым путём (голый
+-- update({'deleted_at': ...}) из клиента) до этой миграции — плейсхолдер
+-- ставится и на уже помеченные строки, а не только на новые вызовы RPC.
+update post_comments
+   set body = '[комментарий удалён]',
+       media_urls = '{}'
+ where deleted_at is not null
+   and body <> '[комментарий удалён]';
+
+-- И закрываем сам старый путь: комментарии редактировать нельзя (эта
+-- функция и не для того), единственная легитимная запись после insert —
+-- soft_delete_own_comment, а она SECURITY DEFINER и column-грант ей не
+-- нужен. Любой клиент — старый APK или новый — обязан идти через RPC.
+revoke update on post_comments from authenticated;
+
 -- RLS-3: политика "правлю только свой профиль" ограничивает строку, но не
 -- колонки — обычный PATCH на свою же строку мог переписать social_score или
 -- status (снять с себя бан) напрямую, в обход score_events и модерации.

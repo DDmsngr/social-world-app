@@ -104,8 +104,31 @@ jobs:
           channel: ${{ env.FLUTTER_CHANNEL }}
           cache: true
 
-      # В релизной сборке ключи боевые: без них APK поднимался на заглушках —
-      # с дев-входом и моковыми людьми на карте вместо реальных данных.
+      # Раньше пустой секрет молча собирал релизный APK на заглушках — с
+      # дев-входом и моковыми людьми на карте вместо боевых данных, и никто
+      # не узнавал об этом до ручной проверки на телефоне. Теперь пустое
+      # значение останавливает сборку здесь, а не после 8 минут Gradle.
+      - name: Verify required secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          YANDEX_MAPKIT_API_KEY: ${{ secrets.YANDEX_MAPKIT_API_KEY }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          missing=""
+          [ -z "$SUPABASE_URL" ] && missing="$missing SUPABASE_URL"
+          [ -z "$SUPABASE_ANON_KEY" ] && missing="$missing SUPABASE_ANON_KEY"
+          [ -z "$YANDEX_MAPKIT_API_KEY" ] && missing="$missing YANDEX_MAPKIT_API_KEY"
+          [ -z "$ANDROID_KEYSTORE_BASE64" ] && missing="$missing ANDROID_KEYSTORE_BASE64"
+          [ -z "$ANDROID_KEYSTORE_PASSWORD" ] && missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -z "$ANDROID_KEY_ALIAS" ] && missing="$missing ANDROID_KEY_ALIAS"
+          if [ -n "$missing" ]; then
+            echo "::error::Релизная сборка без боевых секретов не имеет смысла — пусто:$missing"
+            exit 1
+          fi
+
       - name: Prepare local env asset
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -186,6 +209,16 @@ jobs:
       # (см. supabase/migrations/0007_app_updates.sql). GitHub Releases для этого
       # не годятся: репозиторий приватный, и приложению пришлось бы носить в себе
       # токен с доступом к исходникам.
+      - name: Verify service-role secret
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::SUPABASE_SERVICE_ROLE_KEY пуст — публикация манифеста обновления упадёт, лучше остановиться здесь"
+            exit 1
+          fi
+
       - name: Publish update manifest to Supabase Storage
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         env:

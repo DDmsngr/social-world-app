@@ -27,6 +27,10 @@ class FeedController extends AsyncNotifier<List<Post>> {
   @override
   Future<List<Post>> build() async {
     ref.keepAlive();
+    // Пересоздание после выхода (resetSessionScopedProviders) не должно
+    // стрелять запросом без сессии — city_feed доступна только authenticated,
+    // без охраны это была бы гарантированная ошибка ровно в момент логаута.
+    if (ref.watch(currentUserProvider) == null) return const [];
     final posts = await ref.watch(feedRepositoryProvider).loadFeed();
     return _withoutHidden(posts);
   }

@@ -36,6 +36,11 @@ class SupabaseFeedRepository implements FeedRepository {
     String? placeTitle,
     String? routeId,
   }) async {
+    // UID фиксируем один раз: между двумя await к _client.auth.currentUser
+    // в теории может успеть смениться сессия, а вставлять и читать профиль
+    // нужно строго от одного и того же человека.
+    final userId = _userId;
+
     // Файлы уезжают в хранилище до записи в базу: если загрузка сорвётся,
     // в ленте не останется поста с битыми ссылками.
     final uploader = MediaUploader(_client, bucket: 'post-media');
@@ -46,7 +51,7 @@ class SupabaseFeedRepository implements FeedRepository {
     final row = await _client
         .from('posts')
         .insert({
-          'author_id': _userId,
+          'author_id': userId,
           'kind': postKindFor(kind, mediaUrls).name,
           'body': body.trim(),
           'media_urls': mediaUrls,
@@ -56,17 +61,28 @@ class SupabaseFeedRepository implements FeedRepository {
         .select()
         .single();
 
-    final profile = await _client
-        .from('profiles')
-        .select('display_name,avatar_url')
-        .eq('id', _userId)
-        .single();
+    // Пост уже записан — сбой в этом отдельном чтении не должен превращать
+    // успешную публикацию в «не удалось»: имя/аватар просто отобразятся не
+    // сразу, и next city_feed их всё равно подтянет джойном.
+    String? authorName;
+    String? authorAvatarUrl;
+    try {
+      final profile = await _client
+          .from('profiles')
+          .select('display_name,avatar_url')
+          .eq('id', userId)
+          .single();
+      authorName = profile['display_name'] as String?;
+      authorAvatarUrl = profile['avatar_url'] as String?;
+    } catch (_) {
+      // Молча — пост уже опубликован, отсутствие имени тут не ошибка публикации.
+    }
 
     return Post(
       id: row['id'] as String,
-      authorId: _userId,
-      authorName: (profile['display_name'] as String?) ?? 'Без имени',
-      authorAvatarUrl: profile['avatar_url'] as String?,
+      authorId: userId,
+      authorName: authorName ?? 'Без имени',
+      authorAvatarUrl: authorAvatarUrl,
       kind: _kindFrom(row['kind']),
       body: row['body'] as String?,
       mediaUrls: _stringList(row['media_urls']),

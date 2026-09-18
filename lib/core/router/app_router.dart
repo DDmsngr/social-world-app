@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/feature_flags.dart';
+import '../session/session_reset.dart';
 
 import '../../features/auth/domain/entities/app_user.dart';
 import '../../features/chat/presentation/chat_screen.dart';
@@ -75,8 +76,20 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.keepAlive();
 
   final auth = AuthRouterState();
-  ref.listen(authStateProvider, (_, next) => auth.value = next,
-      fireImmediately: true);
+  String? lastUid;
+  ref.listen(authStateProvider, (_, next) {
+    auth.value = next;
+
+    // Сравниваем именно подтверждённый UID, а не сам факт нового события:
+    // обновление токена или профиля у того же человека (completeProfile,
+    // радиус гео) не должно сбрасывать ленту/чаты — только смена того, кто
+    // вошёл, включая выход.
+    final nextUid = next.value?.id;
+    if (nextUid != lastUid) {
+      lastUid = nextUid;
+      resetSessionScopedProviders(ref);
+    }
+  }, fireImmediately: true);
   ref.onDispose(auth.dispose);
 
   // Полноэкранный hero-баннер (SplashScreen) должен успеть нарисовать хотя бы

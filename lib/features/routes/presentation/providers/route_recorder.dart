@@ -88,11 +88,15 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
   Timer? _ticker;
   Timer? _resubscribe;
   DateTime? _lastSampleAt;
+  var _disposed = false;
 
   @override
   RouteRecordingState build() {
     ref.keepAlive();
-    ref.onDispose(_teardown);
+    ref.onDispose(() {
+      _disposed = true;
+      _teardown();
+    });
     return const RouteRecordingState();
   }
 
@@ -102,7 +106,10 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     state = const RouteRecordingState(status: RecordingStatus.preparing);
 
     final allowed = await _ensurePermission();
-    if (!allowed) return;
+    // Например, resetSessionScopedProviders успел пересоздать провайдер
+    // (выход из аккаунта) прямо во время ожидания разрешения — эта
+    // корутина всё ещё держит старый, уже уничтоженный инстанс.
+    if (_disposed || !allowed) return;
 
     final startedAt = DateTime.now();
     state = RouteRecordingState(
@@ -118,6 +125,7 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     // при движении, и без этого карта стоит пустой, пока человек не пройдёт
     // первые метры — выглядит как сломанная запись.
     await _seedFirstPoint();
+    if (_disposed) return;
     _listenToPositions();
   }
 
@@ -135,7 +143,15 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     // После паузы разрыв во времени не должен превратиться в «телепорт»:
     // следующую точку считаем от момента возобновления.
     _lastSampleAt = DateTime.now();
-    _positions?.resume();
+    // Обычная пауза держит подписку живой (_positions.pause()), но stop()
+    // уже разорвал её (_teardown обнулил _positions) — экран публикации
+    // после «Продолжить» вызывает тот же resume(), и .resume() на null
+    // молча ничего не делал: таймер шёл, а новые точки не приходили.
+    if (_positions == null) {
+      _listenToPositions();
+    } else {
+      _positions!.resume();
+    }
     _startTicker();
     state = state.copyWith(status: RecordingStatus.recording);
   }

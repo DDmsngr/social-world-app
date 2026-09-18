@@ -35,10 +35,11 @@ class SupabaseEventsRepository implements EventsRepository {
     String? placeId,
     String? placeTitle,
   }) async {
+    final userId = _userId;
     final row = await _client
         .from('events')
         .insert({
-          'author_id': _userId,
+          'author_id': userId,
           'title': title.trim(),
           'description': description?.trim(),
           'starts_at': startsAt.toUtc().toIso8601String(),
@@ -48,17 +49,27 @@ class SupabaseEventsRepository implements EventsRepository {
         .select()
         .single();
 
-    final profile = await _client
-        .from('profiles')
-        .select('display_name,avatar_url')
-        .eq('id', _userId)
-        .single();
+    // Событие уже создано — падение этого отдельного чтения не должно
+    // превращать успешную публикацию в ошибку (см. тот же фикс в постах).
+    String? authorName;
+    String? authorAvatarUrl;
+    try {
+      final profile = await _client
+          .from('profiles')
+          .select('display_name,avatar_url')
+          .eq('id', userId)
+          .single();
+      authorName = profile['display_name'] as String?;
+      authorAvatarUrl = profile['avatar_url'] as String?;
+    } catch (_) {
+      // Молча — событие уже опубликовано.
+    }
 
     return Event(
       id: row['id'] as String,
-      authorId: _userId,
-      authorName: (profile['display_name'] as String?) ?? 'Без имени',
-      authorAvatarUrl: profile['avatar_url'] as String?,
+      authorId: userId,
+      authorName: authorName ?? 'Без имени',
+      authorAvatarUrl: authorAvatarUrl,
       title: row['title'] as String,
       description: row['description'] as String?,
       startsAt: DateTime.parse(row['starts_at'] as String),
