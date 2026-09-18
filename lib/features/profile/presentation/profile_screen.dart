@@ -41,11 +41,13 @@ class ProfileScreen extends ConsumerWidget {
                       user?.displayName ?? 'Без имени',
                       style: AppTypography.serif(26),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      user?.email ?? user?.phone ?? '',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
+                    if (user?.displayContact != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        user!.displayContact!,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                   ],
                 ),
               ),

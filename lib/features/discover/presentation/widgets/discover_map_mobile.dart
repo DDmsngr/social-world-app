@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:yandex_maps_mapkit/mapkit.dart' as ymk;
 import 'package:yandex_maps_mapkit/mapkit_factory.dart';
 import 'package:yandex_maps_mapkit/yandex_map.dart';
@@ -32,6 +33,9 @@ class DiscoverMap extends StatefulWidget {
 class _DiscoverMapState extends State<DiscoverMap> {
   late final AppLifecycleListener _lifecycle;
   ymk.MapObjectCollection? _objects;
+  ymk.MapWindow? _window;
+  ymk.UserLocationLayer? _userLocationLayer;
+  bool _locatingSelf = false;
 
   // Слушатели тапов живут ровно столько же, сколько метки: MapKit держит
   // на них слабую ссылку, и без своего списка они собираются сборщиком,
@@ -60,6 +64,10 @@ class _DiscoverMapState extends State<DiscoverMap> {
 
   @override
   void dispose() {
+    // Явно гасим видимость перед уходом виджета: поле — единственная сильная
+    // ссылка на объект слоя, и без явного использования его считают мёртвым
+    // кодом, хотя MapKit держит его живым, пока виден слой геолокации.
+    _userLocationLayer?.setVisible(false);
     _stopMapkit();
     _lifecycle.dispose();
     super.dispose();
@@ -85,7 +93,14 @@ class _DiscoverMapState extends State<DiscoverMap> {
       ' ${widget.data.centerLongitude}',
     );
     window.map.nightModeEnabled = true;
+    _window = window;
     _objects = window.map.mapObjects.addCollection();
+
+    // Штатный слой MapKit: синяя точка + окружность точности сама следит за
+    // сервисом геолокации, свою метку рисовать не нужно.
+    _userLocationLayer = mapkit.createUserLocationLayer(window)
+      ..setVisible(true)
+      ..setDefaultSource();
 
     window.map.move(
       ymk.CameraPosition(
@@ -100,6 +115,45 @@ class _DiscoverMapState extends State<DiscoverMap> {
     );
 
     _rebuildObjects();
+  }
+
+  Future<void> _recenterOnMe() async {
+    if (_locatingSelf) return;
+    setState(() => _locatingSelf = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        AppLog.add('DiscoverMap: службы геолокации выключены на устройстве');
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        AppLog.add('DiscoverMap: нет разрешения на геолокацию');
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      _window?.map.move(
+        ymk.CameraPosition(
+          ymk.Point(latitude: position.latitude, longitude: position.longitude),
+          zoom: 15.5,
+          azimuth: 0,
+          tilt: 0,
+        ),
+        animation: const ymk.Animation(
+          type: ymk.AnimationType.Smooth,
+          duration: 0.4,
+        ),
+      );
+    } catch (error) {
+      AppLog.add('DiscoverMap: не удалось определить местоположение: $error');
+    } finally {
+      if (mounted) setState(() => _locatingSelf = false);
+    }
   }
 
   void _rebuildObjects() {
@@ -206,6 +260,29 @@ class _DiscoverMapState extends State<DiscoverMap> {
               ),
             ),
           ),
+        Positioned(
+          right: 16,
+          bottom: 90,
+          child: Material(
+            color: AppColors.ink2,
+            shape: const CircleBorder(),
+            elevation: 4,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: _recenterOnMe,
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: _locatingSelf
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.my_location, color: AppColors.primaryTint),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

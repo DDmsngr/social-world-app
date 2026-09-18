@@ -1,4 +1,6 @@
-﻿import 'package:flutter/foundation.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -70,6 +72,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       fireImmediately: true);
   ref.onDispose(auth.dispose);
 
+  // Полноэкранный hero-баннер (SplashScreen) должен успеть нарисовать хотя бы
+  // один кадр: при мгновенно восстановленной сессии (кэш VK/Яндекс-токена)
+  // redirect иначе срабатывает раньше первого кадра, и виден только маленький
+  // нативный значок Android 12+ SplashScreen API. Защёлка на Timer, а не на
+  // DateTime.now() — под flutter_test часы виртуальные и не двигаются, а вот
+  // сам Timer через pumpAndSettle честно "срабатывает".
+  var splashElapsed = false;
+  final splashTimer = Timer(const Duration(milliseconds: 700), () {
+    splashElapsed = true;
+    auth.value = auth.value;
+  });
+  ref.onDispose(splashTimer.cancel);
+
   return GoRouter(
     initialLocation: Routes.splash,
     refreshListenable: auth,
@@ -82,7 +97,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         return Routes.feed;
       }
 
-      if (auth.isResolving) {
+      if (auth.isResolving || !splashElapsed) {
         return location == Routes.splash ? null : Routes.splash;
       }
 

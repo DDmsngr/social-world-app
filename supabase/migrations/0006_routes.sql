@@ -205,7 +205,10 @@ create policy "фото маршрутов читают все"
   on storage.objects for select
   using (bucket_id = 'route-photos');
 
-create policy "загружаю фото только в свою папку"
+-- Имена политик держим короче 63 байт: Postgres режет идентификаторы по этой
+-- границе, а в кириллице это всего 31 символ — обрезанные имена разных политик
+-- легко совпадают, и создание падает с «policy already exists».
+create policy "фото маршрута в свою папку"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'route-photos'

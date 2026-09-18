@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/debug/app_log.dart';
 import '../../../core/media/media_kind.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -94,7 +95,11 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
         _startsAt = null;
         _busy = false;
       });
-    } catch (_) {
+    } catch (error) {
+      // Загрузка вложений — самое частое место реального падения здесь, а
+      // snackbar не говорит, что именно отказало (сеть, RLS, лимит размера
+      // на прокси). Без adb это единственный способ увидеть причину.
+      AppLog.add('Публикация не удалась: $error');
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(

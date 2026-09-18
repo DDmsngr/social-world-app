@@ -12,7 +12,7 @@ create policy "медиа постов читают все"
   on storage.objects for select
   using (bucket_id = 'post-media');
 
-create policy "загружаю медиа поста только в свою папку"
+create policy "медиа поста в свою папку"
   on storage.objects for insert to authenticated
   with check (
     bucket_id = 'post-media'
