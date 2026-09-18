@@ -20,11 +20,18 @@ class DiscoverMap extends StatefulWidget {
     required this.data,
     required this.places,
     required this.onPlaceTap,
+    this.filterActive = false,
   });
 
   final DiscoverSnapshot data;
   final List<Place> places;
   final ValueChanged<Place> onPlaceTap;
+
+  /// true, пока в поиске есть непустой текст — тогда камера подстраивается
+  /// под найденные места вместо того, чтобы держать исходный центр района.
+  /// Без этого фильтр молча убирал метки за пределами экрана, а человек видел
+  /// «поиск ничего не делает».
+  final bool filterActive;
 
   @override
   State<DiscoverMap> createState() => _DiscoverMapState();
@@ -59,6 +66,14 @@ class _DiscoverMapState extends State<DiscoverMap> {
     super.didUpdateWidget(old);
     if (widget.data != old.data || widget.places != old.places) {
       _rebuildObjects();
+    }
+
+    final searchJustStarted = widget.filterActive && !old.filterActive;
+    final searchResultsChanged = widget.filterActive && widget.places != old.places;
+    if ((searchJustStarted || searchResultsChanged) && widget.places.isNotEmpty) {
+      _focusOnPlaces(widget.places);
+    } else if (!widget.filterActive && old.filterActive) {
+      _resetCamera();
     }
   }
 
@@ -115,6 +130,68 @@ class _DiscoverMapState extends State<DiscoverMap> {
     );
 
     _rebuildObjects();
+  }
+
+  void _focusOnPlaces(List<Place> places) {
+    final window = _window;
+    if (window == null) return;
+
+    var minLat = places.first.latitude;
+    var maxLat = places.first.latitude;
+    var minLng = places.first.longitude;
+    var maxLng = places.first.longitude;
+    for (final place in places) {
+      minLat = minLat < place.latitude ? minLat : place.latitude;
+      maxLat = maxLat > place.latitude ? maxLat : place.latitude;
+      minLng = minLng < place.longitude ? minLng : place.longitude;
+      maxLng = maxLng > place.longitude ? maxLng : place.longitude;
+    }
+
+    // Один результат — не прямоугольник, а точка: обычный zoom вместо
+    // cameraPositionForGeometry, у которой на вырожденном боксе выходит
+    // максимальное приближение.
+    if (places.length == 1) {
+      window.map.move(
+        ymk.CameraPosition(
+          ymk.Point(latitude: minLat, longitude: minLng),
+          zoom: 16,
+          azimuth: 0,
+          tilt: 0,
+        ),
+        animation: const ymk.Animation(type: ymk.AnimationType.Smooth, duration: 0.4),
+      );
+      return;
+    }
+
+    final position = window.map.cameraPositionForGeometry(
+      ymk.Geometry.fromBoundingBox(
+        ymk.BoundingBox(
+          ymk.Point(latitude: minLat, longitude: minLng),
+          ymk.Point(latitude: maxLat, longitude: maxLng),
+        ),
+      ),
+    );
+    window.map.move(
+      position,
+      animation: const ymk.Animation(type: ymk.AnimationType.Smooth, duration: 0.4),
+    );
+  }
+
+  void _resetCamera() {
+    final window = _window;
+    if (window == null) return;
+    window.map.move(
+      ymk.CameraPosition(
+        ymk.Point(
+          latitude: widget.data.centerLatitude,
+          longitude: widget.data.centerLongitude,
+        ),
+        zoom: 14.5,
+        azimuth: 0,
+        tilt: 0,
+      ),
+      animation: const ymk.Animation(type: ymk.AnimationType.Smooth, duration: 0.4),
+    );
   }
 
   Future<void> _recenterOnMe() async {

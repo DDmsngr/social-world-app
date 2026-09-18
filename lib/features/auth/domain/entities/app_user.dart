@@ -6,6 +6,7 @@ class AppUser {
     this.displayName,
     this.avatarUrl,
     this.socialScore = 0,
+    this.locationBlurM = 500,
   });
 
   final String id;
@@ -14,6 +15,11 @@ class AppUser {
   final String? displayName;
   final String? avatarUrl;
   final int socialScore;
+
+  /// Радиус, с которым человек виден на карте «Рядом» — точные координаты
+  /// снапятся к ячейке сетки этого размера. Совпадает с дефолтом и check-
+  /// ограничением (>= 200) колонки profiles.location_blur_m из 0001_init.sql.
+  final int locationBlurM;
 
   /// Пока профиль не заполнен — гоним пользователя в онбординг.
   bool get hasProfile => (displayName ?? '').trim().isNotEmpty;
@@ -33,6 +39,7 @@ class AppUser {
     String? displayName,
     String? avatarUrl,
     int? socialScore,
+    int? locationBlurM,
   }) =>
       AppUser(
         id: id,
@@ -41,5 +48,6 @@ class AppUser {
         displayName: displayName ?? this.displayName,
         avatarUrl: avatarUrl ?? this.avatarUrl,
         socialScore: socialScore ?? this.socialScore,
+        locationBlurM: locationBlurM ?? this.locationBlurM,
       );
 }

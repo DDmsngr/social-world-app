@@ -78,6 +78,13 @@ class LocalAuthRepository implements AuthRepository {
     return _openSession(current.copyWith(displayName: displayName.trim()));
   }
 
+  @override
+  Future<AppUser> updateLocationBlur(int meters) async {
+    final current = _user;
+    if (current == null) throw Exception('Нет активной сессии');
+    return _openSession(current.copyWith(locationBlurM: meters));
+  }
+
   AppUser _openSession(AppUser user) {
     _user = user;
     _controller.add(user);

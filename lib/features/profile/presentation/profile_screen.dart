@@ -18,7 +18,16 @@ class ProfileScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Профиль')),
+      appBar: AppBar(
+        title: const Text('Профиль'),
+        actions: [
+          IconButton(
+            onPressed: () => context.push(Routes.settings),
+            tooltip: 'Настройки',
+            icon: const Icon(Icons.settings_outlined),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.gutter),
         children: [
@@ -70,11 +79,6 @@ class ProfileScreen extends ConsumerWidget {
           const _MyPosts(),
           const SizedBox(height: 24),
           const PhaseList(),
-          const SizedBox(height: 24),
-          TextButton(
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
-            child: const Text('Выйти'),
-          ),
         ],
       ),
     );
@@ -181,7 +185,6 @@ class PhaseList extends StatelessWidget {
       children: const [
         SectionLabel('Дальше'),
         SizedBox(height: 12),
-        _Row('Настройки приватности геолокации', 'Фаза 2'),
         _Row('Список заблокированных', 'Фаза 2'),
         _Row('События и push', 'Фаза 3'),
       ],

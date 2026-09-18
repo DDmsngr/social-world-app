@@ -14,11 +14,14 @@ import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/create/presentation/create_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
+import '../../features/events/domain/entities/event.dart';
+import '../../features/events/presentation/event_detail_screen.dart';
 import '../../features/events/presentation/events_screen.dart';
 import '../../features/feed/domain/entities/post.dart';
 import '../../features/feed/presentation/feed_screen.dart';
 import '../../features/feed/presentation/post_detail_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/routes/presentation/route_detail_screen.dart';
 import '../../features/routes/presentation/route_recorder_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
@@ -34,6 +37,7 @@ abstract final class Routes {
   static const create = '/create';
   static const chats = '/chats';
   static const profile = '/profile';
+  static const settings = '/profile/settings';
 
   /// Запись и просмотр маршрутов живут вне вкладок: во время прогулки нижняя
   /// навигация только мешает, а открытый чужой маршрут — это отдельный экран.
@@ -42,6 +46,9 @@ abstract final class Routes {
 
   /// Обсуждение поста — тоже отдельный экран: ветки требуют всей высоты.
   static const posts = '/posts';
+
+  /// Карточка одного события — вне вкладок по той же причине, что и посты.
+  static const eventDetail = '/event';
 
   static const authFlow = {splash, signIn, onboarding};
 }
@@ -139,6 +146,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           postId: state.pathParameters['postId']!,
           post: state.extra as Post?,
         ),
+      ),
+      GoRoute(
+        path: '${Routes.eventDetail}/:eventId',
+        builder: (_, state) => EventDetailScreen(
+          eventId: state.pathParameters['eventId']!,
+          event: state.extra as Event?,
+        ),
+      ),
+      GoRoute(
+        path: Routes.settings,
+        builder: (_, _) => const SettingsScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>

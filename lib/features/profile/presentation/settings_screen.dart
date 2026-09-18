@@ -1,0 +1,164 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_typography.dart';
+import '../../../core/update/update_controller.dart';
+import '../../../core/widgets/sw_widgets.dart';
+import '../../auth/presentation/providers/auth_providers.dart';
+
+class SettingsScreen extends ConsumerStatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  int? _pendingBlur;
+  var _savingBlur = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final blur = (_pendingBlur ?? user?.locationBlurM ?? 500).toDouble();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Настройки')),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.gutter),
+        children: [
+          const SectionLabel('Приватность'),
+          const SizedBox(height: 12),
+          GlassCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Радиус видимости на карте',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Другие видят вас размытым пятном такого радиуса, а не '
+                  'точной точкой — точные координаты никогда не покидают '
+                  'устройство.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Slider(
+                  value: blur.clamp(200, 2000),
+                  min: 200,
+                  max: 2000,
+                  divisions: 18,
+                  label: '${blur.round()} м',
+                  activeColor: AppColors.primaryTint,
+                  onChanged: (value) =>
+                      setState(() => _pendingBlur = value.round()),
+                  onChangeEnd: (value) async {
+                    setState(() => _savingBlur = true);
+                    try {
+                      await ref
+                          .read(authRepositoryProvider)
+                          .updateLocationBlur(value.round());
+                    } finally {
+                      if (mounted) setState(() => _savingBlur = false);
+                    }
+                  },
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${blur.round()} м',
+                      style: AppTypography.serif(20, color: AppColors.primaryTint),
+                    ),
+                    if (_savingBlur)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 26),
+          const SectionLabel('Приложение'),
+          const SizedBox(height: 12),
+          const _UpdateRow(),
+          const SizedBox(height: 10),
+          const _VersionRow(),
+          const SizedBox(height: 26),
+          const SectionLabel('Аккаунт'),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VersionRow extends StatelessWidget {
+  const _VersionRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        return GlassCard(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Версия'),
+              Text(
+                info == null
+                    ? '…'
+                    : '${info.version} (${info.buildNumber})',
+                style: const TextStyle(color: AppColors.textDim),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UpdateRow extends ConsumerWidget {
+  const _UpdateRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(updateControllerProvider);
+    final label = switch (state.stage) {
+      UpdateStage.checking => 'Проверяем…',
+      UpdateStage.available => 'Доступно обновление',
+      UpdateStage.downloading => 'Скачивается…',
+      UpdateStage.readyToInstall => 'Готово к установке',
+      UpdateStage.failed => 'Не удалось проверить',
+      _ => 'Вы используете последнюю версию',
+    };
+
+    return GlassCard(
+      onTap: state.stage == UpdateStage.downloading
+          ? null
+          : () => ref.read(updateControllerProvider.notifier).check(),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text('Обновления'),
+          Text(label, style: const TextStyle(color: AppColors.textDim)),
+        ],
+      ),
+    );
+  }
+}

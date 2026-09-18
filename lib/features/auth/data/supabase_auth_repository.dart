@@ -79,6 +79,22 @@ class SupabaseAuthRepository implements AuthRepository {
     return merged;
   }
 
+  @override
+  Future<AppUser> updateLocationBlur(int meters) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthException('Нет активной сессии');
+
+    final row = await _client
+        .from('profiles')
+        .update({'location_blur_m': meters})
+        .eq('id', user.id)
+        .select()
+        .single();
+    final merged = _merge(user, row);
+    _controller.add(merged);
+    return merged;
+  }
+
   void dispose() {
     _authSub.cancel();
     _controller.close();
@@ -106,5 +122,6 @@ class SupabaseAuthRepository implements AuthRepository {
         displayName: row['display_name'] as String?,
         avatarUrl: row['avatar_url'] as String?,
         socialScore: (row['social_score'] as num?)?.toInt() ?? 0,
+        locationBlurM: (row['location_blur_m'] as num?)?.toInt() ?? 500,
       );
 }

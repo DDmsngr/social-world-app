@@ -13,11 +13,16 @@ class DiscoverMap extends StatelessWidget {
     required this.data,
     required this.places,
     required this.onPlaceTap,
+    this.filterActive = false,
   });
 
   final DiscoverSnapshot data;
   final List<Place> places;
   final ValueChanged<Place> onPlaceTap;
+
+  /// Веб и так показывает список без карты — камеры для наведения нет,
+  /// поле принято только ради одинаковой сигнатуры с мобильной реализацией.
+  final bool filterActive;
 
   @override
   Widget build(BuildContext context) {

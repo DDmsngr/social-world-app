@@ -18,4 +18,7 @@ abstract interface class AuthRepository {
 
   /// Заполнение публичного профиля после первого входа.
   Future<AppUser> completeProfile({required String displayName});
+
+  /// Радиус размытия гео на карте «Рядом» — экран настроек.
+  Future<AppUser> updateLocationBlur(int meters);
 }

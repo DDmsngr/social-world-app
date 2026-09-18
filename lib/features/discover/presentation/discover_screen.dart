@@ -60,6 +60,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               child: DiscoverMap(
                 data: snapshot,
                 places: ref.watch(filteredPlacesProvider),
+                filterActive: ref.watch(discoverSearchProvider).isNotEmpty ||
+                    ref.watch(categoryFilterProvider).isNotEmpty,
                 onPlaceTap: (place) => _showPlace(context, place),
               ),
             ),
@@ -72,9 +74,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 decoration: InputDecoration(
                   hintText: 'Найти место на карте',
                   prefixIcon: const Icon(Icons.search),
-                  suffixIcon: ref.watch(discoverSearchProvider).isEmpty
-                      ? null
-                      : const Icon(Icons.tune, color: AppColors.primaryTint),
+                  suffixIcon: IconButton(
+                    onPressed: () =>
+                        _showFilters(context, ref, snapshot.places),
+                    tooltip: 'Фильтры',
+                    icon: Icon(
+                      Icons.tune,
+                      color: ref.watch(categoryFilterProvider).isEmpty
+                          ? null
+                          : AppColors.primaryTint,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -91,6 +101,84 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) =>
             _DiscoverError(onRetry: () => ref.invalidate(discoverDataProvider)),
+      ),
+    );
+  }
+
+  Future<void> _showFilters(
+    BuildContext context,
+    WidgetRef ref,
+    List<Place> allPlaces,
+  ) {
+    final categories = {
+      for (final place in allPlaces)
+        if (place.category != null && place.category!.isNotEmpty)
+          place.category!,
+    }.toList()..sort();
+
+    return showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.gutter),
+        child: SheetCard(
+          child: Consumer(
+            builder: (context, ref, _) {
+              final selected = ref.watch(categoryFilterProvider);
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const SectionLabel('Фильтры'),
+                      if (selected.isNotEmpty)
+                        TextButton(
+                          onPressed: () => ref
+                              .read(categoryFilterProvider.notifier)
+                              .clear(),
+                          child: const Text('Сбросить'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  if (categories.isEmpty)
+                    Text(
+                      'Категорий пока нет',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final category in categories)
+                          ChoiceChip(
+                            label: Text(category),
+                            selected: selected.contains(category),
+                            onSelected: (_) => ref
+                                .read(categoryFilterProvider.notifier)
+                                .toggle(category),
+                            showCheckmark: false,
+                            backgroundColor: AppColors.card,
+                            selectedColor: AppColors.primary,
+                            labelStyle: TextStyle(
+                              fontSize: 13,
+                              color: selected.contains(category)
+                                  ? AppColors.onPrimary
+                                  : AppColors.textDim,
+                            ),
+                            side: const BorderSide(color: AppColors.hair),
+                          ),
+                      ],
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
