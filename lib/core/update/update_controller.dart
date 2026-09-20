@@ -76,7 +76,10 @@ class UpdateController extends Notifier<UpdateState> {
   /// приезжает сама, а iOS ставить APK не умеет в принципе.
   bool get _supported => !kIsWeb && Platform.isAndroid;
 
-  Future<void> check() async {
+  /// [silent] — проверка на старте: о неудаче человеку знать незачем.
+  /// Ручная проверка из настроек, наоборот, обязана сказать правду, иначе
+  /// «Вы используете последнюю версию» врёт при выключенной сети.
+  Future<void> check({bool silent = true}) async {
     if (!_supported || !Env.isConfigured) return;
 
     final pending = await _loadPending();
@@ -99,10 +102,15 @@ class UpdateController extends Notifier<UpdateState> {
       }
       state = UpdateState(stage: UpdateStage.available, info: manifest);
     } catch (error) {
-      // Нет сети или бакет недоступен — молча остаёмся без «лампочки»,
-      // ронять пользователю в лицо ошибку на старте незачем.
       AppLog.add('Проверка обновления не удалась: $error');
-      state = const UpdateState(stage: UpdateStage.upToDate);
+      state = silent
+          // Нет сети или бакет недоступен — молча остаёмся без «лампочки»,
+          // ронять пользователю в лицо ошибку на старте незачем.
+          ? const UpdateState(stage: UpdateStage.upToDate)
+          : const UpdateState(
+              stage: UpdateStage.failed,
+              error: 'Не удалось проверить обновления. Проверьте соединение.',
+            );
     }
   }
 

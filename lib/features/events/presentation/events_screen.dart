@@ -73,8 +73,17 @@ class EventsScreen extends ConsumerWidget {
                     '${Routes.eventDetail}/${event.id}',
                     extra: event,
                   ),
-                  onToggleJoin: () =>
-                      ref.read(eventsProvider.notifier).toggleJoin(event),
+                  onToggleJoin: () async {
+                    final saved = await ref
+                        .read(eventsProvider.notifier)
+                        .toggleJoin(event);
+                    if (saved || !context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Не удалось записаться — нет связи'),
+                      ),
+                    );
+                  },
                   onReport: () async {
                     final sent = await showReportSheet(
                       context,

@@ -13,6 +13,7 @@ import '../../events/presentation/providers/events_providers.dart';
 import '../domain/entities/discover_snapshot.dart';
 import '../domain/entities/place.dart';
 import 'providers/discover_providers.dart';
+import 'providers/presence_publisher.dart';
 import 'widgets/discover_map.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
@@ -52,6 +53,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Пока открыта карта — обновляем свою размытую точку в `locations`.
+    // Без этого «Рядом» на боевом бэкенде всегда пустой: читать чужие точки
+    // приложение умело, а писать свою — нет.
+    ref.watch(presencePublisherProvider);
+
     final data = ref.watch(discoverDataProvider);
     // Прошедшие события карте не нужны: она про то, что происходит сейчас.
     final upcoming = [

@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../core/debug/app_log.dart';
 import '../../../../core/media/media_kind.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -124,6 +125,7 @@ class _VideoItem extends StatefulWidget {
 class _VideoItemState extends State<_VideoItem> {
   late final VideoPlayerController _controller;
   var _ready = false;
+  var _failed = false;
 
   @override
   void initState() {
@@ -132,9 +134,11 @@ class _VideoItemState extends State<_VideoItem> {
       ..setLooping(true)
       ..initialize().then((_) {
         if (mounted) setState(() => _ready = true);
-      }).catchError((_) {
-        // Битая ссылка или неподдерживаемый кодек — карточка просто останется
-        // с заглушкой вместо кадра, ронять ленту из-за этого незачем.
+      }).catchError((Object error) {
+        // Битая ссылка или неподдерживаемый кодек. Раньше здесь оставался
+        // вечный кружок загрузки, и видео выглядело как «сейчас докрутится».
+        AppLog.add('Видео не открылось: $error');
+        if (mounted) setState(() => _failed = true);
       });
   }
 
@@ -152,6 +156,25 @@ class _VideoItemState extends State<_VideoItem> {
 
   @override
   Widget build(BuildContext context) {
+    if (_failed) {
+      return ColoredBox(
+        color: AppColors.ink2,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videocam_off_outlined, color: AppColors.textFaint),
+              const SizedBox(height: 6),
+              Text(
+                'Видео не открылось',
+                style: TextStyle(color: AppColors.textFaint, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (!_ready) {
       return ColoredBox(
         color: AppColors.ink2,

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/env.dart';
+import '../../../../core/debug/app_log.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../moderation/presentation/providers/report_providers.dart';
 import '../../data/local_feed_repository.dart';
@@ -45,8 +46,37 @@ class FeedController extends AsyncNotifier<List<Post>> {
 
   /// Лайк применяется на месте: перезагружать ленту ради одного счётчика
   /// значит терять позицию скролла.
-  Future<void> toggleLike(Post post) async {
-    final updated = await ref.read(feedRepositoryProvider).toggleLike(post);
+  final _likesInFlight = <String>{};
+
+  /// Возвращает false, если лайк не сохранился — экран показывает сообщение.
+  /// Раньше сеть отваливалась молча: сердечко не менялось, и человек тыкал
+  /// в него снова, не понимая, почему ничего не происходит.
+  Future<bool> toggleLike(Post post) async {
+    // Один запрос на пост за раз: два быстрых тапа иначе гоняют лайк и его
+    // снятие наперегонки, и в базе остаётся случайный из двух.
+    if (!_likesInFlight.add(post.id)) return true;
+
+    // Сердечко отзывается сразу, не дожидаясь ответа сервера.
+    _replace(
+      post.copyWith(
+        likedByMe: !post.likedByMe,
+        likeCount: post.likeCount + (post.likedByMe ? -1 : 1),
+      ),
+    );
+
+    try {
+      _replace(await ref.read(feedRepositoryProvider).toggleLike(post));
+      return true;
+    } catch (error) {
+      AppLog.add('Лайк не сохранился: $error');
+      _replace(post);
+      return false;
+    } finally {
+      _likesInFlight.remove(post.id);
+    }
+  }
+
+  void _replace(Post updated) {
     state = AsyncValue.data([
       for (final item in state.value ?? const <Post>[])
         if (item.id == updated.id) updated else item,

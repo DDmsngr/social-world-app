@@ -10,6 +10,7 @@ import 'core/config/env.dart';
 import 'core/config/mapkit_boot.dart';
 import 'core/debug/app_log.dart';
 import 'core/theme/theme_choice.dart';
+import 'features/discover/presentation/providers/presence_publisher.dart';
 
 Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -47,12 +48,18 @@ Future<void> main() async {
   );
 
   final themeChoice = await loadThemeChoice();
+  // Читаем до первого кадра: иначе публикатор присутствия успел бы отправить
+  // точку человека, который его выключил.
+  final presenceEnabled = await loadPresenceEnabled();
 
   FlutterNativeSplash.remove();
 
   runApp(
     ProviderScope(
-      overrides: [initialThemeChoiceProvider.overrideWithValue(themeChoice)],
+      overrides: [
+        initialThemeChoiceProvider.overrideWithValue(themeChoice),
+        initialPresenceEnabledProvider.overrideWithValue(presenceEnabled),
+      ],
       child: const SocialWorldApp(),
     ),
   );

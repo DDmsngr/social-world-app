@@ -64,7 +64,17 @@ class FeedScreen extends ConsumerWidget {
                 final post = posts[index];
                 return PostCard(
                   post: post,
-                  onLike: () => ref.read(feedProvider.notifier).toggleLike(post),
+                  onLike: () async {
+                    final saved = await ref
+                        .read(feedProvider.notifier)
+                        .toggleLike(post);
+                    if (saved || !context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Лайк не сохранился — нет связи'),
+                      ),
+                    );
+                  },
                   onComment: () =>
                       context.push('${Routes.posts}/${post.id}', extra: post),
                   onReport: () async {

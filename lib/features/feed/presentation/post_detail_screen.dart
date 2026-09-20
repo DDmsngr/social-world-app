@@ -130,8 +130,17 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     if (post != null)
                       PostCard(
                         post: post,
-                        onLike: () =>
-                            ref.read(feedProvider.notifier).toggleLike(post),
+                        onLike: () async {
+                          final saved = await ref
+                              .read(feedProvider.notifier)
+                              .toggleLike(post);
+                          if (saved || !context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Лайк не сохранился — нет связи'),
+                            ),
+                          );
+                        },
                         onComment: _focusNode.requestFocus,
                         onReport: () async {
                           final sent = await showReportSheet(

@@ -138,7 +138,17 @@ class _EventDetailBody extends ConsumerWidget {
         ),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: () => ref.read(eventsProvider.notifier).toggleJoin(event),
+          onPressed: () async {
+            final saved = await ref
+                .read(eventsProvider.notifier)
+                .toggleJoin(event);
+            if (saved || !context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Не удалось записаться — нет связи'),
+              ),
+            );
+          },
           style: event.joinedByMe
               ? FilledButton.styleFrom(
                   backgroundColor: AppColors.card,

@@ -10,6 +10,35 @@ class SupabaseDiscoverRepository implements DiscoverRepository {
 
   final SupabaseClient _client;
 
+  String get _userId {
+    final id = _client.auth.currentUser?.id;
+    if (id == null) throw const AuthException('Нет активной сессии');
+    return id;
+  }
+
+  @override
+  Future<void> publishPresence({
+    required double blurredLatitude,
+    required double blurredLongitude,
+    required int blurRadiusMeters,
+  }) async {
+    await _client.from('locations').upsert({
+      'profile_id': _userId,
+      // Тот же формат, что у фото маршрута: geography принимает EWKT текстом,
+      // отдельных колонок под широту и долготу в таблице нет.
+      'geo': 'SRID=4326;POINT($blurredLongitude $blurredLatitude)',
+      'blur_radius_m': blurRadiusMeters,
+      // Дублирует триггер из миграции 0013: пока она не применена, свежесть
+      // точки держится этим полем, после — триггер перекрывает его своим now().
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'profile_id');
+  }
+
+  @override
+  Future<void> clearPresence() async {
+    await _client.from('locations').delete().eq('profile_id', _userId);
+  }
+
   @override
   Future<DiscoverSnapshot> loadNearby({
     required double centerLatitude,

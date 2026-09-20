@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/env.dart';
+import '../../../../core/debug/app_log.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../moderation/presentation/providers/report_providers.dart';
 import '../../data/local_events_repository.dart';
@@ -42,8 +43,34 @@ class EventsController extends AsyncNotifier<List<Event>> {
     });
   }
 
-  Future<void> toggleJoin(Event event) async {
-    final updated = await ref.read(eventsRepositoryProvider).toggleJoin(event);
+  final _joinsInFlight = <String>{};
+
+  /// Возвращает false, если записаться не удалось — экран показывает
+  /// сообщение. Молчаливый отказ здесь хуже, чем в ленте: человек уверен,
+  /// что придёт на встречу, а в списке участников его нет.
+  Future<bool> toggleJoin(Event event) async {
+    if (!_joinsInFlight.add(event.id)) return true;
+
+    _replace(
+      event.copyWith(
+        joinedByMe: !event.joinedByMe,
+        participantCount: event.participantCount + (event.joinedByMe ? -1 : 1),
+      ),
+    );
+
+    try {
+      _replace(await ref.read(eventsRepositoryProvider).toggleJoin(event));
+      return true;
+    } catch (error) {
+      AppLog.add('Участие не сохранилось: $error');
+      _replace(event);
+      return false;
+    } finally {
+      _joinsInFlight.remove(event.id);
+    }
+  }
+
+  void _replace(Event updated) {
     state = AsyncValue.data([
       for (final item in state.value ?? const <Event>[])
         if (item.id == updated.id) updated else item,

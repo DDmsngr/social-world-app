@@ -11,6 +11,8 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/update/update_controller.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../discover/presentation/providers/discover_providers.dart';
+import '../../discover/presentation/providers/presence_publisher.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -47,6 +49,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 26),
           const SectionLabel('Приватность'),
           const SizedBox(height: 12),
+          const _PresenceSwitch(),
+          const SizedBox(height: 10),
           GlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,11 +61,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Другие видят вас размытым пятном такого радиуса, а не '
-                  'точной точкой — это касается пассивного присутствия на '
-                  'карте «Рядом». Если вы сами публикуете маршрут прогулки, '
-                  'его путь и точки фото видны точно — это осознанная '
-                  'публикация, а не слежение.',
+                  'Насколько крупным будет это пятно. С маршрутом прогулки '
+                  'иначе: если вы публикуете его сами, путь и точки съёмки '
+                  'видны точно — это осознанная публикация, а не слежение.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),
@@ -113,8 +115,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SectionLabel('Аккаунт'),
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            onPressed: () async {
+              // Сначала убираем точку: после signOut сессии уже нет и удалить
+              // свою строку в `locations` будет нечем — человек остался бы
+              // висеть на чужих картах до протухания через два часа.
+              try {
+                await ref.read(discoverRepositoryProvider).clearPresence();
+              } catch (_) {
+                // Не повод не дать выйти из аккаунта.
+              }
+              await ref.read(authRepositoryProvider).signOut();
+            },
             child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresenceSwitch extends ConsumerWidget {
+  const _PresenceSwitch();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(presenceEnabledProvider);
+
+    return GlassCard(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Показывать меня на карте',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  enabled
+                      ? 'Пока приложение открыто, другие видят размытое пятно '
+                            'вашего района. Выключите — точка исчезнет с карты '
+                            'сразу.'
+                      : 'Вас не видно в разделе «Рядом». Карта, события и '
+                            'публикации работают как обычно.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Switch(
+            value: enabled,
+            activeThumbColor: AppColors.onPrimary,
+            activeTrackColor: AppColors.primary,
+            onChanged: (value) =>
+                ref.read(presenceEnabledProvider.notifier).set(value),
           ),
         ],
       ),
@@ -223,7 +280,9 @@ class _UpdateRow extends ConsumerWidget {
     return GlassCard(
       onTap: state.stage == UpdateStage.downloading
           ? null
-          : () => ref.read(updateControllerProvider.notifier).check(),
+          : () => ref
+                .read(updateControllerProvider.notifier)
+                .check(silent: false),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [

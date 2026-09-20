@@ -38,6 +38,17 @@ class LocalDiscoverRepository implements DiscoverRepository {
     );
   }
 
+  /// На заглушках публиковать некуда: список людей и так захардкожен.
+  @override
+  Future<void> publishPresence({
+    required double blurredLatitude,
+    required double blurredLongitude,
+    required int blurRadiusMeters,
+  }) async {}
+
+  @override
+  Future<void> clearPresence() async {}
+
   static const _places = <Place>[
     Place(
       id: 'theatre-square',
