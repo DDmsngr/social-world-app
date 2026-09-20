@@ -36,6 +36,18 @@ void main() {
       expect(point.radiusMeters, 3000);
     });
 
+    test('слишком мелкий радиус подтягивается до разрешённого базой', () {
+      final point = blurredPresenceFor(
+        enabled: true,
+        user: const AppUser(id: 'user-1', locationBlurM: 50),
+        latitude: _lat,
+        longitude: _lng,
+      )!;
+
+      // Иначе check (blur_radius_m >= 200) роняет каждую публикацию.
+      expect(point.radiusMeters, 200);
+    });
+
     test('выключенное присутствие не публикуется', () {
       expect(
         blurredPresenceFor(

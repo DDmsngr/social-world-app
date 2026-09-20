@@ -76,7 +76,9 @@ BlurredPoint? blurredPresenceFor({
     latitude: latitude,
     longitude: longitude,
     salt: user.id,
-    radiusMeters: user.locationBlurM.toDouble(),
+    // В таблице стоит check (blur_radius_m >= 200). Значение меньше уронило бы
+    // каждую публикацию, и человек молча пропал бы с карты навсегда.
+    radiusMeters: user.locationBlurM.clamp(200, 10000).toDouble(),
   );
 }
 
