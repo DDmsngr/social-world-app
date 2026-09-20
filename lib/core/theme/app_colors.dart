@@ -66,11 +66,14 @@ class AppPalette {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// «Бургунди и шампань» — тёмная тема по выбору Левона.
+  /// «Бургунди и шампань» — тёмная тема по выбору Левона. Все шесть кодов —
+  /// один в один из присланного референса (Фон/Карточки/Вторичный фон/
+  /// Акцент/Текст/Вторичный текст), кроме [primaryHover] — его в референсе
+  /// нет, это состояние нажатия, придуманное поверх акцента.
   static const burgundyChampagne = AppPalette(
     brightness: Brightness.dark,
     ink: Color(0xFF21151D),
-    ink2: Color(0xFF2B1C25),
+    ink2: Color(0xFF3B2731),
     card: Color(0xFF302029),
     paper: Color(0xFFFFF8F0),
     primary: Color(0xFFE89BBA),
