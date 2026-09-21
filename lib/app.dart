@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/env.dart';
+import 'core/links/deep_link_service.dart';
 import 'core/oauth/oauth_sign_in.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_colors.dart';
@@ -66,10 +67,7 @@ class _SocialWorldAppState extends ConsumerState<SocialWorldApp>
     if (identical(palette, AppColors.current)) return;
     AppColors.current = palette;
 
-    SystemChrome.setSystemUIOverlayStyle(
-      (palette.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
-          .copyWith(statusBarColor: Colors.transparent),
-    );
+    SystemChrome.setSystemUIOverlayStyle(AppTheme.overlayStyle(palette));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) rebuildWholeTree(context);
     });
@@ -80,6 +78,8 @@ class _SocialWorldAppState extends ConsumerState<SocialWorldApp>
     // Подписка на редирект VK ID/Яндекс ID должна жить с самого старта —
     // иначе холодный запуск приложения по диплинку теряет первое событие.
     if (Env.isConfigured) ref.watch(oauthDeepLinkProvider);
+    // Ссылки на объекты (пост, событие, место, профиль, маршрут) ловятся
+    // всегда — в том числе в режиме заглушек.
 
     final choice = ref.watch(themeChoiceProvider);
     final palette = resolvePalette(
@@ -91,13 +91,17 @@ class _SocialWorldAppState extends ConsumerState<SocialWorldApp>
     _applyPalette(palette);
     _armScheduleTimer(choice);
 
+    final router = ref.watch(routerProvider);
+    // После роутера: сервису ссылок нужен уже созданный роутер.
+    ref.watch(deepLinkServiceProvider);
+
     return MaterialApp.router(
       title: 'Social World',
       debugShowCheckedModeBanner: false,
       theme: _lightTheme,
       darkTheme: _darkTheme,
       themeMode: palette.isDark ? ThemeMode.dark : ThemeMode.light,
-      routerConfig: ref.watch(routerProvider),
+      routerConfig: router,
       locale: const Locale('ru'),
       supportedLocales: const [Locale('ru'), Locale('en')],
       localizationsDelegates: const [

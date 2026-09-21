@@ -13,9 +13,36 @@ abstract final class AppRadius {
 abstract final class AppSpacing {
   static const gutter = 20.0;
   static const section = 32.0;
+
+  /// Отступы прокручиваемого экрана вне нижней навигации. Низ считается от
+  /// системной панели устройства (жесты или три кнопки), а не фиксированным
+  /// числом: иначе последняя кнопка уезжает под системные клавиши.
+  static EdgeInsets page(BuildContext context, {double top = 12}) =>
+      EdgeInsets.fromLTRB(
+        gutter,
+        top,
+        gutter,
+        24 + MediaQuery.paddingOf(context).bottom,
+      );
 }
 
 abstract final class AppTheme {
+  /// Системные панели рисуются поверх приложения без собственной подложки:
+  /// строка состояния и навигационная панель прозрачные, а иконки подбираются
+  /// под тему. `systemNavigationBarContrastEnforced: false` убирает
+  /// полупрозрачную «плашку» Android под тремя кнопками — из-за неё казалось,
+  /// что кнопки лежат в отдельных светящихся прямоугольниках.
+  static SystemUiOverlayStyle overlayStyle(AppPalette p) => SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: p.isDark ? Brightness.light : Brightness.dark,
+    statusBarBrightness: p.isDark ? Brightness.dark : Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness:
+        p.isDark ? Brightness.light : Brightness.dark,
+    systemNavigationBarContrastEnforced: false,
+  );
+
   static ThemeData build(AppPalette p) {
     final base = p.isDark
         ? ThemeData.dark(useMaterial3: true)
@@ -53,13 +80,7 @@ abstract final class AppTheme {
         elevation: 0,
         centerTitle: false,
         titleTextStyle: AppTypography.serif(24, color: p.text),
-        systemOverlayStyle: p.isDark
-            ? SystemUiOverlayStyle.light.copyWith(
-                statusBarColor: Colors.transparent,
-              )
-            : SystemUiOverlayStyle.dark.copyWith(
-                statusBarColor: Colors.transparent,
-              ),
+        systemOverlayStyle: overlayStyle(p),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

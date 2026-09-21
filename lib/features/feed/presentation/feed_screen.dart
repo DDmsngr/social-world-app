@@ -1,16 +1,15 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/sw_widgets.dart';
-import '../../moderation/domain/entities/report_reason.dart';
-import '../../moderation/presentation/widgets/report_sheet.dart';
+import '../../../core/widgets/state_message.dart';
+import '../../notifications/notifications.dart';
 import 'providers/feed_providers.dart';
 import 'widgets/post_card.dart';
+import 'widgets/story_strip.dart';
 
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
@@ -18,11 +17,23 @@ class FeedScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(feedProvider);
+    final unread = ref.watch(unreadNotificationsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Моменты'),
         actions: [
+          IconButton(
+            onPressed: () => context.push(Routes.notifications),
+            tooltip: unread == 0 ? 'Уведомления' : 'Уведомления: $unread новых',
+            icon: Badge(
+              isLabelVisible: unread > 0,
+              label: Text(unread > 9 ? '9+' : '$unread'),
+              backgroundColor: AppColors.primary,
+              textColor: AppColors.onPrimary,
+              child: Icon(Icons.notifications_none, color: AppColors.textDim),
+            ),
+          ),
           IconButton(
             onPressed: () => ref.read(feedProvider.notifier).refresh(),
             tooltip: 'Обновить',
@@ -32,107 +43,47 @@ class FeedScreen extends ConsumerWidget {
         ],
       ),
       body: feed.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => _FeedMessage(
+        loading: () => const LoadingView(),
+        error: (_, _) => StateMessage.error(
+          label: 'Моменты',
           title: 'Моменты не загрузились',
-          text: 'Проверьте соединение и попробуйте ещё раз.',
-          actionLabel: 'Повторить',
           onAction: () => ref.read(feedProvider.notifier).refresh(),
         ),
         data: (posts) {
           if (posts.isEmpty) {
-            return const _FeedMessage(
+            return const StateMessage(
+              label: 'Моменты',
               title: 'Пока тихо',
               text: 'В городе ещё никто ничего не опубликовал. '
                   'Начните первым — вкладка «Создать».',
             );
           }
 
+          final stories = storiesFrom(posts);
+
           return RefreshIndicator(
             color: AppColors.primaryTint,
             backgroundColor: AppColors.ink2,
             onRefresh: () => ref.read(feedProvider.notifier).refresh(),
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.gutter,
-                12,
-                AppSpacing.gutter,
-                24,
-              ),
-              itemCount: posts.length,
+              padding: const EdgeInsets.only(top: 8, bottom: 24),
+              // +1 — полоса историй первым элементом.
+              itemCount: posts.length + 1,
               itemBuilder: (context, index) {
-                final post = posts[index];
-                return PostCard(
-                  post: post,
-                  onLike: () async {
-                    final saved = await ref
-                        .read(feedProvider.notifier)
-                        .toggleLike(post);
-                    if (saved || !context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Лайк не сохранился — нет связи'),
-                      ),
-                    );
-                  },
-                  onComment: () =>
-                      context.push('${Routes.posts}/${post.id}', extra: post),
-                  onReport: () async {
-                    final sent = await showReportSheet(
-                      context,
-                      target: ReportTarget.post,
-                      targetId: post.id,
-                      subject: '${post.authorName}: ${post.body ?? 'публикация'}',
-                    );
-                    if (!sent || !context.mounted) return;
-                    ref.read(feedProvider.notifier).hide(post.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Жалоба отправлена')),
-                    );
-                  },
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: StoryStrip(stories: stories),
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
+                  child: PostCard(post: posts[index - 1]),
                 );
               },
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _FeedMessage extends StatelessWidget {
-  const _FeedMessage({
-    required this.title,
-    required this.text,
-    this.actionLabel,
-    this.onAction,
-  });
-
-  final String title;
-  final String text;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.gutter),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SectionLabel('Моменты'),
-            const SizedBox(height: 14),
-            Text(title, style: AppTypography.serif(30)),
-            const SizedBox(height: 10),
-            Text(text, style: Theme.of(context).textTheme.bodyMedium),
-            if (actionLabel != null) ...[
-              const SizedBox(height: 18),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-            ],
-          ],
-        ),
       ),
     );
   }

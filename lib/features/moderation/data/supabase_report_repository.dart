@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/permissions/content_permissions.dart';
 import '../domain/entities/report_reason.dart';
 import '../domain/repositories/report_repository.dart';
 
@@ -18,9 +19,16 @@ class SupabaseReportRepository implements ReportRepository {
     required String targetId,
     required ReportReason reason,
     String? comment,
+    String? targetAuthorId,
   }) async {
     final reporterId = _client.auth.currentUser?.id;
     if (reporterId == null) throw const AuthException('Нет активной сессии');
+    if (targetAuthorId != null) {
+      ContentPermissions(
+        viewerId: reporterId,
+        ownerId: targetAuthorId,
+      ).requireForeign();
+    }
 
     await _client.from('reports').insert({
       'reporter_id': reporterId,

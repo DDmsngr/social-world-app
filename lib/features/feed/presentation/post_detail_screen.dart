@@ -6,10 +6,9 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
-import '../../moderation/domain/entities/report_reason.dart';
-import '../../moderation/presentation/widgets/report_sheet.dart';
 import '../domain/comment_thread.dart';
 import '../domain/entities/comment.dart';
 import '../domain/entities/post.dart';
@@ -46,15 +45,48 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     super.dispose();
   }
 
-  Post? get _post {
-    if (widget.post != null) return widget.post;
-    final feed = ref.read(feedProvider).value ?? const <Post>[];
+  /// Пост, подгруженный с сервера, когда ни в ленте, ни в переданных данных
+  /// его нет (ссылка, уведомление, перезапуск).
+  Post? _fetched;
+  var _fetching = false;
+  var _notFound = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.post == null) _fetchIfMissing();
+  }
+
+  Future<void> _fetchIfMissing() async {
+    final inFeed = ref.read(feedProvider).value?.any((p) => p.id == widget.postId);
+    if (inFeed ?? false) return;
+
+    setState(() => _fetching = true);
+    try {
+      final post = await ref.read(feedRepositoryProvider).loadPost(widget.postId);
+      if (!mounted) return;
+      setState(() {
+        _fetched = post;
+        _notFound = post == null;
+        _fetching = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _notFound = true;
+        _fetching = false;
+      });
+    }
+  }
+
+  /// Свежая версия из ленты важнее переданной: после лайка, правки или
+  /// смены настроек экран показывает то, что лежит в состоянии, а не снимок.
+  Post? _currentPost(List<Post> feed) {
     for (final post in feed) {
       if (post.id == widget.postId) return post;
     }
-    return null;
+    return widget.post ?? _fetched;
   }
-
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -90,11 +122,46 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   Widget build(BuildContext context) {
     final thread = ref.watch(commentsProvider(widget.postId));
     final myId = ref.watch(currentUserProvider)?.id;
-    final post = _post;
+    final post = _currentPost(ref.watch(feedProvider).value ?? const <Post>[]);
+
+    // Пост исчез из ленты (удалён автором или скрыт жалобой/блокировкой) —
+    // страница закрывается, а не остаётся с призраком поста.
+    ref.listen(feedProvider, (previous, next) {
+      final was = previous?.value?.any((p) => p.id == widget.postId) ?? false;
+      final still = next.value?.any((p) => p.id == widget.postId) ?? false;
+      if (next.hasValue && was && !still && mounted) {
+        context.canPop() ? context.pop() : context.go(Routes.feed);
+      }
+    });
+
+    if (post == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Публикация'),
+          leading: IconButton(
+            onPressed: () =>
+                context.canPop() ? context.pop() : context.go(Routes.feed),
+            tooltip: 'Назад',
+            icon: const Icon(Icons.arrow_back),
+          ),
+        ),
+        body: _fetching
+            ? const LoadingView()
+            : _notFound
+            ? StateMessage(
+                title: 'Публикация недоступна',
+                text: 'Возможно, её удалили или автор ограничил доступ.',
+                icon: Icons.visibility_off_outlined,
+                actionLabel: 'Повторить',
+                onAction: _fetchIfMissing,
+              )
+            : const LoadingView(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Обсуждение'),
+        title: Text(post.isArticle ? 'Статья' : 'Обсуждение'),
         leading: IconButton(
           onPressed: () =>
               context.canPop() ? context.pop() : context.go(Routes.feed),
@@ -106,15 +173,10 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
         children: [
           Expanded(
             child: thread.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.gutter),
-                  child: Text(
-                    'Обсуждение не загрузилось. Проверьте соединение.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
+              loading: () => const LoadingView(),
+              error: (_, _) => StateMessage.error(
+                title: 'Обсуждение не загрузилось',
+                onAction: () => ref.invalidate(commentsProvider(widget.postId)),
               ),
               data: (comments) {
                 final rows = visibleThread(comments, _collapsed);
@@ -127,34 +189,11 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                     16,
                   ),
                   children: [
-                    if (post != null)
-                      PostCard(
-                        post: post,
-                        onLike: () async {
-                          final saved = await ref
-                              .read(feedProvider.notifier)
-                              .toggleLike(post);
-                          if (saved || !context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Лайк не сохранился — нет связи'),
-                            ),
-                          );
-                        },
-                        onComment: _focusNode.requestFocus,
-                        onReport: () async {
-                          final sent = await showReportSheet(
-                            context,
-                            target: ReportTarget.post,
-                            targetId: post.id,
-                            subject:
-                                '${post.authorName}: ${post.body ?? 'публикация'}',
-                          );
-                          if (!sent || !context.mounted) return;
-                          ref.read(feedProvider.notifier).hide(post.id);
-                          context.pop();
-                        },
-                      ),
+                    PostCard(
+                      post: post,
+                      full: true,
+                      onComment: _focusNode.requestFocus,
+                    ),
                     const SectionLabel('Обсуждение'),
                     const SizedBox(height: 10),
                     if (rows.isEmpty)

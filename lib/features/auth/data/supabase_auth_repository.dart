@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/debug/app_log.dart';
+import '../../../core/media/media_uploader.dart';
 import '../domain/entities/app_user.dart';
 import '../domain/repositories/auth_repository.dart';
 
@@ -124,6 +125,49 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> updateProfile({
+    String? displayName,
+    String? bio,
+    String? city,
+    String? avatarLocalPath,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthException('Нет активной сессии');
+
+    final changes = <String, dynamic>{};
+    if (displayName != null) changes['display_name'] = displayName.trim();
+    if (bio != null) changes['bio'] = bio.trim().isEmpty ? null : bio.trim();
+    if (city != null) changes['city'] = city.trim().isEmpty ? null : city.trim();
+    if (avatarLocalPath != null) {
+      // Файл уезжает в бакет `avatars` до записи в профиль: сорвавшаяся
+      // загрузка не оставит в анкете ссылку на несуществующую картинку.
+      changes['avatar_url'] = await MediaUploader(
+        _client,
+        bucket: 'avatars',
+      ).upload(avatarLocalPath);
+    }
+    if (changes.isEmpty) return _lastKnown ?? _fromAuthUser(user);
+
+    final myGeneration = ++_generation;
+    // Читаем обратно то, что реально записала база (после триггеров и
+    // проверок), а не собираем профиль из того, что отправили.
+    final row = await _client
+        .from('profiles')
+        .update(changes)
+        .eq('id', user.id)
+        .select()
+        .single()
+        .timeout(const Duration(seconds: 20));
+
+    final merged = _merge(user, row);
+    if (myGeneration == _generation) {
+      _lastKnown = merged;
+      _controller.add(merged);
+    }
+    return merged;
+  }
+
+  @override
   Future<AppUser> updateLocationBlur(int meters) async {
     final user = _auth.currentUser;
     if (user == null) throw const AuthException('Нет активной сессии');
@@ -191,6 +235,8 @@ class SupabaseAuthRepository implements AuthRepository {
         phone: user.phone,
         displayName: row['display_name'] as String?,
         avatarUrl: row['avatar_url'] as String?,
+        bio: row['bio'] as String?,
+        city: row['city'] as String?,
         socialScore: (row['social_score'] as num?)?.toInt() ?? 0,
         locationBlurM: (row['location_blur_m'] as num?)?.toInt() ?? 500,
       );

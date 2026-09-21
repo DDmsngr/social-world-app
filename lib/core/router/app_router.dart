@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,12 +16,19 @@ import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/create/presentation/create_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
+import '../../features/discover/presentation/place_screen.dart';
 import '../../features/events/domain/entities/event.dart';
 import '../../features/events/presentation/event_detail_screen.dart';
 import '../../features/events/presentation/events_screen.dart';
 import '../../features/feed/domain/entities/post.dart';
 import '../../features/feed/presentation/feed_screen.dart';
 import '../../features/feed/presentation/post_detail_screen.dart';
+import '../../features/feed/presentation/post_edit_screen.dart';
+import '../../features/notifications/notifications_screen.dart';
+import '../../features/profile/presentation/blocked_users_screen.dart';
+import '../../features/profile/presentation/edit_profile_screen.dart';
+import '../../features/profile/presentation/user_profile_screen.dart';
+import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/routes/presentation/route_detail_screen.dart';
@@ -43,6 +50,15 @@ abstract final class Routes {
   static const chats = '/chats';
   static const profile = '/profile';
   static const settings = '/profile/settings';
+  static const editProfile = '/profile/edit';
+  static const blocked = '/profile/blocked';
+
+  /// Профиль любого человека: ${Routes.user}/id. Свой открывается тем же
+  /// экраном и показывает действия владельца.
+  static const user = '/users';
+  static const saved = '/saved';
+  static const notifications = '/notifications';
+  static const places = '/places';
 
   /// Запись и просмотр маршрутов живут вне вкладок: во время прогулки нижняя
   /// навигация только мешает, а открытый чужой маршрут — это отдельный экран.
@@ -112,6 +128,9 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: Routes.splash,
     refreshListenable: auth,
+    // Неизвестный адрес (устаревшая ссылка, битый диплинк) — на карту, а не на
+    // экран с ошибкой роутера.
+    onException: (_, state, router) => router.go(Routes.home),
     redirect: (context, state) {
       final location = state.matchedLocation;
 
@@ -171,6 +190,36 @@ final routerProvider = Provider<GoRouter>((ref) {
           eventId: state.pathParameters['eventId']!,
           event: state.extra as Event?,
         ),
+      ),
+      GoRoute(
+        path: '${Routes.posts}/:postId/edit',
+        builder: (_, state) => PostEditScreen(
+          postId: state.pathParameters['postId']!,
+          post: state.extra as Post?,
+        ),
+      ),
+      GoRoute(
+        path: '${Routes.user}/:userId',
+        builder: (_, state) =>
+            UserProfileScreen(userId: state.pathParameters['userId']!),
+      ),
+      GoRoute(
+        path: '${Routes.places}/:placeId',
+        builder: (_, state) =>
+            PlaceScreen(placeId: state.pathParameters['placeId']!),
+      ),
+      GoRoute(
+        path: Routes.editProfile,
+        builder: (_, _) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: Routes.blocked,
+        builder: (_, _) => const BlockedUsersScreen(),
+      ),
+      GoRoute(path: Routes.saved, builder: (_, _) => const SavedScreen()),
+      GoRoute(
+        path: Routes.notifications,
+        builder: (_, _) => const NotificationsScreen(),
       ),
       GoRoute(
         path: Routes.settings,

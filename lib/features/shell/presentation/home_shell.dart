@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update/update_badge.dart';
 import '../../../core/update/update_controller.dart';
+import '../../notifications/notifications.dart';
+import '../../profile/presentation/providers/profile_providers.dart';
+import '../../saved/saved.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key, required this.navigationShell});
@@ -15,15 +20,43 @@ class HomeShell extends ConsumerStatefulWidget {
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell>
+    with WidgetsBindingObserver {
+  Timer? _poll;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Одна проверка за запуск: оболочка создаётся после входа и живёт до
     // закрытия приложения, так что дёргать сеть чаще незачем.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(updateControllerProvider.notifier).check();
+      // Заранее поднимаем то, что нужно карточкам сразу: список блокировок,
+      // закладки и уведомления (значок на колокольчике).
+      ref.read(blocksProvider);
+      ref.read(savedProvider);
+      ref.read(notificationsProvider);
     });
+    // Push (FCM) — отдельная инфраструктура; пока значок обновляется опросом.
+    _poll = Timer.periodic(
+      const Duration(seconds: 90),
+      (_) => ref.read(notificationsProvider.notifier).refreshQuietly(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(notificationsProvider.notifier).refreshQuietly();
+    }
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

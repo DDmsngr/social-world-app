@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,16 +6,21 @@ import '../../../core/debug/log_viewer_screen.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/sw_widgets.dart';
+import '../../../core/widgets/state_message.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../events/domain/entities/event.dart';
-import '../../events/presentation/providers/events_providers.dart';
 import '../domain/entities/discover_snapshot.dart';
+import '../domain/entities/nearby_person.dart';
 import '../domain/entities/place.dart';
 import 'providers/discover_providers.dart';
 import 'providers/presence_publisher.dart';
 import 'widgets/discover_map.dart';
+import 'widgets/map_controls.dart';
+import 'widgets/map_object_sheets.dart';
 
+/// Главный экран. Цикл, вокруг которого строится приложение:
+/// карта → активность → объект → действие → возврат на карту. Всё остальное
+/// (события, моменты, профили) открывается с карты и возвращает на неё.
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
 
@@ -48,8 +53,29 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     }
   }
 
-  void _openEvent(Event event) =>
-      context.push('${Routes.eventDetail}/${event.id}', extra: event);
+  void _focus(double? latitude, double? longitude, {double zoom = 16}) {
+    if (latitude == null || longitude == null) return;
+    ref.read(mapFocusProvider.notifier).request(latitude, longitude, zoom: zoom);
+  }
+
+  /// Выбор результата поиска или строки «Рядом»: камера идёт к объекту, карточка
+  /// открывается поверх карты; у человека без точки открывается профиль.
+  void _onSelect(MapSearchResult result) {
+    switch (result.kind) {
+      case SearchKind.place:
+        _focus(result.latitude, result.longitude);
+        showPlaceSheet(context, result.payload! as Place);
+      case SearchKind.event:
+        final event = result.payload! as Event;
+        _focus(result.latitude, result.longitude);
+        showEventSheet(context, event);
+      case SearchKind.nearbyPerson:
+        _focus(result.latitude, result.longitude, zoom: 15);
+        showPersonSheet(context, result.payload! as NearbyPerson);
+      case SearchKind.profile:
+        openProfile(context, result.id);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,11 +85,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     ref.watch(presencePublisherProvider);
 
     final data = ref.watch(discoverDataProvider);
-    // Прошедшие события карте не нужны: она про то, что происходит сейчас.
-    final upcoming = [
-      for (final event in ref.watch(eventsProvider).value ?? const <Event>[])
-        if (!event.isPast) event,
-    ];
+    final view = ref.watch(mapViewProvider);
+    final picking = ref.watch(pickingAnchorProvider);
+    final anchor = ref.watch(nearbyAnchorProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -78,38 +102,73 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             Positioned.fill(
               child: DiscoverMap(
                 data: snapshot,
-                places: ref.watch(filteredPlacesProvider),
-                events: [
-                  for (final event in upcoming)
-                    if (event.hasLocation) event,
-                ],
-                onEventTap: _openEvent,
-                filterActive: ref.watch(discoverSearchProvider).isNotEmpty ||
-                    ref.watch(categoryFilterProvider).isNotEmpty,
-                onPlaceTap: (place) => _showPlace(context, place),
+                places: view.places,
+                events: view.events,
+                people: view.people,
+                // Пока зоны пересчитываются, слой пустой — старые не висят
+                // поверх новых.
+                activity: ref.watch(visibleActivityProvider),
+                activityMode: ref.watch(activityModeProvider),
+                anchor: anchor,
+                focus: ref.watch(mapFocusProvider),
+                filterActive: view.isFiltered,
+                onPlaceTap: (place) => showPlaceSheet(context, place),
+                onEventTap: (event) => showEventSheet(context, event),
+                onPersonTap: (person) => showPersonSheet(context, person),
+                onLongTap: picking
+                    ? (lat, lng) {
+                        ref.read(nearbyAnchorProvider.notifier).set(
+                          NearbyAnchor(latitude: lat, longitude: lng),
+                        );
+                        ref.read(pickingAnchorProvider.notifier).set(false);
+                      }
+                    : null,
               ),
             ),
             Positioned(
               left: AppSpacing.gutter,
               right: AppSpacing.gutter,
               top: 12,
-              child: TextField(
-                onChanged: ref.read(discoverSearchProvider.notifier).update,
-                decoration: InputDecoration(
-                  hintText: 'Найти место на карте',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: IconButton(
-                    onPressed: () =>
-                        _showFilters(context, ref, snapshot.places),
-                    tooltip: 'Фильтры',
-                    icon: Icon(
-                      Icons.tune,
-                      color: ref.watch(categoryFilterProvider).isEmpty
-                          ? null
-                          : AppColors.primaryTint,
-                    ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  MapSearchBar(
+                    onSelect: _onSelect,
+                    onOpenFilters: () => showMapFiltersSheet(context, snapshot.places),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  const MapLayerChips(),
+                  if (picking) ...[
+                    const SizedBox(height: 8),
+                    _PickingBanner(
+                      onCancel: () =>
+                          ref.read(pickingAnchorProvider.notifier).set(false),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (view.isEmpty && view.isFiltered)
+              const Positioned(
+                left: AppSpacing.gutter,
+                right: AppSpacing.gutter,
+                bottom: 148,
+                child: MapEmptyBanner(),
+              ),
+            Positioned(
+              left: AppSpacing.gutter,
+              bottom: 92,
+              child: const MapModeSwitch(),
+            ),
+            Positioned(
+              right: AppSpacing.gutter,
+              bottom: 92,
+              child: ActionChip(
+                avatar: Icon(Icons.radar, size: 18, color: AppColors.primaryTint),
+                label: const Text('Рядом'),
+                onPressed: () => showNearbySheet(context, onSelect: _onSelect),
+                backgroundColor: AppColors.ink2,
+                side: BorderSide(color: AppColors.hairStrong),
               ),
             ),
             Positioned(
@@ -118,124 +177,54 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               bottom: 16,
               child: _CityPulseCard(
                 data: snapshot,
-                eventCount: upcoming.length,
+                view: view,
                 onOpen: () => context.push(Routes.events),
               ),
             ),
+            const MapIntro(),
           ],
         ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) =>
-            _DiscoverError(onRetry: () => ref.invalidate(discoverDataProvider)),
-      ),
-    );
-  }
-
-  Future<void> _showFilters(
-    BuildContext context,
-    WidgetRef ref,
-    List<Place> allPlaces,
-  ) {
-    final categories = {
-      for (final place in allPlaces)
-        if (place.category != null && place.category!.isNotEmpty)
-          place.category!,
-    }.toList()..sort();
-
-    return showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.gutter),
-        child: SheetCard(
-          child: Consumer(
-            builder: (context, ref, _) {
-              final selected = ref.watch(categoryFilterProvider);
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const SectionLabel('Фильтры'),
-                      if (selected.isNotEmpty)
-                        TextButton(
-                          onPressed: () => ref
-                              .read(categoryFilterProvider.notifier)
-                              .clear(),
-                          child: const Text('Сбросить'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  if (categories.isEmpty)
-                    Text(
-                      'Категорий пока нет',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    )
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final category in categories)
-                          ChoiceChip(
-                            label: Text(category),
-                            selected: selected.contains(category),
-                            onSelected: (_) => ref
-                                .read(categoryFilterProvider.notifier)
-                                .toggle(category),
-                            showCheckmark: false,
-                            backgroundColor: AppColors.card,
-                            selectedColor: AppColors.primary,
-                            labelStyle: TextStyle(
-                              fontSize: 13,
-                              color: selected.contains(category)
-                                  ? AppColors.onPrimary
-                                  : AppColors.textDim,
-                            ),
-                            side: BorderSide(color: AppColors.hair),
-                          ),
-                      ],
-                    ),
-                ],
-              );
-            },
-          ),
+        loading: () => const LoadingView(),
+        error: (_, _) => StateMessage.error(
+          title: 'Не удалось загрузить район',
+          onAction: () => ref.invalidate(discoverDataProvider),
         ),
       ),
     );
   }
+}
 
-  Future<void> _showPlace(BuildContext context, Place place) =>
-      showModalBottomSheet<void>(
-        context: context,
-        useSafeArea: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => Padding(
-          padding: const EdgeInsets.all(AppSpacing.gutter),
-          child: SheetCard(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionLabel(place.category ?? 'Место'),
-                const SizedBox(height: 12),
-                Text(place.title, style: AppTypography.serif(28)),
-                if (place.description != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    place.description!,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ],
+class _PickingBanner extends StatelessWidget {
+  const _PickingBanner({required this.onCancel});
+
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.geo.withValues(alpha: 0.95),
+      borderRadius: BorderRadius.circular(AppRadius.field),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
+        child: Row(
+          children: [
+            const Icon(Icons.touch_app_outlined, size: 18, color: Colors.black87),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Удерживайте палец на карте, чтобы выбрать точку',
+                style: TextStyle(color: Colors.black87, fontSize: 13),
+              ),
             ),
-          ),
+            TextButton(
+              onPressed: onCancel,
+              child: const Text('Отмена', style: TextStyle(color: Colors.black87)),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// «Пульс города»: что происходит вокруг прямо сейчас, одной строкой.
@@ -243,12 +232,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 class _CityPulseCard extends StatelessWidget {
   const _CityPulseCard({
     required this.data,
-    required this.eventCount,
+    required this.view,
     required this.onOpen,
   });
 
   final DiscoverSnapshot data;
-  final int eventCount;
+  final MapView view;
   final VoidCallback onOpen;
 
   @override
@@ -256,9 +245,9 @@ class _CityPulseCard extends StatelessWidget {
     final level = data.pulseLevel;
     final dot = level >= 2 ? AppColors.primaryTint : AppColors.geo;
     final summary = [
-      _plural(eventCount, 'событие', 'события', 'событий'),
-      _plural(data.places.length, 'место', 'места', 'мест'),
-      '${data.people.length} рядом',
+      _plural(view.events.length, 'событие', 'события', 'событий'),
+      _plural(view.places.length, 'место', 'места', 'мест'),
+      '${view.people.length} рядом',
     ].join(' · ');
 
     return Semantics(
@@ -339,32 +328,4 @@ String _plural(int n, String one, String few, String many) {
       ? few
       : many;
   return '$n $word';
-}
-
-class _DiscoverError extends StatelessWidget {
-  const _DiscoverError({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.gutter),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Не удалось загрузить район', style: AppTypography.serif(26)),
-            const SizedBox(height: 8),
-            Text(
-              'Проверьте соединение и попробуйте ещё раз.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 18),
-            FilledButton(onPressed: onRetry, child: const Text('Повторить')),
-          ],
-        ),
-      ),
-    );
-  }
 }

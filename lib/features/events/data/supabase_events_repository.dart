@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../domain/entities/event.dart';
+import '../domain/entities/event_route.dart';
 import '../domain/repositories/events_repository.dart';
 
 class SupabaseEventsRepository implements EventsRepository {
@@ -27,6 +28,16 @@ class SupabaseEventsRepository implements EventsRepository {
   }
 
   @override
+  Future<Event?> loadEvent(String eventId) async {
+    final rows = await _client.rpc(
+      'city_events',
+      params: {'in_event': eventId, 'in_limit': 1},
+    ) as List<dynamic>;
+    if (rows.isEmpty) return null;
+    return _fromRow(rows.first as Map<String, dynamic>);
+  }
+
+  @override
   Future<Event> createEvent({
     required String title,
     required DateTime startsAt,
@@ -34,6 +45,7 @@ class SupabaseEventsRepository implements EventsRepository {
     DateTime? endsAt,
     String? placeId,
     String? placeTitle,
+    List<EventRoutePoint> routePoints = const [],
   }) async {
     final userId = _userId;
     final row = await _client
@@ -45,6 +57,9 @@ class SupabaseEventsRepository implements EventsRepository {
           'starts_at': startsAt.toUtc().toIso8601String(),
           'ends_at': endsAt?.toUtc().toIso8601String(),
           'place_id': placeId,
+          // Маршрут ложится той же записью, что и событие: нет состояния
+          // «событие создано, а маршрут потерялся».
+          'route_points': [for (final point in routePoints) point.toJson()],
         })
         .select()
         .single();
@@ -74,35 +89,78 @@ class SupabaseEventsRepository implements EventsRepository {
       description: row['description'] as String?,
       startsAt: DateTime.parse(row['starts_at'] as String),
       endsAt: _parseNullable(row['ends_at']),
+      placeId: placeId,
       placeTitle: placeTitle,
+      routePoints: EventRoutePoint.parseList(row['route_points']),
       createdAt: DateTime.parse(row['created_at'] as String),
     );
   }
 
   @override
   Future<Event> toggleJoin(Event event) async {
-    if (event.joinedByMe) {
+    final me = _userId;
+    final join = !event.joinedByMe;
+
+    if (join) {
+      // Идемпотентно: если запись уже есть (прошлый тап дошёл, а экран
+      // об этом не узнал), повтор не падает на дубликате ключа, а просто
+      // подтверждает участие.
+      await _client.from('event_participants').upsert(
+        {'event_id': event.id, 'profile_id': me},
+        onConflict: 'event_id,profile_id',
+        ignoreDuplicates: true,
+      );
+    } else {
       await _client.from('event_participants').delete().match({
         'event_id': event.id,
-        'profile_id': _userId,
-      });
-    } else {
-      await _client.from('event_participants').insert({
-        'event_id': event.id,
-        'profile_id': _userId,
+        'profile_id': me,
       });
     }
 
-    final joined = !event.joinedByMe;
+    // Итог берём у сервера, а не выводим арифметикой: счётчик участников
+    // мог измениться за это время у других людей.
+    try {
+      final fresh = await loadEvent(event.id);
+      if (fresh != null) return fresh;
+    } catch (_) {
+      // Запись прошла — сбой повторного чтения не отменяет участия.
+    }
     return event.copyWith(
-      joinedByMe: joined,
-      participantCount: event.participantCount + (joined ? 1 : -1),
+      joinedByMe: join,
+      participantCount: event.participantCount + (join ? 1 : -1),
     );
   }
 
   @override
-  Future<void> deleteEvent(String eventId) =>
-      _client.from('events').delete().eq('id', eventId);
+  Future<List<EventParticipant>> loadParticipants(String eventId) async {
+    final rows = await _client.rpc(
+      'event_participants_list',
+      params: {'in_event': eventId},
+    ) as List<dynamic>;
+    return [
+      for (final raw in rows)
+        EventParticipant(
+          profileId: (raw as Map<String, dynamic>)['profile_id'] as String,
+          displayName: (raw['display_name'] as String?) ?? 'Без имени',
+          avatarUrl: raw['avatar_url'] as String?,
+        ),
+    ];
+  }
+
+  @override
+  Future<void> deleteEvent(String eventId) async {
+    // eq('author_id') — второй замок поверх RLS: чужое событие не совпадёт
+    // с фильтром, и вместо тихого «успеха» придёт пустой результат.
+    final deleted = await _client
+        .from('events')
+        .delete()
+        .eq('id', eventId)
+        .eq('author_id', _userId)
+        .select('id');
+    if (deleted.isEmpty) {
+      throw const AuthException('Событие не найдено или оно не ваше');
+    }
+  }
 
   Event _fromRow(Map<String, dynamic> row) => Event(
     id: row['id'] as String,
@@ -113,10 +171,12 @@ class SupabaseEventsRepository implements EventsRepository {
     description: row['description'] as String?,
     startsAt: DateTime.parse(row['starts_at'] as String),
     endsAt: _parseNullable(row['ends_at']),
+    placeId: row['place_id'] as String?,
     placeTitle: row['place_title'] as String?,
     latitude: (row['place_latitude'] as num?)?.toDouble(),
     longitude: (row['place_longitude'] as num?)?.toDouble(),
     coverUrl: row['cover_url'] as String?,
+    routePoints: EventRoutePoint.parseList(row['route_points']),
     createdAt: DateTime.parse(row['created_at'] as String),
     participantCount: (row['participant_count'] as num?)?.toInt() ?? 0,
     joinedByMe: row['joined_by_me'] as bool? ?? false,

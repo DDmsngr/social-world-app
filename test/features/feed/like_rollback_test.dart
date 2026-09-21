@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:social_world/features/auth/domain/entities/app_user.dart';
 import 'package:social_world/features/auth/presentation/providers/auth_providers.dart';
 import 'package:social_world/features/feed/domain/entities/post.dart';
+import 'package:social_world/features/feed/domain/entities/publish_settings.dart';
 import 'package:social_world/features/feed/domain/repositories/feed_repository.dart';
 import 'package:social_world/features/feed/presentation/providers/feed_providers.dart';
 
@@ -33,12 +34,39 @@ class _FailingFeedRepository implements FeedRepository {
   }
 
   @override
+  Future<Post?> loadPost(String postId) async => _post;
+
+  @override
+  Future<Post> updatePost(
+    Post post, {
+    required String body,
+    String? title,
+    BodyFormat? bodyFormat,
+    required PublishSettings settings,
+    required List<String> keepMediaUrls,
+    List<String> newMediaPaths = const [],
+    String? placeId,
+    String? placeTitle,
+    double? placeLatitude,
+    double? placeLongitude,
+  }) async => _post;
+
+  @override
+  Future<String> uploadInlineImage(String localPath) async => localPath;
+
+  @override
   Future<Post> createPost({
     required String body,
     PostKind kind = PostKind.text,
+    PostType postType = PostType.moment,
+    String? title,
+    BodyFormat bodyFormat = BodyFormat.plain,
+    PublishSettings settings = PublishSettings.defaults,
     List<String> mediaPaths = const [],
     String? placeId,
     String? placeTitle,
+    double? placeLatitude,
+    double? placeLongitude,
     String? routeId,
   }) async => _post;
 

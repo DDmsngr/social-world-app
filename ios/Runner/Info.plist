@@ -35,6 +35,8 @@
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Чтобы добавить на маршрут уже снятые фотографии.</string>
 		<!-- Редирект из моста входа (VK ID/Яндекс ID) — см. lib/core/oauth. -->
+		<key>FlutterDeepLinkingEnabled</key>
+		<false/>
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>

@@ -51,7 +51,13 @@ void main() {
   testWidgets('свёрнутая ветка прячет ответы', (tester) async {
     await pumpScreen(tester);
 
-    await tester.tap(find.text('Саша').first);
+    // Имя ведёт в профиль, а свернуть ветку можно любым другим местом её
+    // шапки — берём пустой правый край строки.
+    final header = find.ancestor(
+      of: find.text('Саша').first,
+      matching: find.byType(InkWell),
+    ).first;
+    await tester.tapAt(tester.getTopRight(header) + const Offset(-6, 10));
     await tester.pump();
 
     expect(find.text('Вода реально тёплая? Собираюсь завтра с утра.'), findsNothing);

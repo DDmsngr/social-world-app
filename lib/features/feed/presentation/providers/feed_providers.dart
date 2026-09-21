@@ -5,6 +5,7 @@ import '../../../../core/config/env.dart';
 import '../../../../core/debug/app_log.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../moderation/presentation/providers/report_providers.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/local_feed_repository.dart';
 import '../../data/supabase_feed_repository.dart';
 import '../../domain/entities/post.dart';
@@ -87,6 +88,16 @@ class FeedController extends AsyncNotifier<List<Post>> {
     state = AsyncValue.data([post, ...?state.value]);
   }
 
+  /// Пост после правки: лента показывает новую версию без перезагрузки.
+  void replacePost(Post post) => _replace(post);
+
+  void remove(String postId) {
+    state = AsyncValue.data([
+      for (final item in state.value ?? const <Post>[])
+        if (item.id != postId) item,
+    ]);
+  }
+
   /// Счётчик на карточке должен совпадать с тем, что человек только что
   /// написал в ветке: иначе, вернувшись в ленту, он видит, что комментария
   /// будто и не было.
@@ -109,7 +120,10 @@ class FeedController extends AsyncNotifier<List<Post>> {
   }
 
   List<Post> _withoutHidden(List<Post> posts) {
-    final hidden = ref.read(reportRepositoryProvider).hiddenTargetIds;
+    final hidden = {
+      ...ref.read(reportRepositoryProvider).hiddenTargetIds,
+      ...?ref.read(blocksProvider).value?.keys,
+    };
     if (hidden.isEmpty) return posts;
     return posts
         .where(

@@ -79,6 +79,34 @@ class LocalAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> updateProfile({
+    String? displayName,
+    String? bio,
+    String? city,
+    String? avatarLocalPath,
+  }) async {
+    final current = _user;
+    if (current == null) throw Exception('Нет активной сессии');
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    return _openSession(
+      AppUser(
+        id: current.id,
+        email: current.email,
+        phone: current.phone,
+        displayName: displayName?.trim() ?? current.displayName,
+        // В моках хранилища нет: ссылкой на аватар служит сам путь к файлу.
+        avatarUrl: avatarLocalPath ?? current.avatarUrl,
+        bio: bio == null ? current.bio : (bio.trim().isEmpty ? null : bio.trim()),
+        city: city == null
+            ? current.city
+            : (city.trim().isEmpty ? null : city.trim()),
+        socialScore: current.socialScore,
+        locationBlurM: current.locationBlurM,
+      ),
+    );
+  }
+
+  @override
   Future<AppUser> updateLocationBlur(int meters) async {
     final current = _user;
     if (current == null) throw Exception('Нет активной сессии');

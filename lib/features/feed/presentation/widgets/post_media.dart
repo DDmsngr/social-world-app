@@ -4,6 +4,8 @@ import 'package:video_player/video_player.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/media/media_kind.dart';
+import '../../../../core/media/photo_viewer.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/theme/app_colors.dart';
 
 /// Вложения поста: одна фотография, лента из нескольких или видео.
@@ -36,7 +38,7 @@ class _PostMediaState extends State<PostMedia> {
     if (widget.urls.length == 1) {
       return AspectRatio(
         aspectRatio: 4 / 3,
-        child: _MediaItem(url: widget.urls.first),
+        child: _MediaItem(url: widget.urls.first, allUrls: widget.urls),
       );
     }
 
@@ -49,7 +51,8 @@ class _PostMediaState extends State<PostMedia> {
             controller: _pageController,
             itemCount: widget.urls.length,
             onPageChanged: (page) => setState(() => _page = page),
-            itemBuilder: (_, index) => _MediaItem(url: widget.urls[index]),
+            itemBuilder: (_, index) =>
+                _MediaItem(url: widget.urls[index], allUrls: widget.urls),
           ),
         ),
         Padding(
@@ -78,19 +81,38 @@ class _PostMediaState extends State<PostMedia> {
 }
 
 class _MediaItem extends StatelessWidget {
-  const _MediaItem({required this.url});
+  const _MediaItem({required this.url, required this.allUrls});
 
   final String url;
+  final List<String> allUrls;
+
+  /// Тап по фото открывает его на весь экран; листать можно все фото поста.
+  void _open(BuildContext context) {
+    final photos = allUrls.where((item) => !isVideoUrl(item)).toList();
+    showPhotoViewer(
+      context,
+      urls: photos,
+      initialIndex: photos.indexOf(url).clamp(0, photos.length - 1),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     if (isVideoUrl(url)) return _VideoItem(url: url);
 
+    return GestureDetector(
+      onTap: () => _open(context),
+      behavior: HitTestBehavior.opaque,
+      child: _image(),
+    );
+  }
+
+  Widget _image() {
     // В режиме заглушек ссылкой служит сам файл (на вебе это blob:), кеш для
     // такого не нужен и не работает.
     if (!url.startsWith('http')) {
-      return Image.network(
-        url,
+      return Image(
+        image: imageProviderFor(url),
         fit: BoxFit.cover,
         errorBuilder: (_, _, _) => ColoredBox(color: AppColors.ink2),
       );

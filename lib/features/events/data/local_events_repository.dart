@@ -1,4 +1,6 @@
+import '../../../core/permissions/content_permissions.dart';
 import '../domain/entities/event.dart';
+import '../domain/entities/event_route.dart';
 import '../domain/repositories/events_repository.dart';
 
 /// Лента событий на моках, пока Supabase не поднят — тот же приём, что и
@@ -14,6 +16,7 @@ class LocalEventsRepository implements EventsRepository {
   final String Function() currentUserName;
 
   late final List<Event> _events = List.of(_seed);
+  final _participants = <String, List<EventParticipant>>{};
   var _nextId = 0;
 
   @override
@@ -25,6 +28,14 @@ class LocalEventsRepository implements EventsRepository {
   }
 
   @override
+  Future<Event?> loadEvent(String eventId) async {
+    for (final event in _events) {
+      if (event.id == eventId) return event;
+    }
+    return null;
+  }
+
+  @override
   Future<Event> createEvent({
     required String title,
     required DateTime startsAt,
@@ -32,6 +43,7 @@ class LocalEventsRepository implements EventsRepository {
     DateTime? endsAt,
     String? placeId,
     String? placeTitle,
+    List<EventRoutePoint> routePoints = const [],
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     final event = Event(
@@ -42,7 +54,9 @@ class LocalEventsRepository implements EventsRepository {
       description: description?.trim(),
       startsAt: startsAt,
       endsAt: endsAt,
+      placeId: placeId,
       placeTitle: placeTitle,
+      routePoints: routePoints,
       createdAt: DateTime.now(),
     );
     _events.add(event);
@@ -58,12 +72,45 @@ class LocalEventsRepository implements EventsRepository {
     );
     final index = _events.indexWhere((item) => item.id == event.id);
     if (index != -1) _events[index] = updated;
+
+    final list = _participants.putIfAbsent(event.id, () => []);
+    list.removeWhere((p) => p.profileId == currentUserId());
+    if (joined) {
+      list.add(
+        EventParticipant(
+          profileId: currentUserId(),
+          displayName: currentUserName(),
+        ),
+      );
+    }
     return updated;
   }
 
   @override
+  Future<List<EventParticipant>> loadParticipants(String eventId) async {
+    final own = _participants[eventId] ?? const <EventParticipant>[];
+    // К живым участникам добавляем автора события: он идёт всегда.
+    final event = await loadEvent(eventId);
+    return [
+      if (event != null &&
+          !own.any((p) => p.profileId == event.authorId))
+        EventParticipant(
+          profileId: event.authorId,
+          displayName: event.authorName,
+        ),
+      ...own,
+    ];
+  }
+
+  @override
   Future<void> deleteEvent(String eventId) async {
-    _events.removeWhere((event) => event.id == eventId);
+    final index = _events.indexWhere((event) => event.id == eventId);
+    if (index == -1) return;
+    ContentPermissions(
+      viewerId: currentUserId(),
+      ownerId: _events[index].authorId,
+    ).requireOwner();
+    _events.removeAt(index);
   }
 
   static final _seed = <Event>[
@@ -73,10 +120,30 @@ class LocalEventsRepository implements EventsRepository {
       authorName: 'Саша',
       title: 'Утренний забег вдоль моря',
       description: 'Стартуем от Театральной, темп спокойный, компанию найдём по пути.',
+      placeId: 'theatre-square',
       placeTitle: 'Театральная площадь',
-      startsAt: DateTime.now().add(const Duration(days: 1, hours: 7)),
+      latitude: 43.5789,
+      longitude: 39.7232,
+      startsAt: DateTime.now().add(const Duration(hours: 5)),
       createdAt: DateTime.now().subtract(const Duration(hours: 2)),
       participantCount: 5,
+      routePoints: const [
+        EventRoutePoint(
+          latitude: 43.5789,
+          longitude: 39.7232,
+          title: 'Театральная площадь',
+        ),
+        EventRoutePoint(
+          latitude: 43.5740,
+          longitude: 39.7289,
+          title: 'Приморская набережная',
+        ),
+        EventRoutePoint(
+          latitude: 43.5689,
+          longitude: 39.7258,
+          title: 'Зимний театр',
+        ),
+      ],
     ),
     Event(
       id: 'seed-event-2',
@@ -84,7 +151,10 @@ class LocalEventsRepository implements EventsRepository {
       authorName: 'Ника',
       title: 'Вечер настольных игр',
       description: 'Собираемся у Площади Искусств, игр много — приносить не обязательно.',
+      placeId: 'art-square',
       placeTitle: 'Площадь Искусств',
+      latitude: 43.5752,
+      longitude: 39.7246,
       startsAt: DateTime.now().add(const Duration(days: 3, hours: 19)),
       createdAt: DateTime.now().subtract(const Duration(hours: 8)),
       participantCount: 11,

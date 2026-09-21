@@ -47,6 +47,14 @@ class _FakeAuthRepository implements AuthRepository {
       _current!;
 
   @override
+  Future<AppUser> updateProfile({
+    String? displayName,
+    String? bio,
+    String? city,
+    String? avatarLocalPath,
+  }) async => _current!;
+
+  @override
   Future<AppUser> updateLocationBlur(int meters) async => _current!;
 
   void dispose() => unawaited(_controller.close());

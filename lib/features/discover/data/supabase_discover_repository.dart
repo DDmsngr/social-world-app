@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../domain/activity.dart';
 import '../domain/entities/discover_snapshot.dart';
 import '../domain/entities/nearby_person.dart';
 import '../domain/entities/place.dart';
@@ -83,6 +84,42 @@ class SupabaseDiscoverRepository implements DiscoverRepository {
           .map((row) => _personFromRow(row as Map<String, dynamic>))
           .toList(growable: false),
     );
+  }
+
+  @override
+  Future<Place?> loadPlace(String placeId) async {
+    final rows = await _client.rpc('place_by_id', params: {'in_place': placeId})
+        as List<dynamic>;
+    if (rows.isEmpty) return null;
+    return _placeFromRow(rows.first as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<ActivityCell>> loadActivity(ActivityQuery query) async {
+    final rows = await _client.rpc(
+      'city_activity',
+      params: {
+        'in_lat': query.latitude,
+        'in_lng': query.longitude,
+        'in_radius_m': query.radiusMeters,
+        'in_kinds': [for (final layer in query.layers) layer.wire],
+        'in_categories': query.categories.isEmpty ? null : query.categories.toList(),
+        'in_at': query.at.toUtc().toIso8601String(),
+      },
+    ) as List<dynamic>;
+
+    return [
+      for (final raw in rows)
+        ActivityCell(
+          latitude: ((raw as Map<String, dynamic>)['latitude'] as num).toDouble(),
+          longitude: (raw['longitude'] as num).toDouble(),
+          score: (raw['score'] as num).toDouble(),
+          radiusMeters: (raw['radius_m'] as num?)?.toInt() ?? 600,
+          eventCount: (raw['event_count'] as num?)?.toInt() ?? 0,
+          placeCount: (raw['place_count'] as num?)?.toInt() ?? 0,
+          momentCount: (raw['moment_count'] as num?)?.toInt() ?? 0,
+        ),
+    ];
   }
 
   Place _placeFromRow(Map<String, dynamic> row) => Place(

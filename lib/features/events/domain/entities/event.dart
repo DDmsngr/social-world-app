@@ -1,3 +1,5 @@
+import 'event_route.dart';
+
 class Event {
   const Event({
     required this.id,
@@ -9,10 +11,12 @@ class Event {
     this.authorAvatarUrl,
     this.description,
     this.endsAt,
+    this.placeId,
     this.placeTitle,
     this.latitude,
     this.longitude,
     this.coverUrl,
+    this.routePoints = const [],
     this.participantCount = 0,
     this.joinedByMe = false,
   });
@@ -26,6 +30,8 @@ class Event {
   final DateTime startsAt;
   final DateTime? endsAt;
 
+  final String? placeId;
+
   /// Название места, а не координаты — тот же принцип, что и у постов.
   final String? placeTitle;
 
@@ -36,6 +42,9 @@ class Event {
 
   final String? coverUrl;
 
+  /// Маршрут события: последовательность точек. Пустой — маршрута нет.
+  final List<EventRoutePoint> routePoints;
+
   final DateTime createdAt;
   final int participantCount;
   final bool joinedByMe;
@@ -43,6 +52,7 @@ class Event {
   bool get isPast => (endsAt ?? startsAt).isBefore(DateTime.now());
 
   bool get hasLocation => latitude != null && longitude != null;
+  bool get hasRoute => routePoints.length >= 2;
 
   Event copyWith({
     int? participantCount,
@@ -58,12 +68,27 @@ class Event {
     description: description,
     startsAt: startsAt,
     endsAt: endsAt,
+    placeId: placeId,
     placeTitle: placeTitle,
     latitude: latitude ?? this.latitude,
     longitude: longitude ?? this.longitude,
     coverUrl: coverUrl,
+    routePoints: routePoints,
     createdAt: createdAt,
     participantCount: participantCount ?? this.participantCount,
     joinedByMe: joinedByMe ?? this.joinedByMe,
   );
+}
+
+/// Участник события — строка списка «Кто идёт».
+class EventParticipant {
+  const EventParticipant({
+    required this.profileId,
+    required this.displayName,
+    this.avatarUrl,
+  });
+
+  final String profileId;
+  final String displayName;
+  final String? avatarUrl;
 }

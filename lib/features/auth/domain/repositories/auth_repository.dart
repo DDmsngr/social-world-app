@@ -19,6 +19,16 @@ abstract interface class AuthRepository {
   /// Заполнение публичного профиля после первого входа.
   Future<AppUser> completeProfile({required String displayName});
 
+  /// Правка собственной анкеты. `null` — поле не трогаем, пустая строка у
+  /// [bio]/[city] — очищаем. [avatarLocalPath] — файл с устройства: в
+  /// хранилище его кладёт репозиторий, а ссылка попадает в профиль.
+  Future<AppUser> updateProfile({
+    String? displayName,
+    String? bio,
+    String? city,
+    String? avatarLocalPath,
+  });
+
   /// Радиус размытия гео на карте «Рядом» — экран настроек.
   Future<AppUser> updateLocationBlur(int meters);
 }

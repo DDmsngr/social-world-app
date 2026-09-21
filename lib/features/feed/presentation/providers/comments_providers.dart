@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/env.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/local_comments_repository.dart';
 import '../../data/supabase_comments_repository.dart';
 import '../../domain/comment_thread.dart';
@@ -29,8 +30,19 @@ class CommentsController extends AsyncNotifier<List<Comment>> {
   final String postId;
 
   @override
-  Future<List<Comment>> build() {
-    return ref.watch(commentsRepositoryProvider).loadThread(postId);
+  Future<List<Comment>> build() async {
+    final thread = await ref.watch(commentsRepositoryProvider).loadThread(postId);
+    // Комментарии заблокированных и скрытых людей гасим на месте: удалять их
+    // из дерева нельзя — под ними могут висеть чужие ответы.
+    final blocked = ref.read(blocksProvider).value?.keys.toSet() ?? const <String>{};
+    if (blocked.isEmpty) return thread;
+    return [
+      for (final comment in thread)
+        if (blocked.contains(comment.authorId))
+          comment.copyWith(deleted: true)
+        else
+          comment,
+    ];
   }
 
   /// Новый комментарий встаёт на своё место в дереве сразу, без перезагрузки

@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../core/errors/friendly_error.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_choice.dart';
-import '../../../core/theme/app_typography.dart';
 import '../../../core/update/update_controller.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
@@ -22,14 +22,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  int? _pendingBlur;
-  var _savingBlur = false;
-
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(currentUserProvider);
-    final blur = (_pendingBlur ?? user?.locationBlurM ?? 500).toDouble();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Настройки'),
@@ -40,68 +34,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           icon: const Icon(Icons.arrow_back),
         ),
       ),
+      // Низ считается от системной панели (жесты или три кнопки): без этого
+      // «Выйти» уезжала под системные клавиши.
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.gutter),
+        padding: AppSpacing.page(context, top: AppSpacing.gutter),
         children: [
+          const SectionLabel('Профиль'),
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            onTap: () => context.push(Routes.editProfile),
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, color: AppColors.primaryTint),
+                const SizedBox(width: 14),
+                const Expanded(child: Text('Редактировать профиль')),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
+          const SizedBox(height: 26),
           const SectionLabel('Оформление'),
           const SizedBox(height: 12),
           const _ThemePicker(),
           const SizedBox(height: 26),
-          const SectionLabel('Приватность'),
+          const SectionLabel('Приватность геолокации'),
           const SizedBox(height: 12),
-          const _PresenceSwitch(),
+          const _GeoPrivacy(),
           const SizedBox(height: 10),
           GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            onTap: () => context.push(Routes.blocked),
+            child: Row(
               children: [
-                Text(
-                  'Радиус видимости на карте',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Насколько крупным будет это пятно. С маршрутом прогулки '
-                  'иначе: если вы публикуете его сами, путь и точки съёмки '
-                  'видны точно — это осознанная публикация, а не слежение.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 8),
-                Slider(
-                  value: blur.clamp(200, 2000),
-                  min: 200,
-                  max: 2000,
-                  divisions: 18,
-                  label: '${blur.round()} м',
-                  activeColor: AppColors.primaryTint,
-                  onChanged: (value) =>
-                      setState(() => _pendingBlur = value.round()),
-                  onChangeEnd: (value) async {
-                    setState(() => _savingBlur = true);
-                    try {
-                      await ref
-                          .read(authRepositoryProvider)
-                          .updateLocationBlur(value.round());
-                    } finally {
-                      if (mounted) setState(() => _savingBlur = false);
-                    }
-                  },
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${blur.round()} м',
-                      style: AppTypography.serif(20, color: AppColors.primaryTint),
-                    ),
-                    if (_savingBlur)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                  ],
-                ),
+                Icon(Icons.block_outlined, color: AppColors.primaryTint),
+                const SizedBox(width: 14),
+                const Expanded(child: Text('Заблокированные и скрытые')),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
               ],
             ),
           ),
@@ -117,7 +86,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           OutlinedButton(
             onPressed: () async {
               // Сначала убираем точку: после signOut сессии уже нет и удалить
-              // свою строку в `locations` будет нечем — человек остался бы
+              // свою строку в locations будет нечем — человек остался бы
               // висеть на чужих картах до протухания через два часа.
               try {
                 await ref.read(discoverRepositoryProvider).clearPresence();
@@ -134,51 +103,146 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-class _PresenceSwitch extends ConsumerWidget {
-  const _PresenceSwitch();
+/// Способы показывать своё присутствие на карте «Рядом». Геолокация самого
+/// телефона (чтобы карта нашла вас) и публикация положения другим людям —
+/// разные вещи: разрешение ОС ничего не публикует, публикация включается
+/// только здесь и всегда размыта до района.
+enum _GeoMode {
+  hidden('Никому', 'Вас нет на карте у других. Карта для вас работает как обычно.', null),
+  approximate('Приблизительно', 'Другие видят пятно района, около 1 км.', 1000),
+  district('Район', 'Пятно около 500 м. Так по умолчанию.', 500),
+  precise('Точнее', 'Пятно около 200 м — самое точное из возможных.', 200);
+
+  const _GeoMode(this.label, this.hint, this.blurMeters);
+
+  final String label;
+  final String hint;
+
+  /// null — присутствие выключено.
+  final int? blurMeters;
+}
+
+class _GeoPrivacy extends ConsumerStatefulWidget {
+  const _GeoPrivacy();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final enabled = ref.watch(presenceEnabledProvider);
+  ConsumerState<_GeoPrivacy> createState() => _GeoPrivacyState();
+}
+
+class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
+  _GeoMode? _pending;
+  var _saving = false;
+
+  _GeoMode _current() {
+    if (!ref.read(presenceEnabledProvider)) return _GeoMode.hidden;
+    final blur = ref.read(currentUserProvider)?.locationBlurM ?? 500;
+    if (blur <= 300) return _GeoMode.precise;
+    if (blur <= 700) return _GeoMode.district;
+    return _GeoMode.approximate;
+  }
+
+  Future<void> _choose(_GeoMode mode) async {
+    if (_saving) return;
+    setState(() {
+      _pending = mode;
+      _saving = true;
+    });
+    try {
+      final blur = mode.blurMeters;
+      if (blur == null) {
+        // Выключение убирает точку с карты сразу, не дожидаясь протухания.
+        await ref.read(presenceEnabledProvider.notifier).set(false);
+      } else {
+        await ref.read(authRepositoryProvider).updateLocationBlur(blur);
+        await ref.read(presenceEnabledProvider.notifier).set(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось сохранить'))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _pending = null;
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Подписка на оба источника: режим пересчитывается после сохранения.
+    ref.watch(presenceEnabledProvider);
+    ref.watch(currentUserProvider);
+    final current = _pending ?? _current();
 
     return GlassCard(
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Показывать меня на карте',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  enabled
-                      ? 'Пока приложение открыто, другие видят размытое пятно '
-                            'вашего района. Выключите — точка исчезнет с карты '
-                            'сразу.'
-                      : 'Вас не видно в разделе «Рядом». Карта, события и '
-                            'публикации работают как обычно.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 6),
+            child: Text(
+              'Кому видно, что вы рядом. Точные координаты не покидают телефон: '
+              'публикуется только размытая точка, пока приложение открыто. '
+              'Маршрут прогулки — отдельно: если вы публикуете его сами, путь '
+              'виден точно.',
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
-          const SizedBox(width: 12),
-          Switch(
-            value: enabled,
-            activeThumbColor: AppColors.onPrimary,
-            activeTrackColor: AppColors.primary,
-            onChanged: (value) =>
-                ref.read(presenceEnabledProvider.notifier).set(value),
+          for (final mode in _GeoMode.values)
+            Semantics(
+              button: true,
+              selected: mode == current,
+              inMutuallyExclusiveGroup: true,
+              child: InkWell(
+                onTap: () => _choose(mode),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(mode.label),
+                            Text(
+                              mode.hint,
+                              style: TextStyle(fontSize: 12, color: AppColors.textDim),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (mode == current)
+                        _saving
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(Icons.check, color: AppColors.primaryTint),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 6, 18, 8),
+            child: Text(
+              'Место в конкретном посте задаётся отдельно — галочкой '
+              '«Показывать место публикации» при создании.',
+              style: TextStyle(fontSize: 12, color: AppColors.textFaint),
+            ),
           ),
         ],
       ),
     );
   }
 }
-
 class _ThemePicker extends ConsumerWidget {
   const _ThemePicker();
 

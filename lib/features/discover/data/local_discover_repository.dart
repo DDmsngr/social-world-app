@@ -1,10 +1,39 @@
 import '../../../core/location/geo_privacy.dart';
+import '../domain/activity.dart';
 import '../domain/entities/discover_snapshot.dart';
 import '../domain/entities/nearby_person.dart';
 import '../domain/entities/place.dart';
 import '../domain/repositories/discover_repository.dart';
 
 class LocalDiscoverRepository implements DiscoverRepository {
+  /// [activitySource] отдаёт события и моменты, которые лежат в соседних
+  /// репозиториях-заглушках: без сервера считать активность больше не из чего.
+  LocalDiscoverRepository({this.activitySource});
+
+  final List<ActivityObject> Function()? activitySource;
+
+  @override
+  Future<Place?> loadPlace(String placeId) async {
+    for (final place in _places) {
+      if (place.id == placeId) return place;
+    }
+    return null;
+  }
+
+  @override
+  Future<List<ActivityCell>> loadActivity(ActivityQuery query) async {
+    final objects = [
+      for (final place in _places)
+        ActivityObject(
+          kind: ActivityKind.place,
+          latitude: place.latitude,
+          longitude: place.longitude,
+          category: place.category,
+        ),
+      ...?activitySource?.call(),
+    ];
+    return ActivityCalculator.compute(objects, query);
+  }
   @override
   Future<DiscoverSnapshot> loadNearby({
     required double centerLatitude,

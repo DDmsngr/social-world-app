@@ -5,6 +5,7 @@ import '../../../../core/config/env.dart';
 import '../../../../core/debug/app_log.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../moderation/presentation/providers/report_providers.dart';
+import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/local_events_repository.dart';
 import '../../data/supabase_events_repository.dart';
 import '../../domain/entities/event.dart';
@@ -48,8 +49,11 @@ class EventsController extends AsyncNotifier<List<Event>> {
   /// Возвращает false, если записаться не удалось — экран показывает
   /// сообщение. Молчаливый отказ здесь хуже, чем в ленте: человек уверен,
   /// что придёт на встречу, а в списке участников его нет.
-  Future<bool> toggleJoin(Event event) async {
-    if (!_joinsInFlight.add(event.id)) return true;
+  Future<bool> toggleJoin(Event stale) async {
+    if (!_joinsInFlight.add(stale.id)) return true;
+    // Экран мог передать устаревший снимок (например, тот, с которым его
+    // открыли): решает всегда то, что сейчас лежит в списке.
+    final event = byId(stale.id) ?? stale;
 
     _replace(
       event.copyWith(
@@ -77,8 +81,32 @@ class EventsController extends AsyncNotifier<List<Event>> {
     ]);
   }
 
+  Event? byId(String id) {
+    for (final item in state.value ?? const <Event>[]) {
+      if (item.id == id) return item;
+    }
+    return null;
+  }
+
+  /// Событие по id: из списка, а если его там нет (ссылка, уведомление,
+  /// перезапуск) — с сервера, с добавлением в список.
+  Future<Event?> ensure(String id) async {
+    final known = byId(id);
+    if (known != null) return known;
+    final fetched = await ref.read(eventsRepositoryProvider).loadEvent(id);
+    if (fetched != null) append(fetched);
+    return fetched;
+  }
+
   void append(Event event) {
     state = AsyncValue.data([...?state.value, event]);
+  }
+
+  void remove(String id) {
+    state = AsyncValue.data([
+      for (final item in state.value ?? const <Event>[])
+        if (item.id != id) item,
+    ]);
   }
 
   /// После жалобы контент исчезает сразу, не дожидаясь разбора.
@@ -90,7 +118,10 @@ class EventsController extends AsyncNotifier<List<Event>> {
   }
 
   List<Event> _withoutHidden(List<Event> events) {
-    final hidden = ref.read(reportRepositoryProvider).hiddenTargetIds;
+    final hidden = {
+      ...ref.read(reportRepositoryProvider).hiddenTargetIds,
+      ...?ref.read(blocksProvider).value?.keys,
+    };
     if (hidden.isEmpty) return events;
     return events
         .where(
@@ -104,3 +135,10 @@ class EventsController extends AsyncNotifier<List<Event>> {
 final eventsProvider = AsyncNotifierProvider<EventsController, List<Event>>(
   EventsController.new,
 );
+
+/// Кто идёт на событие. После «Участвовать» экран инвалидирует этот провайдер,
+/// чтобы человек сразу увидел себя в списке.
+final eventParticipantsProvider = FutureProvider.autoDispose
+    .family<List<EventParticipant>, String>((ref, eventId) {
+      return ref.watch(eventsRepositoryProvider).loadParticipants(eventId);
+    });

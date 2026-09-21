@@ -5,6 +5,8 @@ class AppUser {
     this.phone,
     this.displayName,
     this.avatarUrl,
+    this.bio,
+    this.city,
     this.socialScore = 0,
     this.locationBlurM = 500,
   });
@@ -14,6 +16,8 @@ class AppUser {
   final String? phone;
   final String? displayName;
   final String? avatarUrl;
+  final String? bio;
+  final String? city;
   final int socialScore;
 
   /// Радиус, с которым человек виден на карте «Рядом» — точные координаты
@@ -38,6 +42,8 @@ class AppUser {
   AppUser copyWith({
     String? displayName,
     String? avatarUrl,
+    String? bio,
+    String? city,
     int? socialScore,
     int? locationBlurM,
   }) =>
@@ -47,6 +53,8 @@ class AppUser {
         phone: phone,
         displayName: displayName ?? this.displayName,
         avatarUrl: avatarUrl ?? this.avatarUrl,
+        bio: bio ?? this.bio,
+        city: city ?? this.city,
         socialScore: socialScore ?? this.socialScore,
         locationBlurM: locationBlurM ?? this.locationBlurM,
       );

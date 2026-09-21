@@ -4,6 +4,9 @@ import '../../features/chat/presentation/providers/chat_providers.dart';
 import '../../features/events/presentation/providers/events_providers.dart';
 import '../../features/feed/presentation/providers/feed_providers.dart';
 import '../../features/moderation/presentation/providers/report_providers.dart';
+import '../../features/notifications/notifications.dart';
+import '../../features/profile/presentation/providers/profile_providers.dart';
+import '../../features/saved/saved.dart';
 import '../../features/routes/presentation/providers/route_recorder.dart';
 
 /// Провайдеры, у которых состояние привязано к тому, кто именно сейчас
@@ -18,6 +21,10 @@ void resetSessionScopedProviders(Ref ref) {
   ref.invalidate(feedProvider);
   ref.invalidate(eventsProvider);
   ref.invalidate(reportRepositoryProvider);
+  ref.invalidate(profileRepositoryProvider);
+  ref.invalidate(blocksProvider);
+  ref.invalidate(savedProvider);
+  ref.invalidate(notificationsProvider);
   ref.invalidate(chatRepositoryProvider);
   ref.invalidate(routeRecorderProvider);
 }

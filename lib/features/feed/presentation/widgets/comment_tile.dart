@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../domain/entities/comment.dart';
 
 /// Узел ветки: отступ по глубине, слева направляющая линия ветки — так же,
@@ -64,30 +64,27 @@ class CommentTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    CircleAvatar(
+                    UserAvatar(
+                      name: comment.authorName,
+                      url: comment.authorAvatarUrl,
+                      userId: comment.authorId,
                       radius: 11,
-                      backgroundColor: AppColors.ink2,
-                      backgroundImage: comment.authorAvatarUrl == null
-                          ? null
-                          : CachedNetworkImageProvider(comment.authorAvatarUrl!),
-                      child: comment.authorAvatarUrl != null
-                          ? null
-                          : Text(
-                              comment.authorName.characters.first.toUpperCase(),
-                              style: AppTypography.serif(
-                                11,
-                                color: AppColors.primaryTint,
-                              ),
-                            ),
                     ),
                     const SizedBox(width: 8),
+                    // Имя, как и аватар, ведёт в профиль; свернуть ветку можно
+                    // остальной частью строки.
                     Flexible(
-                      child: Text(
-                        comment.authorName,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontSize: 13,
+                      child: GestureDetector(
+                        onTap: comment.deleted
+                            ? onToggleCollapse
+                            : () => openProfile(context, comment.authorId),
+                        child: Text(
+                          comment.authorName,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),

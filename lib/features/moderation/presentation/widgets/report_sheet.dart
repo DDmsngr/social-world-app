@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/friendly_error.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -14,6 +15,7 @@ Future<bool> showReportSheet(
   required ReportTarget target,
   required String targetId,
   required String subject,
+  String? authorId,
 }) async {
   final sent = await showModalBottomSheet<bool>(
     context: context,
@@ -21,7 +23,12 @@ Future<bool> showReportSheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) =>
-        _ReportSheet(target: target, targetId: targetId, subject: subject),
+        _ReportSheet(
+          target: target,
+          targetId: targetId,
+          subject: subject,
+          authorId: authorId,
+        ),
   );
   return sent ?? false;
 }
@@ -31,11 +38,13 @@ class _ReportSheet extends ConsumerStatefulWidget {
     required this.target,
     required this.targetId,
     required this.subject,
+    this.authorId,
   });
 
   final ReportTarget target;
   final String targetId;
   final String subject;
+  final String? authorId;
 
   @override
   ConsumerState<_ReportSheet> createState() => _ReportSheetState();
@@ -57,13 +66,18 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
             target: widget.target,
             targetId: widget.targetId,
             reason: reason,
+            targetAuthorId: widget.authorId,
           );
       if (mounted) Navigator.of(context).pop(true);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось отправить жалобу')),
+        SnackBar(
+          content: Text(
+            friendlyError(error, fallback: 'Не удалось отправить жалобу'),
+          ),
+        ),
       );
     }
   }

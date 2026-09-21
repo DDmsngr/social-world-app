@@ -9,6 +9,8 @@ import 'app.dart';
 import 'core/config/env.dart';
 import 'core/config/mapkit_boot.dart';
 import 'core/debug/app_log.dart';
+import 'core/theme/app_colors.dart';
+import 'core/theme/app_theme.dart';
 import 'core/theme/theme_choice.dart';
 import 'features/discover/presentation/providers/presence_publisher.dart';
 
@@ -40,11 +42,11 @@ Future<void> main() async {
   // нативной инициализации (MapKitFactory.setApiKey) больше нет.
   if (!kIsWeb) await MapkitBoot.init(Env.yandexMapkitApiKey);
 
+  // Приложение рисуется под системными панелями: фон продолжается до края
+  // экрана, а отступы от панелей берутся из MediaQuery, а не из констант.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-    ),
+    AppTheme.overlayStyle(AppColors.current),
   );
 
   final themeChoice = await loadThemeChoice();

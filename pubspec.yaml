@@ -68,6 +68,9 @@ dependencies:
   path_provider: ^2.1.5
   shared_preferences: ^2.3.3
   open_filex: ^4.5.0
+  share_plus: ^13.3.0
+  flutter_markdown_plus: ^1.0.12
+  markdown: ^7.3.1
 
 dev_dependencies:
   flutter_test:

@@ -1,7 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/media/media_uploader.dart';
+import '../../../core/permissions/content_permissions.dart';
 import '../domain/entities/post.dart';
+import '../domain/entities/publish_settings.dart';
 import '../domain/repositories/feed_repository.dart';
 
 class SupabaseFeedRepository implements FeedRepository {
@@ -28,12 +30,28 @@ class SupabaseFeedRepository implements FeedRepository {
   }
 
   @override
+  Future<Post?> loadPost(String postId) async {
+    final rows = await _client.rpc(
+      'city_feed',
+      params: {'in_post': postId, 'in_limit': 1},
+    ) as List<dynamic>;
+    if (rows.isEmpty) return null;
+    return _fromRow(rows.first as Map<String, dynamic>);
+  }
+
+  @override
   Future<Post> createPost({
     required String body,
     PostKind kind = PostKind.text,
+    PostType postType = PostType.moment,
+    String? title,
+    BodyFormat bodyFormat = BodyFormat.plain,
+    PublishSettings settings = PublishSettings.defaults,
     List<String> mediaPaths = const [],
     String? placeId,
     String? placeTitle,
+    double? placeLatitude,
+    double? placeLongitude,
     String? routeId,
   }) async {
     // UID фиксируем один раз: между двумя await к _client.auth.currentUser
@@ -53,7 +71,12 @@ class SupabaseFeedRepository implements FeedRepository {
         .insert({
           'author_id': userId,
           'kind': postKindFor(kind, mediaUrls).name,
+          'post_type': postType.name,
+          'title': _clean(title),
           'body': body.trim(),
+          'body_format': bodyFormat.name,
+          'visibility': settings.visibility.wire,
+          'show_geo': settings.showGeo,
           'media_urls': mediaUrls,
           'place_id': placeId,
           'route_id': routeId,
@@ -84,13 +107,100 @@ class SupabaseFeedRepository implements FeedRepository {
       authorName: authorName ?? 'Без имени',
       authorAvatarUrl: authorAvatarUrl,
       kind: _kindFrom(row['kind']),
+      postType: PostType.parse(row['post_type']),
+      title: row['title'] as String?,
       body: row['body'] as String?,
+      bodyFormat: BodyFormat.parse(row['body_format']),
+      visibility: PostVisibility.parse(row['visibility']),
+      showGeo: row['show_geo'] as bool? ?? true,
       mediaUrls: _stringList(row['media_urls']),
+      placeId: placeId,
       placeTitle: placeTitle,
+      placeLatitude: placeLatitude,
+      placeLongitude: placeLongitude,
       routeId: row['route_id'] as String?,
       createdAt: DateTime.parse(row['created_at'] as String),
     );
   }
+
+  @override
+  Future<Post> updatePost(
+    Post post, {
+    required String body,
+    String? title,
+    BodyFormat? bodyFormat,
+    required PublishSettings settings,
+    required List<String> keepMediaUrls,
+    List<String> newMediaPaths = const [],
+    String? placeId,
+    String? placeTitle,
+    double? placeLatitude,
+    double? placeLongitude,
+  }) async {
+    final userId = _userId;
+    ContentPermissions(viewerId: userId, ownerId: post.authorId).requireOwner();
+
+    final uploader = MediaUploader(_client, bucket: 'post-media');
+    final media = [
+      ...keepMediaUrls,
+      for (final path in newMediaPaths) await uploader.upload(path),
+    ];
+
+    // eq('author_id') — второй замок поверх RLS: чужая строка не совпадёт с
+    // фильтром, и запрос вернёт пустой результат вместо тихого успеха.
+    final updated = await _client
+        .from('posts')
+        .update({
+          'kind': postKindFor(post.kind, media).name,
+          'title': _clean(title),
+          'body': body.trim(),
+          'body_format': (bodyFormat ?? post.bodyFormat).name,
+          'visibility': settings.visibility.wire,
+          'show_geo': settings.showGeo,
+          'media_urls': media,
+          'place_id': placeId,
+        })
+        .eq('id', post.id)
+        .eq('author_id', userId)
+        .select('id');
+    if (updated.isEmpty) {
+      throw const PermissionDeniedException('Пост не найден или он не ваш');
+    }
+
+    final fresh = await loadPost(post.id);
+    if (fresh != null) return fresh;
+
+    // Пост уже сохранён; сюда попадаем только если повторное чтение
+    // отработало пусто, — отдаём то, что только что записали.
+    return Post(
+      id: post.id,
+      authorId: post.authorId,
+      authorName: post.authorName,
+      authorAvatarUrl: post.authorAvatarUrl,
+      kind: postKindFor(post.kind, media),
+      postType: post.postType,
+      title: _clean(title),
+      body: body.trim(),
+      bodyFormat: bodyFormat ?? post.bodyFormat,
+      visibility: settings.visibility,
+      showGeo: settings.showGeo,
+      mediaUrls: media,
+      placeId: placeId,
+      placeTitle: placeTitle,
+      placeLatitude: placeLatitude,
+      placeLongitude: placeLongitude,
+      routeId: post.routeId,
+      createdAt: post.createdAt,
+      editedAt: DateTime.now(),
+      likeCount: post.likeCount,
+      likedByMe: post.likedByMe,
+      commentCount: post.commentCount,
+    );
+  }
+
+  @override
+  Future<String> uploadInlineImage(String localPath) =>
+      MediaUploader(_client, bucket: 'post-media').upload(localPath);
 
   @override
   Future<Post> toggleLike(Post post) async {
@@ -114,8 +224,19 @@ class SupabaseFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<void> deletePost(String postId) =>
-      _client.from('posts').delete().eq('id', postId);
+  Future<void> deletePost(String postId) async {
+    // Свой пост: RLS пропускает только автора, а eq('author_id') не даёт
+    // запросу «успешно» удалить ноль строк для чужого.
+    final deleted = await _client
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('author_id', _userId)
+        .select('id');
+    if (deleted.isEmpty) {
+      throw const PermissionDeniedException('Пост не найден или он не ваш');
+    }
+  }
 
   Post _fromRow(Map<String, dynamic> row) => Post(
     id: row['id'] as String,
@@ -123,15 +244,31 @@ class SupabaseFeedRepository implements FeedRepository {
     authorName: (row['author_name'] as String?) ?? 'Без имени',
     authorAvatarUrl: row['avatar_url'] as String?,
     kind: _kindFrom(row['kind']),
+    postType: PostType.parse(row['post_type']),
+    title: row['title'] as String?,
     body: row['body'] as String?,
+    bodyFormat: BodyFormat.parse(row['body_format']),
+    visibility: PostVisibility.parse(row['visibility']),
+    showGeo: row['show_geo'] as bool? ?? true,
     mediaUrls: _stringList(row['media_urls']),
+    placeId: row['place_id'] as String?,
     placeTitle: row['place_title'] as String?,
+    placeLatitude: (row['place_latitude'] as num?)?.toDouble(),
+    placeLongitude: (row['place_longitude'] as num?)?.toDouble(),
     routeId: row['route_id'] as String?,
     createdAt: DateTime.parse(row['created_at'] as String),
+    editedAt: row['edited_at'] is String
+        ? DateTime.parse(row['edited_at'] as String)
+        : null,
     likeCount: (row['like_count'] as num?)?.toInt() ?? 0,
     likedByMe: row['liked_by_me'] as bool? ?? false,
     commentCount: (row['comment_count'] as num?)?.toInt() ?? 0,
   );
+
+  String? _clean(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
 
   PostKind _kindFrom(dynamic raw) => PostKind.values.firstWhere(
     (kind) => kind.name == raw,

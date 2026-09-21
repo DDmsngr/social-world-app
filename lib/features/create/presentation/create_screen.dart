@@ -1,21 +1,39 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/debug/app_log.dart';
-import '../../../core/media/media_kind.dart';
+import '../../../core/errors/friendly_error.dart';
 import '../../../core/router/app_router.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../discover/domain/entities/place.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
+import '../../events/data/address_resolver.dart';
+import '../../events/domain/entities/event_route.dart';
 import '../../events/presentation/providers/events_providers.dart';
+import '../../events/presentation/widgets/event_route_editor.dart';
+import '../../feed/domain/entities/post.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
+import '../../feed/presentation/providers/publish_settings_provider.dart';
+import '../../feed/presentation/widgets/publish_settings_panel.dart';
+import 'widgets/composer_parts.dart';
+import 'widgets/post_body_editor.dart';
 
-enum _CreateKind { post, event, route }
+enum _CreateKind {
+  moment('Момент'),
+  article('Статья'),
+  event('Событие'),
+  route('Маршрут');
+
+  const _CreateKind(this.label);
+
+  final String label;
+
+  bool get isPost => this == moment || this == article;
+}
 
 String _formatStartsAt(DateTime time) {
   final dd = time.day.toString().padLeft(2, '0');
@@ -33,17 +51,21 @@ class CreateScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateScreenState extends ConsumerState<CreateScreen> {
-  var _kind = _CreateKind.post;
+  var _kind = _CreateKind.moment;
 
   final _bodyController = TextEditingController();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _picker = ImagePicker();
+  final _geocoder = NominatimGeocoder();
   final _attachments = <XFile>[];
+  var _markdown = false;
+
   // Место храним целиком, а не только название: у places title не уникален
   // (тем более при краудсорсинге), резолвить id обратно по строке нельзя.
   Place? _selectedPlace;
   DateTime? _startsAt;
+  var _routePoints = <EventRoutePoint>[];
   bool _busy = false;
 
   /// Больше четырёх карточка в ленте всё равно не покажет внятно, а вес
@@ -58,68 +80,28 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     super.dispose();
   }
 
+  void _resetForm() {
+    _bodyController.clear();
+    _titleController.clear();
+    _descriptionController.clear();
+    _attachments.clear();
+    _routePoints = [];
+    _selectedPlace = null;
+    _startsAt = null;
+    _markdown = false;
+  }
+
   Future<void> _publish() async {
     setState(() => _busy = true);
     try {
-      if (_kind == _CreateKind.post) {
-        final post = await ref.read(feedRepositoryProvider).createPost(
-              body: _bodyController.text,
-              mediaPaths: [for (final file in _attachments) file.path],
-              placeId: _selectedPlace?.id,
-              placeTitle: _selectedPlace?.title,
-            );
-
-        ref.read(feedProvider.notifier).prepend(post);
-        ref.invalidate(myPostsProvider);
-
-        if (!mounted) return;
-        _bodyController.clear();
-        _attachments.clear();
-        context.go(Routes.feed);
+      if (_kind.isPost) {
+        await _publishPost();
       } else {
-        final event = await ref.read(eventsRepositoryProvider).createEvent(
-              title: _titleController.text,
-              description: _descriptionController.text.trim().isEmpty
-                  ? null
-                  : _descriptionController.text,
-              startsAt: _startsAt!,
-              placeId: _selectedPlace?.id,
-              placeTitle: _selectedPlace?.title,
-            );
-
-        // Координаты места сервер отдаёт только в city_events — подставляем
-        // их из выбранного места, чтобы метка встала на карту сразу.
-        final placed = event.copyWith(
-          latitude: _selectedPlace?.latitude,
-          longitude: _selectedPlace?.longitude,
-        );
-        ref.read(eventsProvider.notifier).append(placed);
-
-        if (!mounted) return;
-        _titleController.clear();
-        _descriptionController.clear();
-        final messenger = ScaffoldMessenger.of(context);
-        final router = GoRouter.of(context);
-        context.go(Routes.home);
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              placed.hasLocation ? 'Событие на карте' : 'Событие создано',
-            ),
-            action: SnackBarAction(
-              label: 'Открыть',
-              onPressed: () => router.push(
-                '${Routes.eventDetail}/${placed.id}',
-                extra: placed,
-              ),
-            ),
-          ),
-        );
+        await _publishEvent();
       }
-
+      if (!mounted) return;
       setState(() {
-        _selectedPlace = null;
-        _startsAt = null;
+        _resetForm();
         _busy = false;
       });
     } catch (error) {
@@ -130,9 +112,77 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
       if (!mounted) return;
       setState(() => _busy = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось опубликовать')),
+        SnackBar(
+          content: Text(friendlyError(error, fallback: 'Не удалось опубликовать')),
+        ),
       );
     }
+  }
+
+  Future<void> _publishPost() async {
+    final isArticle = _kind == _CreateKind.article;
+    final settings = ref.read(publishSettingsProvider).current;
+
+    final post = await ref.read(feedRepositoryProvider).createPost(
+      body: _bodyController.text,
+      postType: isArticle ? PostType.article : PostType.moment,
+      title: isArticle ? _titleController.text : null,
+      bodyFormat: isArticle || _markdown ? BodyFormat.markdown : BodyFormat.plain,
+      settings: settings,
+      mediaPaths: [for (final file in _attachments) file.path],
+      placeId: _selectedPlace?.id,
+      placeTitle: _selectedPlace?.title,
+      placeLatitude: _selectedPlace?.latitude,
+      placeLongitude: _selectedPlace?.longitude,
+    );
+
+    // Выбранное в этой публикации становится настройкой по умолчанию для
+    // следующей. Сбой записи на диск не должен портить уже сделанный пост.
+    try {
+      await ref.read(publishSettingsProvider.notifier).rememberAsDefault();
+    } catch (error) {
+      AppLog.add('Настройки публикации не запомнились: $error');
+    }
+
+    ref.read(feedProvider.notifier).prepend(post);
+    ref.invalidate(myPostsProvider);
+    if (mounted) context.go(Routes.feed);
+  }
+
+  Future<void> _publishEvent() async {
+    final event = await ref.read(eventsRepositoryProvider).createEvent(
+      title: _titleController.text,
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text,
+      startsAt: _startsAt!,
+      placeId: _selectedPlace?.id,
+      placeTitle: _selectedPlace?.title,
+      routePoints: _routePoints,
+    );
+
+    // Координаты места сервер отдаёт только в city_events — подставляем
+    // их из выбранного места, чтобы метка встала на карту сразу.
+    final placed = event.copyWith(
+      latitude: _selectedPlace?.latitude,
+      longitude: _selectedPlace?.longitude,
+    );
+    ref.read(eventsProvider.notifier).append(placed);
+
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    context.go(Routes.home);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(placed.hasLocation ? 'Событие на карте' : 'Событие создано'),
+        action: SnackBarAction(
+          label: 'Открыть',
+          onPressed: () =>
+              router.push('${Routes.eventDetail}/${placed.id}', extra: placed),
+        ),
+      ),
+    );
   }
 
   int get _freeSlots => _maxAttachments - _attachments.length;
@@ -163,6 +213,29 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     setState(() => _attachments.add(video));
   }
 
+  /// Фото, вставляемое прямо в текст статьи: в отличие от вложений оно нужно
+  /// в хранилище ещё до публикации, чтобы получить ссылку.
+  Future<String?> _insertInlineImage() async {
+    final file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (file == null) return null;
+    try {
+      return await ref.read(feedRepositoryProvider).uploadInlineImage(file.path);
+    } catch (error) {
+      AppLog.add('Фото в текст не загрузилось: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(friendlyError(error, fallback: 'Фото не загрузилось')),
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> _pickStartsAt() async {
     final now = DateTime.now();
     final date = await showDatePicker(
@@ -186,13 +259,25 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     });
   }
 
+  bool get _canPublish {
+    if (_busy) return false;
+    return switch (_kind) {
+      _CreateKind.moment =>
+        _bodyController.text.trim().length >= 3 || _attachments.isNotEmpty,
+      _CreateKind.article =>
+        _titleController.text.trim().length >= 3 &&
+            _bodyController.text.trim().length >= 20,
+      _CreateKind.event =>
+        _titleController.text.trim().length >= 3 && _startsAt != null,
+      _CreateKind.route => false,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    final places = ref.watch(discoverDataProvider).value?.places ?? const [];
-    final canPublish = !_busy &&
-        (_kind == _CreateKind.post
-            ? _bodyController.text.trim().length >= 3 || _attachments.isNotEmpty
-            : _titleController.text.trim().length >= 3 && _startsAt != null);
+    final places = ref.watch(discoverDataProvider).value?.places ?? const <Place>[];
+    final center = ref.watch(discoverCenterProvider).value;
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Создать')),
@@ -202,10 +287,13 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
           const SectionLabel('Что публикуем'),
           const SizedBox(height: 14),
           SegmentedButton<_CreateKind>(
-            segments: const [
-              ButtonSegment(value: _CreateKind.post, label: Text('Пост')),
-              ButtonSegment(value: _CreateKind.event, label: Text('Событие')),
-              ButtonSegment(value: _CreateKind.route, label: Text('Маршрут')),
+            showSelectedIcon: false,
+            segments: [
+              for (final kind in _CreateKind.values)
+                ButtonSegment(
+                  value: kind,
+                  label: Text(kind.label, style: const TextStyle(fontSize: 13)),
+                ),
             ],
             selected: {_kind},
             onSelectionChanged: (selected) =>
@@ -221,7 +309,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               'Приложение запишет ваш путь, пока открыто на экране. По дороге '
               'можно снимать фото — они встанут метками прямо на маршруте. '
               'Опубликуется только то, что вы сами отправите в ленту.',
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 22),
             FilledButton.icon(
@@ -230,10 +318,88 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               label: const Text('Начать запись'),
             ),
           ],
-          if (_kind == _CreateKind.post) ...[
+          if (_kind == _CreateKind.moment) ...[
             Text('Что происходит\nв городе?', style: AppTypography.serif(32)),
             const SizedBox(height: 18),
-          ] else if (_kind == _CreateKind.event) ...[
+            PostBodyEditor(
+              controller: _bodyController,
+              markdown: _markdown,
+              onMarkdownChanged: (value) => setState(() => _markdown = value),
+              maxLength: 500,
+              onChanged: () => setState(() {}),
+            ),
+          ],
+          if (_kind == _CreateKind.article) ...[
+            Text('Расскажите\nподробно', style: AppTypography.serif(32)),
+            const SizedBox(height: 8),
+            Text(
+              'Длинный текст с заголовком: маршрут выходных, обзор места, '
+              'история. Поддерживается Markdown.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              controller: _titleController,
+              maxLength: 160,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(hintText: 'Заголовок'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 10),
+            PostBodyEditor(
+              controller: _bodyController,
+              markdown: true,
+              alwaysMarkdown: true,
+              onMarkdownChanged: (_) {},
+              maxLength: 20000,
+              minLines: 10,
+              maxLines: 24,
+              hint: 'Текст статьи',
+              onInsertImage: _insertInlineImage,
+              onChanged: () => setState(() {}),
+            ),
+          ],
+          if (_kind.isPost) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                AttachButton(
+                  icon: Icons.photo_library_outlined,
+                  label: 'Фото',
+                  onTap: _freeSlots == 0 ? null : _addPhotos,
+                ),
+                const SizedBox(width: 8),
+                AttachButton(
+                  icon: Icons.photo_camera_outlined,
+                  label: 'Снять',
+                  onTap: _freeSlots == 0 ? null : _shootPhoto,
+                ),
+                const SizedBox(width: 8),
+                if (_kind == _CreateKind.moment)
+                  AttachButton(
+                    icon: Icons.videocam_outlined,
+                    label: 'Видео',
+                    onTap: _freeSlots == 0 ? null : _addVideo,
+                  ),
+              ],
+            ),
+            if (_attachments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 92,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _attachments.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, index) => AttachmentThumb(
+                    file: _attachments[index],
+                    onRemove: () => setState(() => _attachments.removeAt(index)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+          if (_kind == _CreateKind.event) ...[
             Text('Соберите\nлюдей на событие', style: AppTypography.serif(32)),
             const SizedBox(height: 18),
             TextField(
@@ -264,185 +430,50 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             ),
             const SizedBox(height: 18),
           ],
-          if (_kind == _CreateKind.post) TextField(
-            controller: _bodyController,
-            maxLines: 6,
-            maxLength: 500,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              hintText: 'Напишите, что увидели или куда зовёте',
-              alignLabelWithHint: true,
+          if (_kind != _CreateKind.route) ...[
+            const SizedBox(height: 10),
+            const SectionLabel('Место'),
+            const SizedBox(height: 12),
+            Text(
+              'Необязательно. Указывается название места, а не ваши координаты.',
+              style: theme.textTheme.bodyMedium,
             ),
-            onChanged: (_) => setState(() {}),
-          ),
-          if (_kind == _CreateKind.post) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                _AttachButton(
-                  icon: Icons.photo_library_outlined,
-                  label: 'Фото',
-                  onTap: _freeSlots == 0 ? null : _addPhotos,
-                ),
-                const SizedBox(width: 8),
-                _AttachButton(
-                  icon: Icons.photo_camera_outlined,
-                  label: 'Снять',
-                  onTap: _freeSlots == 0 ? null : _shootPhoto,
-                ),
-                const SizedBox(width: 8),
-                _AttachButton(
-                  icon: Icons.videocam_outlined,
-                  label: 'Видео',
-                  onTap: _freeSlots == 0 ? null : _addVideo,
-                ),
-              ],
+            const SizedBox(height: 12),
+            PlacePicker(
+              places: places,
+              selectedId: _selectedPlace?.id,
+              onChanged: (place) => setState(() => _selectedPlace = place),
             ),
-            if (_attachments.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 92,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _attachments.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (_, index) => _AttachmentThumb(
-                    file: _attachments[index],
-                    onRemove: () =>
-                        setState(() => _attachments.removeAt(index)),
-                  ),
-                ),
-              ),
-            ],
+          ],
+          if (_kind == _CreateKind.event) ...[
+            const SizedBox(height: 22),
+            EventRouteEditor(
+              points: _routePoints,
+              onChanged: (points) => setState(() => _routePoints = points),
+              resolver: AddressResolver(places: places, geocoder: _geocoder),
+              mapCenterLatitude: center?.latitude ?? discoverCenterLatitude,
+              mapCenterLongitude: center?.longitude ?? discoverCenterLongitude,
+            ),
+          ],
+          if (_kind.isPost) ...[
+            const SizedBox(height: 22),
+            const PublishSettingsPanel(),
           ],
           if (_kind != _CreateKind.route) ...[
-          const SizedBox(height: 10),
-          const SectionLabel('Место'),
-          const SizedBox(height: 12),
-          Text(
-            'Необязательно. Указывается название места, а не ваши координаты.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final place in places)
-                ChoiceChip(
-                  label: Text(place.title),
-                  selected: _selectedPlace?.id == place.id,
-                  onSelected: (selected) => setState(
-                    () => _selectedPlace = selected ? place : null,
-                  ),
-                  showCheckmark: false,
-                  backgroundColor: AppColors.card,
-                  selectedColor: AppColors.primary,
-                  labelStyle: TextStyle(
-                    fontSize: 13,
-                    color: _selectedPlace?.id == place.id
-                        ? AppColors.onPrimary
-                        : AppColors.textDim,
-                  ),
-                  side: BorderSide(color: AppColors.hair),
-                ),
-            ],
-          ),
-          const SizedBox(height: 26),
-          FilledButton(
-            onPressed: canPublish ? _publish : null,
-            child: _busy
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.onPrimary,
-                    ),
-                  )
-                : const Text('Опубликовать'),
-          ),
+            const SizedBox(height: 26),
+            FilledButton(
+              onPressed: _canPublish ? _publish : null,
+              child: _busy
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Опубликовать'),
+            ),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _AttachButton extends StatelessWidget {
-  const _AttachButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        minimumSize: const Size(0, 38),
-      ),
-      icon: Icon(icon, size: 17),
-      label: Text(label, style: const TextStyle(fontSize: 13)),
-    );
-  }
-}
-
-/// Превью читается через readAsBytes: у XFile на вебе путь — blob-ссылка, а на
-/// телефоне обычный файл, и это единственный способ показать оба одинаково.
-class _AttachmentThumb extends StatelessWidget {
-  const _AttachmentThumb({required this.file, required this.onRemove});
-
-  final XFile file;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.field),
-          child: SizedBox(
-            width: 92,
-            height: 92,
-            child: isVideoUrl(file.path)
-                ? ColoredBox(
-                    color: AppColors.ink2,
-                    child: Center(
-                      child: Icon(
-                        Icons.movie_outlined,
-                        color: AppColors.primaryTint,
-                      ),
-                    ),
-                  )
-                : FutureBuilder(
-                    future: file.readAsBytes(),
-                    builder: (_, snapshot) => snapshot.hasData
-                        ? Image.memory(snapshot.data!, fit: BoxFit.cover)
-                        : ColoredBox(color: AppColors.ink2),
-                  ),
-          ),
-        ),
-        Positioned(
-          top: 2,
-          right: 2,
-          child: InkWell(
-            onTap: onRemove,
-            customBorder: const CircleBorder(),
-            child: CircleAvatar(
-              radius: 11,
-              backgroundColor: Color(0xCC151417),
-              child: Icon(Icons.close, size: 13, color: AppColors.paper),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
