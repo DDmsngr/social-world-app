@@ -18,7 +18,10 @@ import '../../domain/entities/nearby_person.dart';
 import '../../domain/entities/place.dart';
 import '../../domain/repositories/discover_repository.dart';
 import '../widgets/map_types.dart';
+import 'city_provider.dart';
 
+/// Запасной центр для экранов, которые рисуют карту до того, как
+/// [discoverCenterProvider] успел отдать выбранный город.
 const discoverCenterLatitude = 43.5789;
 const discoverCenterLongitude = 39.7232;
 
@@ -57,12 +60,13 @@ typedef MapCenter = ({double latitude, double longitude});
 
 /// Вокруг какой точки показывать карту и искать, что рядом.
 ///
-/// Всегда центр Сочи, где идёт пилот, — откуда бы ни открыл приложение
-/// человек. Позиция устройства сюда не входит: из другого города вокруг неё
-/// нет данных, и карта пустела. Своё место человек берёт кнопкой «Рядом».
+/// Центр — выбранный город, а не позиция устройства: из другого города вокруг
+/// неё нет данных, и карта пустела. Своё место человек берёт кнопкой «Рядом»,
+/// город меняет через заголовок Pulse.
 final discoverCenterProvider = FutureProvider<MapCenter>((ref) async {
   ref.keepAlive();
-  return (latitude: discoverCenterLatitude, longitude: discoverCenterLongitude);
+  final city = ref.watch(cityProvider);
+  return (latitude: city.latitude, longitude: city.longitude);
 });
 
 /// Точка и радиус сценария «Что есть рядом?». Точку можно взять у устройства

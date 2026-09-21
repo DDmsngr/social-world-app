@@ -15,7 +15,9 @@ import '../domain/entities/discover_snapshot.dart';
 import '../domain/entities/nearby_person.dart';
 import '../domain/entities/place.dart';
 import 'providers/discover_providers.dart';
+import 'providers/city_provider.dart';
 import 'providers/presence_publisher.dart';
+import 'widgets/city_picker.dart';
 import 'widgets/discover_map.dart';
 import 'widgets/map_controls.dart';
 import 'widgets/map_object_sheets.dart';
@@ -31,28 +33,13 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 }
 
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
-  int _titleTaps = 0;
-  DateTime? _firstTapAt;
-
-  // 5 тапов по заголовку за 2 секунды — открывает лог-панель. adb до
-  // телефона тестировщика не дотянуться, а спрятанный жест не мозолит
-  // глаза обычному пользователю.
-  void _onTitleTap() {
-    final now = DateTime.now();
-    if (_firstTapAt == null ||
-        now.difference(_firstTapAt!) > const Duration(seconds: 2)) {
-      _firstTapAt = now;
-      _titleTaps = 1;
-      return;
-    }
-    _titleTaps++;
-    if (_titleTaps >= 5) {
-      _titleTaps = 0;
-      _firstTapAt = null;
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()),
-      );
-    }
+  // Тап по названию города — выбор города; лог-панель переехала на долгое
+  // нажатие, потому что короткий тап теперь занят. adb до телефона
+  // тестировщика не дотянуться, а спрятанный жест не мозолит глаза.
+  void _openLogs() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()),
+    );
   }
 
   void _focus(double? latitude, double? longitude, {double zoom = 16}) {
@@ -98,9 +85,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: GestureDetector(
-          onTap: _onTitleTap,
-          child: const Text('Сочи'),
+        title: InkWell(
+          onTap: () => showCityPicker(context),
+          onLongPress: _openLogs,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(ref.watch(cityProvider).name),
+              const SizedBox(width: 6),
+              const Icon(Icons.expand_more, size: 22),
+            ],
+          ),
         ),
       ),
       body: data.when(

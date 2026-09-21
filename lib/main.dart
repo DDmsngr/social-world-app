@@ -12,6 +12,7 @@ import 'core/debug/app_log.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_choice.dart';
+import 'features/discover/presentation/providers/city_provider.dart';
 import 'features/discover/presentation/providers/presence_publisher.dart';
 
 Future<void> main() async {
@@ -67,6 +68,9 @@ Future<void> main() async {
   // Читаем до первого кадра: иначе публикатор присутствия успел бы отправить
   // точку человека, который его выключил.
   final presenceEnabled = await loadPresenceEnabled();
+  // Город Pulse — до первого кадра: иначе карта открывается на пилотном
+  // городе и только потом переезжает на выбранный.
+  final city = await loadCity();
 
   FlutterNativeSplash.remove();
 
@@ -75,6 +79,7 @@ Future<void> main() async {
       overrides: [
         initialThemeChoiceProvider.overrideWithValue(themeChoice),
         initialPresenceEnabledProvider.overrideWithValue(presenceEnabled),
+        initialCityProvider.overrideWithValue(city),
       ],
       child: const SocialWorldApp(),
     ),

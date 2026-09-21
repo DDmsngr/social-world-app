@@ -17,6 +17,7 @@ import '../../domain/entities/discover_snapshot.dart';
 import '../../domain/entities/nearby_person.dart';
 import '../../domain/entities/place.dart';
 import '../providers/discover_providers.dart';
+import 'activity_palette.dart';
 import 'map_types.dart';
 
 class DiscoverMap extends StatefulWidget {
@@ -115,6 +116,14 @@ class _DiscoverMapState extends State<DiscoverMap> {
     // Точка «Рядом» поставлена или сдвинута — камера идёт к ней, даже если
     // в радиусе ничего нет и подгонять «по найденному» не к чему.
     if (widget.anchor != null && !identical(widget.anchor, old.anchor)) {
+      _resetCamera();
+      return;
+    }
+
+    // Сменился город — камера обязана переехать, иначе человек выбирает
+    // другой город и продолжает смотреть на прежний.
+    if (widget.data.centerLatitude != old.data.centerLatitude ||
+        widget.data.centerLongitude != old.data.centerLongitude) {
       _resetCamera();
       return;
     }
@@ -395,19 +404,17 @@ class _DiscoverMapState extends State<DiscoverMap> {
   }
 
   /// Зона рисуется тремя вложенными кругами разной плотности — получается
-  /// мягкое пятно без резкой границы. Бордовый — основной цвет активности,
-  /// платина — только для самых плотных зон и для режима «спокойнее».
+  /// мягкое пятно без резкой границы. Цвет — по шкале активности Pulse
+  /// (зелёный → красный), в режиме «спокойнее» шкала не применяется.
   void _drawActivity(ymk.MapObjectCollection collection) {
-    final calm = widget.activityMode == ActivityMode.calm;
+    final isDark = AppColors.current.isDark;
 
     for (final cell in widget.activity) {
       final intensity = cell.intensityFor(widget.activityMode);
       if (intensity <= 0.04) continue;
 
-      final tone = calm
-          ? AppColors.textDim
-          : (intensity > 0.85 ? AppColors.paper : AppColors.primaryTint);
-      final base = 0.05 + 0.15 * intensity;
+      final tone = ActivityPalette.forCell(intensity, widget.activityMode);
+      final base = activityAlpha(intensity, isDark: isDark);
       final radius = cell.radiusMeters * 0.85;
       final center = ymk.Point(latitude: cell.latitude, longitude: cell.longitude);
 
