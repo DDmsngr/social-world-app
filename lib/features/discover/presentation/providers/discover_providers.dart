@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/env.dart';
@@ -58,28 +57,11 @@ typedef MapCenter = ({double latitude, double longitude});
 
 /// Вокруг какой точки показывать карту и искать, что рядом.
 ///
-/// Берём последнюю известную позицию устройства: она отдаётся мгновенно и не
-/// будит GPS, в отличие от getCurrentPosition — карте незачем ждать спутники.
-/// Нет разрешения или позиции (первый запуск) — центр Сочи, там идёт пилот.
-///
-/// Без этого «Рядом» врал: запрос всегда шёл вокруг центра города, и человек
-/// в Адлере не видел никого в трёх километрах от себя, хотя своё присутствие
-/// публиковал исправно.
+/// Всегда центр Сочи, где идёт пилот, — откуда бы ни открыл приложение
+/// человек. Позиция устройства сюда не входит: из другого города вокруг неё
+/// нет данных, и карта пустела. Своё место человек берёт кнопкой «Рядом».
 final discoverCenterProvider = FutureProvider<MapCenter>((ref) async {
   ref.keepAlive();
-  try {
-    final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse) {
-      final last = await Geolocator.getLastKnownPosition();
-      if (last != null) {
-        return (latitude: last.latitude, longitude: last.longitude);
-      }
-    }
-  } catch (error) {
-    // В вебе и в тестах геолокатора нет — это штатный путь, не поломка.
-    AppLog.add('Центр карты: позиция устройства недоступна: $error');
-  }
   return (latitude: discoverCenterLatitude, longitude: discoverCenterLongitude);
 });
 
