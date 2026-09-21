@@ -10,7 +10,7 @@
          скачивает новый файл и отдаёт его системному установщику. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
-        android:label="Social World"
+        android:label="ChaWo"
         android:name=".MainApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher">
@@ -51,7 +51,7 @@
             <!-- Веб-ссылки, которыми делятся (DeepLinks.shareBase). Без autoVerify:
                  подтверждённые ссылки требуют assetlinks.json на домене — это
                  инфраструктура, которой у проекта пока нет. Пока Android
-                 предложит выбрать «Открыть в Social World». -->
+                 предложит выбрать «Открыть в ChaWo». -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>

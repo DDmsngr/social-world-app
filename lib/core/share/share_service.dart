@@ -18,7 +18,7 @@ abstract final class ShareService {
     String city = 'Сочи',
   }) {
     final lines = [
-      'Social World',
+      'ChaWo',
       '📍 $city',
       title.trim(),
       if (details != null && details.trim().isNotEmpty) details.trim(),

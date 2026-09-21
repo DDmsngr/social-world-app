@@ -90,7 +90,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
             NavigationDestination(
               icon: Icon(Icons.map_outlined),
               selectedIcon: Icon(Icons.map),
-              label: 'Карта',
+              label: 'Pulse',
             ),
             NavigationDestination(
               icon: Icon(Icons.add_circle_outline, size: 30),

@@ -88,7 +88,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Spacer(),
-              const SectionLabel('Social World'),
+              const SectionLabel('ChaWo'),
               const SizedBox(height: 16),
               Text('Город,\nкоторый вас ', style: AppTypography.serif(40)),
               Text(

@@ -103,7 +103,7 @@ class _UpdateSheet extends ConsumerWidget {
           const SizedBox(height: 10),
           Text(
             info.notes.isEmpty
-                ? 'Свежая сборка Social World. Скачивание идёт в фоне — '
+                ? 'Свежая сборка ChaWo. Скачивание идёт в фоне — '
                     'приложением можно пользоваться дальше.'
                 : info.notes,
             style: TextStyle(color: AppColors.textDim),

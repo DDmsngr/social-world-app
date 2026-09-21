@@ -96,7 +96,7 @@ class _SocialWorldAppState extends ConsumerState<SocialWorldApp>
     ref.watch(deepLinkServiceProvider);
 
     return MaterialApp.router(
-      title: 'Social World',
+      title: 'ChaWo',
       debugShowCheckedModeBanner: false,
       theme: _lightTheme,
       darkTheme: _darkTheme,
