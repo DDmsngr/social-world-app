@@ -463,7 +463,7 @@ class _DiscoverMapState extends State<DiscoverMap> {
       children: [
         YandexMap(
           onMapCreated: _onMapCreated,
-          platformViewType: PlatformViewType.Hybrid,
+          platformViewType: PlatformViewType.TextureHybrid,
         ),
         Positioned(
           right: 16,
