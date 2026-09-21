@@ -65,27 +65,33 @@ class _CityListState extends ConsumerState<_CityList> {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: cities.length,
-                  itemBuilder: (context, index) {
-                    final city = cities[index];
-                    final isSelected = city == selected;
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(city.name),
-                      subtitle: city.isPilot
-                          ? const Text('Здесь уже идёт жизнь')
-                          : null,
-                      trailing: isSelected
-                          ? Icon(Icons.check, color: AppColors.primaryTint)
-                          : null,
-                      onTap: () async {
-                        await ref.read(cityProvider.notifier).choose(city);
-                        if (context.mounted) Navigator.of(context).pop();
-                      },
-                    );
-                  },
+              // Карточка листа — крашеный контейнер, а отклик на нажатие
+              // ListTile рисует на ближайшем Material. Без своего Material он
+              // оказался бы под подложкой и был не виден.
+              : Material(
+                  type: MaterialType.transparency,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: cities.length,
+                    itemBuilder: (context, index) {
+                      final city = cities[index];
+                      final isSelected = city == selected;
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(city.name),
+                        subtitle: city.isPilot
+                            ? const Text('Здесь уже идёт жизнь')
+                            : null,
+                        trailing: isSelected
+                            ? Icon(Icons.check, color: AppColors.primaryTint)
+                            : null,
+                        onTap: () async {
+                          await ref.read(cityProvider.notifier).choose(city);
+                          if (context.mounted) Navigator.of(context).pop();
+                        },
+                      );
+                    },
+                  ),
                 ),
         ),
       ],
