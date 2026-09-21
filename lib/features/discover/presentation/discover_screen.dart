@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/debug/app_log.dart';
 import '../../../core/debug/log_viewer_screen.dart';
+import '../../../core/network/vpn_check.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -85,6 +87,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     ref.watch(presencePublisherProvider);
 
     final data = ref.watch(discoverDataProvider);
+    ref.listen(discoverDataProvider, (_, next) {
+      AppLog.add(
+        'Карта: данные — ${next.isLoading ? 'загрузка' : next.hasError ? 'ошибка ${next.error}' : 'готово'}',
+      );
+    });
     final view = ref.watch(mapViewProvider);
     final picking = ref.watch(pickingAnchorProvider);
     final anchor = ref.watch(nearbyAnchorProvider);
@@ -185,11 +192,41 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           ],
         ),
         loading: () => const LoadingView(),
-        error: (_, _) => StateMessage.error(
-          title: 'Не удалось загрузить район',
-          onAction: () => ref.invalidate(discoverDataProvider),
+        error: (error, _) => _MapError(
+          error: error,
+          onRetry: () => ref.invalidate(discoverDataProvider),
         ),
       ),
+    );
+  }
+}
+
+/// Сбой загрузки карты. Самая частая причина в поле — VPN: включили, открыли
+/// приложение, выключили — и связь зависла. Поэтому проверяем VPN и говорим
+/// прямо, что сделать.
+class _MapError extends StatelessWidget {
+  const _MapError({required this.error, required this.onRetry});
+
+  final Object error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: isVpnActive(),
+      builder: (context, snapshot) {
+        final vpn = snapshot.data ?? false;
+        return StateMessage.error(
+          title: 'Не удалось загрузить район',
+          text: vpn
+              ? 'Включён VPN — из-за него карта может не грузиться. '
+                  'Отключите VPN и нажмите «Повторить». Если не помогло, '
+                  'закройте приложение и откройте снова.'
+              : 'Проверьте соединение и нажмите «Повторить». Если вы только '
+                  'что выключили VPN, закройте приложение и откройте снова.',
+          onAction: onRetry,
+        );
+      },
     );
   }
 }

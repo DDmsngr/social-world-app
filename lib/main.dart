@@ -25,6 +25,20 @@ Future<void> main() async {
     AppLog.add('FlutterError: ${details.exceptionAsString()}');
     FlutterError.presentError(details);
   };
+  // В релизе сломанный виджет — пустое место без объяснений. Пишем причину в
+  // лог и показываем её текстом, чтобы пустой экран можно было разобрать.
+  ErrorWidget.builder = (details) {
+    AppLog.add('Виджет не построился: ${details.exceptionAsString()}');
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'Ошибка экрана: ${details.exceptionAsString()}',
+          style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+        ),
+      ),
+    );
+  };
   PlatformDispatcher.instance.onError = (error, stack) {
     AppLog.add('Uncaught: $error');
     return false;
