@@ -169,9 +169,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             // должно быть ничего, кроме самого платформенного слоя, — так же
             // устроена рабочая карта маршрутов. Камеру двигаем тем же
             // запросом наведения, что и выбор результата поиска.
+            // Когда показан баннер «ничего не найдено», кнопка уходит выше,
+            // чтобы не налезть на него.
             Positioned(
               right: AppSpacing.gutter,
-              bottom: 148,
+              bottom: view.isEmpty && view.isFiltered ? 212 : 148,
               child: _MyLocationButton(
                 onLocated: (lat, lng) => _focus(lat, lng, zoom: 15.5),
               ),
