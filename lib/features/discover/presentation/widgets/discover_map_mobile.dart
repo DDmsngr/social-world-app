@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -88,6 +89,21 @@ class _DiscoverMapState extends State<DiscoverMap> {
   bool _mapkitRunning = false;
   AppPalette? _appliedPalette;
 
+  // Pulse — стартовая вкладка, и go_router строит все пять веток нижней
+  // навигации разом через IndexedStack (см. app_router.dart), а не по
+  // требованию. Первая попытка создать нативный слой карты в этой гонке
+  // иногда зависает без ошибки: mapkit.onStart() отрабатывает, а
+  // onMapCreated не приходит никогда — тот же виджет на отдельном
+  // запушенном экране (маршрут) создаётся нормально. Пересоздаём карту под
+  // новым ключом, если создание не завершилось за разумное время; после
+  // нескольких попыток показываем понятную ошибку вместо вечно пустого
+  // экрана.
+  static const _creationTimeout = Duration(seconds: 6);
+  static const _maxAttempts = 3;
+  int _attempt = 0;
+  Timer? _creationTimer;
+  bool _stalled = false;
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +113,35 @@ class _DiscoverMapState extends State<DiscoverMap> {
       onInactive: _stopMapkit,
     );
     _inputListener.onLongTap = (lat, lng) => widget.onLongTap?.call(lat, lng);
+    _armCreationTimer();
+  }
+
+  void _armCreationTimer() {
+    _creationTimer?.cancel();
+    _creationTimer = Timer(_creationTimeout, _onCreationStalled);
+  }
+
+  void _onCreationStalled() {
+    if (!mounted || _window != null) return;
+    AppLog.add(
+      'DiscoverMap: карта не создалась за ${_creationTimeout.inSeconds} с '
+      '(попытка ${_attempt + 1})',
+    );
+    if (_attempt + 1 >= _maxAttempts) {
+      setState(() => _stalled = true);
+      return;
+    }
+    setState(() => _attempt++);
+    _armCreationTimer();
+  }
+
+  void _retryNow() {
+    _creationTimer?.cancel();
+    setState(() {
+      _attempt++;
+      _stalled = false;
+    });
+    _armCreationTimer();
   }
 
   @override
@@ -154,6 +199,7 @@ class _DiscoverMapState extends State<DiscoverMap> {
     _userLocationLayer?.setVisible(false);
     _stopMapkit();
     _lifecycle.dispose();
+    _creationTimer?.cancel();
     super.dispose();
   }
 
@@ -174,8 +220,9 @@ class _DiscoverMapState extends State<DiscoverMap> {
   void _onMapCreated(ymk.MapWindow window) {
     AppLog.add(
       'DiscoverMap: onMapCreated, центр ${widget.data.centerLatitude},'
-      ' ${widget.data.centerLongitude}',
+      ' ${widget.data.centerLongitude} (попытка ${_attempt + 1})',
     );
+    _creationTimer?.cancel();
     _appliedPalette = AppColors.current;
     window.map.nightModeEnabled = AppColors.current.isDark;
     _window = window;
@@ -465,19 +512,26 @@ class _DiscoverMapState extends State<DiscoverMap> {
             : 'MapKit не инициализировался: ${MapkitBoot.status}',
       );
     }
+    if (_stalled) {
+      return _MobileMapUnavailable(
+        title: 'Карта долго не отвечает',
+        text: 'Такое бывает при первом запуске. Нажмите «Повторить».',
+        onRetry: _retryNow,
+      );
+    }
 
     return Stack(
       children: [
         YandexMap(
+          // Новый ключ при каждой повторной попытке — иначе Flutter считает
+          // это тем же виджетом и не пересоздаёт зависший нативный слой.
+          key: ValueKey(_attempt),
           onMapCreated: _onMapCreated,
-          // Hybrid и TextureHybrid используют SurfaceView, который на этом
-          // Xiaomi (MIUI + Mali, mali_gralloc «Unrecognized format 0x38/0x3b»
-          // в логе) перекрывает Flutter-виджеты поверх карты, а не встаёт под
-          // них: пропадает не только сама карта, а весь Stack целиком (поиск,
-          // чипы, кнопки). Virtual рендерит карту в текстуру через
-          // виртуальный дисплей — тот же путь, что у SDK «Compat» для GPU с
-          // известными проблемами (PlatformViewType.Compat).
-          platformViewType: PlatformViewType.Virtual,
+          // Hybrid — единственный режим, который на этом Xiaomi (MIUI +
+          // Mali) стабильно создаёт карту: сама причина пустого экрана Pulse
+          // не в нём (см. комментарий у _armCreationTimer), TextureHybrid и
+          // Virtual пробовались и не помогли, зато Virtual тяжелее по кадрам.
+          platformViewType: PlatformViewType.Hybrid,
         ),
         Positioned(
           right: 16,
@@ -540,10 +594,15 @@ class _InputListener implements ymk.MapInputListener {
 }
 
 class _MobileMapUnavailable extends StatelessWidget {
-  const _MobileMapUnavailable({required this.title, required this.text});
+  const _MobileMapUnavailable({
+    required this.title,
+    required this.text,
+    this.onRetry,
+  });
 
   final String title;
   final String text;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -560,6 +619,10 @@ class _MobileMapUnavailable extends StatelessWidget {
               Text(title, style: AppTypography.serif(28)),
               const SizedBox(height: 8),
               Text(text, style: Theme.of(context).textTheme.bodyMedium),
+              if (onRetry != null) ...[
+                const SizedBox(height: 16),
+                FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+              ],
             ],
           ),
         ),
