@@ -91,18 +91,26 @@ class _DiscoverMapState extends State<DiscoverMap> {
 
   // Pulse — стартовая вкладка, и go_router строит все пять веток нижней
   // навигации разом через IndexedStack (см. app_router.dart), а не по
-  // требованию. Первая попытка создать нативный слой карты в этой гонке
-  // иногда зависает без ошибки: mapkit.onStart() отрабатывает, а
-  // onMapCreated не приходит никогда — тот же виджет на отдельном
-  // запушенном экране (маршрут) создаётся нормально. Пересоздаём карту под
-  // новым ключом, если создание не завершилось за разумное время; после
-  // нескольких попыток показываем понятную ошибку вместо вечно пустого
-  // экрана.
+  // требованию, одновременно с сетевой вознёй входа (auth, профиль).
+  // Если нативный слой карты создаётся прямо в эту секунду, на части
+  // телефонов (замечено на Xiaomi/MIUI) сам SurfaceView иногда не
+  // появляется вовсе — а плагин всё равно вызывает onMapCreated, так что
+  // определить сбой по обратному вызову нельзя (в логе просто нет второй
+  // строки создания SurfaceView, которая есть при удачном запуске).
+  // Поэтому первое монтирование виджета карты откладываем — даём стартовой
+  // суете улечься. Тот же виджет на отдельном запушенном экране (маршрут)
+  // создаётся сразу и нормально, потому что открывается позже, без этой
+  // одновременности.
+  static const _firstMountDelay = Duration(milliseconds: 700);
+  // Таймер повтора остаётся отдельной, более грубой страховкой: если после
+  // паузы onMapCreated всё равно не пришёл (настоящий сбой, не просто
+  // «молчаливый» как выше), пересоздаём карту под новым ключом.
   static const _creationTimeout = Duration(seconds: 6);
   static const _maxAttempts = 3;
   int _attempt = 0;
   Timer? _creationTimer;
   bool _stalled = false;
+  bool _readyToMount = false;
 
   @override
   void initState() {
@@ -113,7 +121,13 @@ class _DiscoverMapState extends State<DiscoverMap> {
       onInactive: _stopMapkit,
     );
     _inputListener.onLongTap = (lat, lng) => widget.onLongTap?.call(lat, lng);
-    _armCreationTimer();
+    Future.delayed(_firstMountDelay, () {
+      if (!mounted) return;
+      setState(() => _readyToMount = true);
+      // Таймер повтора считает с момента, когда мы реально попытались
+      // смонтировать платформенный виджет, а не с initState.
+      _armCreationTimer();
+    });
   }
 
   void _armCreationTimer() {
@@ -247,7 +261,10 @@ class _DiscoverMapState extends State<DiscoverMap> {
         azimuth: 0,
         tilt: 0,
       ),
-      animation: const ymk.Animation(type: ymk.AnimationType.Smooth, duration: 0.4),
+      animation: const ymk.Animation(
+        type: ymk.AnimationType.Smooth,
+        duration: 0.4,
+      ),
     );
   }
 
@@ -279,7 +296,8 @@ class _DiscoverMapState extends State<DiscoverMap> {
     // Один результат — не прямоугольник, а точка: обычный zoom вместо
     // cameraPositionForGeometry, у которой на вырожденном боксе выходит
     // максимальное приближение.
-    if (points.length == 1 || (maxLat - minLat < 1e-5 && maxLng - minLng < 1e-5)) {
+    if (points.length == 1 ||
+        (maxLat - minLat < 1e-5 && maxLng - minLng < 1e-5)) {
       _moveTo(minLat, minLng);
       return;
     }
@@ -294,7 +312,10 @@ class _DiscoverMapState extends State<DiscoverMap> {
     );
     window.map.move(
       position,
-      animation: const ymk.Animation(type: ymk.AnimationType.Smooth, duration: 0.4),
+      animation: const ymk.Animation(
+        type: ymk.AnimationType.Smooth,
+        duration: 0.4,
+      ),
     );
   }
 
@@ -359,9 +380,14 @@ class _DiscoverMapState extends State<DiscoverMap> {
 
     final anchor = widget.anchor;
     if (anchor != null) {
-      final center = ymk.Point(latitude: anchor.latitude, longitude: anchor.longitude);
+      final center = ymk.Point(
+        latitude: anchor.latitude,
+        longitude: anchor.longitude,
+      );
       // Синий — только геолокация и люди: точка «Рядом» это геолокация.
-      collection.addCircle(ymk.Circle(center, radius: anchor.radiusMeters.toDouble()))
+      collection.addCircle(
+          ymk.Circle(center, radius: anchor.radiusMeters.toDouble()),
+        )
         ..strokeColor = AppColors.geo.withValues(alpha: 0.85)
         ..strokeWidth = 1.5
         ..fillColor = AppColors.geo.withValues(alpha: 0.06)
@@ -405,10 +431,9 @@ class _DiscoverMapState extends State<DiscoverMap> {
       final listener = _TapListener(() => widget.onPlaceTap(place));
       _tapListeners.add(listener);
 
-      collection
-          .addPlacemarkWithPoint(
-            ymk.Point(latitude: place.latitude, longitude: place.longitude),
-          )
+      collection.addPlacemarkWithPoint(
+          ymk.Point(latitude: place.latitude, longitude: place.longitude),
+        )
         ..setText(place.title)
         ..setTextStyle(
           ymk.TextStyle(
@@ -431,10 +456,9 @@ class _DiscoverMapState extends State<DiscoverMap> {
       final listener = _TapListener(() => onEventTap?.call(event));
       _tapListeners.add(listener);
 
-      collection
-          .addPlacemarkWithPoint(
-            ymk.Point(latitude: event.latitude!, longitude: event.longitude!),
-          )
+      collection.addPlacemarkWithPoint(
+          ymk.Point(latitude: event.latitude!, longitude: event.longitude!),
+        )
         ..setText('${_hhmm(event.startsAt)} · ${event.title}')
         ..setTextStyle(
           ymk.TextStyle(
@@ -463,9 +487,16 @@ class _DiscoverMapState extends State<DiscoverMap> {
       final tone = ActivityPalette.forCell(intensity, widget.activityMode);
       final base = activityAlpha(intensity, isDark: isDark);
       final radius = cell.radiusMeters * 0.85;
-      final center = ymk.Point(latitude: cell.latitude, longitude: cell.longitude);
+      final center = ymk.Point(
+        latitude: cell.latitude,
+        longitude: cell.longitude,
+      );
 
-      for (final (scale, alpha) in const [(1.35, 0.35), (0.95, 0.55), (0.55, 0.8)]) {
+      for (final (scale, alpha) in const [
+        (1.35, 0.35),
+        (0.95, 0.55),
+        (0.55, 0.8),
+      ]) {
         collection.addCircle(ymk.Circle(center, radius: radius * scale))
           ..strokeColor = Colors.transparent
           ..strokeWidth = 0
@@ -518,6 +549,12 @@ class _DiscoverMapState extends State<DiscoverMap> {
         text: 'Такое бывает при первом запуске. Нажмите «Повторить».',
         onRetry: _retryNow,
       );
+    }
+    // Короткая пауза перед первым монтированием — см. комментарий у
+    // _firstMountDelay. Спиннер, а не пусто: человек не должен решить, что
+    // экран завис.
+    if (!_readyToMount) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     return Stack(
@@ -621,7 +658,10 @@ class _MobileMapUnavailable extends StatelessWidget {
               Text(text, style: Theme.of(context).textTheme.bodyMedium),
               if (onRetry != null) ...[
                 const SizedBox(height: 16),
-                FilledButton(onPressed: onRetry, child: const Text('Повторить')),
+                FilledButton(
+                  onPressed: onRetry,
+                  child: const Text('Повторить'),
+                ),
               ],
             ],
           ),
