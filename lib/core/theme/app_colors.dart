@@ -66,10 +66,10 @@ class AppPalette {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// «Бургунди и шампань» — тёмная тема по выбору Левона. Все шесть кодов —
-  /// один в один из присланного референса (Фон/Карточки/Вторичный фон/
-  /// Акцент/Текст/Вторичный текст), кроме [primaryHover] — его в референсе
-  /// нет, это состояние нажатия, придуманное поверх акцента.
+  /// «Бургунди и шампань» — зафиксированная фирменная палитра ChaWo
+  /// (решение Алексея 22.09.2026, поверх исходного референса Левона).
+  /// Гео сознательно не розовый и не голубой — золотистый (шампань), чтобы
+  /// не сливаться с брендовым [primary] на карте.
   static const burgundyChampagne = AppPalette(
     brightness: Brightness.dark,
     ink: Color(0xFF21151D),
@@ -77,17 +77,17 @@ class AppPalette {
     card: Color(0xFF302029),
     paper: Color(0xFFFFF8F0),
     primary: Color(0xFFE89BBA),
-    primaryHover: Color(0xFFF2B8CE),
+    primaryHover: Color(0xFFF0B0C9),
     primaryTint: Color(0xFFE89BBA),
     onPrimary: Color(0xFF21151D),
-    success: Color(0xFF62C08F),
-    danger: Color(0xFFE8737D),
-    geo: Color(0xFF82AED6),
+    success: Color(0xFF75C9A5),
+    danger: Color(0xFFE87878),
+    geo: Color(0xFFD8B56A),
     text: Color(0xFFFFF8F0),
     textDim: Color(0xFFBBA9AF),
     textFaint: Color(0x99BBA9AF),
-    hair: Color(0x804A3440),
-    hairStrong: Color(0xFF4A3440),
+    hair: Color(0x80513843),
+    hairStrong: Color(0xFF513843),
   );
 
   /// «Тёплый песок» — светлая тема. Коды сняты со скриншота макета, их

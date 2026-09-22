@@ -161,7 +161,7 @@ class _Thumb extends StatelessWidget {
             customBorder: const CircleBorder(),
             child: CircleAvatar(
               radius: 11,
-              backgroundColor: const Color(0xCC151417),
+              backgroundColor: AppColors.ink.withAlpha(0xCC),
               child: Icon(Icons.close, size: 13, color: AppColors.paper),
             ),
           ),

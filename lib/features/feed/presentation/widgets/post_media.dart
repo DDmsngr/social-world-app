@@ -228,7 +228,7 @@ class _VideoItemState extends State<_VideoItem> {
             Center(
               child: CircleAvatar(
                 radius: 26,
-                backgroundColor: Color(0x99151417),
+                backgroundColor: AppColors.ink.withAlpha(0x99),
                 child: Icon(Icons.play_arrow, color: AppColors.paper, size: 30),
               ),
             ),
