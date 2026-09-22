@@ -251,6 +251,16 @@ class _DiscoverMapState extends State<DiscoverMap> {
 
     _resetCamera(animated: false);
     _rebuildObjects();
+
+    // Известный класс багов Hybrid Composition: движок иногда не выводит на
+    // экран уже готовый кадр с платформенным слоем, пока не случится ещё
+    // один layout/paint — карта и всё, что нарисовано поверх неё, остаются
+    // невидимыми, хотя onMapCreated уже пришёл (проверено логом: разрыв
+    // между стартом и созданием совпадает с ожидаемой паузой, то есть
+    // создание отработало штатно). Просим у движка ещё один кадр явно.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _moveTo(double latitude, double longitude, {double zoom = 16}) {
