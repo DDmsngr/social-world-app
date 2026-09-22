@@ -105,12 +105,17 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ),
       ),
       body: data.when(
+        // LayoutBuilder — не оформление, а обязательное условие: Pulse
+        // строится через StatefulShellRoute.indexedStack (app_router.dart),
+        // и go_router монтирует все пять веток нижней навигации разом при
+        // входе. Без LayoutBuilder Stack с картой строился в тот же кадр,
+        // что и остальные ветки, до того как Scaffold успевал отдать телу
+        // окончательные ограничения размера — нативный слой карты создавался
+        // с недоопределённым размером и не показывал ни себя, ни соседние
+        // виджеты поверх. LayoutBuilder строит детей только после того, как
+        // constraints уже посчитаны, и снимает эту гонку.
         data: (snapshot) => LayoutBuilder(
           builder: (context, constraints) {
-            // ВРЕМЕННЫЙ диагностический лог (снять после проверки):
-            // если тело Scaffold получает нулевые ограничения, Stack не
-            // сможет ничего нарисовать, даже если сам не сломан.
-            AppLog.add('Карта: body constraints — $constraints');
             return Stack(
               children: [
                 Positioned.fill(
@@ -205,24 +210,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                   ),
                 ),
                 const MapIntro(),
-                // ВРЕМЕННЫЙ диагностический маркер (снять после проверки):
-                // если он не виден на экране, тело Scaffold вообще не
-                // компонуется/не красится, и дело не в самой карте.
-                const IgnorePointer(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ColoredBox(
-                      color: Color(0xFFCCFF00),
-                      child: Padding(
-                        padding: EdgeInsets.all(6),
-                        child: Text(
-                          'PULSE ALIVE',
-                          style: TextStyle(color: Colors.black, fontSize: 22),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             );
           },
