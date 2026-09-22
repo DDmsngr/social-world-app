@@ -20,6 +20,7 @@ class AppPalette {
     required this.success,
     required this.danger,
     required this.geo,
+    required this.champagne,
     required this.text,
     required this.textDim,
     required this.textFaint,
@@ -57,6 +58,11 @@ class AppPalette {
   /// Гео и карта — отдельная холодная ветка, иначе метки сливаются с кнопками.
   final Color geo;
 
+  /// Выбранное состояние там, где акцент-розовый не подходит: активная
+  /// вкладка нижней навигации, выбранный сегмент SegmentedButton. Из
+  /// референса — розовый там читается как «действие», а не «выбрано».
+  final Color champagne;
+
   final Color text;
   final Color textDim;
   final Color textFaint;
@@ -83,6 +89,7 @@ class AppPalette {
     success: Color(0xFF75C9A5),
     danger: Color(0xFFE87878),
     geo: Color(0xFFD8B56A),
+    champagne: Color(0xFFE6C98A),
     text: Color(0xFFFFF8F0),
     textDim: Color(0xFFBBA9AF),
     textFaint: Color(0x99BBA9AF),
@@ -105,6 +112,7 @@ class AppPalette {
     success: Color(0xFF2E8B5E),
     danger: Color(0xFFC2414B),
     geo: Color(0xFF3C74A8),
+    champagne: Color(0xFFB8863F),
     text: Color(0xFF3A2A24),
     textDim: Color(0xFF7A635A),
     textFaint: Color(0x997A635A),
@@ -132,6 +140,7 @@ abstract final class AppColors {
   static Color get success => current.success;
   static Color get danger => current.danger;
   static Color get geo => current.geo;
+  static Color get champagne => current.champagne;
   static Color get text => current.text;
   static Color get textDim => current.textDim;
   static Color get textFaint => current.textFaint;

@@ -139,7 +139,7 @@ abstract final class AppTheme {
             fontSize: 11,
             letterSpacing: 0.4,
             color: states.contains(WidgetState.selected)
-                ? p.primaryTint
+                ? p.champagne
                 : p.textFaint,
           ),
         ),
@@ -147,9 +147,18 @@ abstract final class AppTheme {
           (states) => IconThemeData(
             size: 24,
             color: states.contains(WidgetState.selected)
-                ? p.primaryTint
+                ? p.champagne
                 : p.textFaint,
           ),
+        ),
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: SegmentedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: p.textDim,
+          selectedBackgroundColor: p.champagne,
+          selectedForegroundColor: p.ink,
+          side: BorderSide(color: p.hair),
         ),
       ),
       radioTheme: RadioThemeData(
