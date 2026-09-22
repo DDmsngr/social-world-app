@@ -470,7 +470,14 @@ class _DiscoverMapState extends State<DiscoverMap> {
       children: [
         YandexMap(
           onMapCreated: _onMapCreated,
-          platformViewType: PlatformViewType.TextureHybrid,
+          // Hybrid и TextureHybrid используют SurfaceView, который на этом
+          // Xiaomi (MIUI + Mali, mali_gralloc «Unrecognized format 0x38/0x3b»
+          // в логе) перекрывает Flutter-виджеты поверх карты, а не встаёт под
+          // них: пропадает не только сама карта, а весь Stack целиком (поиск,
+          // чипы, кнопки). Virtual рендерит карту в текстуру через
+          // виртуальный дисплей — тот же путь, что у SDK «Compat» для GPU с
+          // известными проблемами (PlatformViewType.Compat).
+          platformViewType: PlatformViewType.Virtual,
         ),
         Positioned(
           right: 16,
