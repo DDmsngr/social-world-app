@@ -37,14 +37,16 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   // нажатие, потому что короткий тап теперь занят. adb до телефона
   // тестировщика не дотянуться, а спрятанный жест не мозолит глаза.
   void _openLogs() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()));
   }
 
   void _focus(double? latitude, double? longitude, {double zoom = 16}) {
     if (latitude == null || longitude == null) return;
-    ref.read(mapFocusProvider.notifier).request(latitude, longitude, zoom: zoom);
+    ref
+        .read(mapFocusProvider.notifier)
+        .request(latitude, longitude, zoom: zoom);
   }
 
   /// Выбор результата поиска или строки «Рядом»: камера идёт к объекту, карточка
@@ -76,7 +78,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     final data = ref.watch(discoverDataProvider);
     ref.listen(discoverDataProvider, (_, next) {
       AppLog.add(
-        'Карта: данные — ${next.isLoading ? 'загрузка' : next.hasError ? 'ошибка ${next.error}' : 'готово'}',
+        'Карта: данные — ${next.isLoading
+            ? 'загрузка'
+            : next.hasError
+            ? 'ошибка ${next.error}'
+            : 'готово'}',
       );
     });
     final view = ref.watch(mapViewProvider);
@@ -99,92 +105,127 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ),
       ),
       body: data.when(
-        data: (snapshot) => Stack(
-          children: [
-            Positioned.fill(
-              child: DiscoverMap(
-                data: snapshot,
-                places: view.places,
-                events: view.events,
-                people: view.people,
-                // Пока зоны пересчитываются, слой пустой — старые не висят
-                // поверх новых.
-                activity: ref.watch(visibleActivityProvider),
-                activityMode: ref.watch(activityModeProvider),
-                anchor: anchor,
-                focus: ref.watch(mapFocusProvider),
-                filterActive: view.isFiltered,
-                onPlaceTap: (place) => showPlaceSheet(context, place),
-                onEventTap: (event) => showEventSheet(context, event),
-                onPersonTap: (person) => showPersonSheet(context, person),
-                onLongTap: picking
-                    ? (lat, lng) {
-                        ref.read(nearbyAnchorProvider.notifier).set(
-                          NearbyAnchor(latitude: lat, longitude: lng),
-                        );
-                        ref.read(pickingAnchorProvider.notifier).set(false);
-                      }
-                    : null,
-              ),
-            ),
-            Positioned(
-              left: AppSpacing.gutter,
-              right: AppSpacing.gutter,
-              top: 12,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  MapSearchBar(
-                    onSelect: _onSelect,
-                    onOpenFilters: () => showMapFiltersSheet(context, snapshot.places),
+        data: (snapshot) => LayoutBuilder(
+          builder: (context, constraints) {
+            // ВРЕМЕННЫЙ диагностический лог (снять после проверки):
+            // если тело Scaffold получает нулевые ограничения, Stack не
+            // сможет ничего нарисовать, даже если сам не сломан.
+            AppLog.add('Карта: body constraints — $constraints');
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: DiscoverMap(
+                    data: snapshot,
+                    places: view.places,
+                    events: view.events,
+                    people: view.people,
+                    // Пока зоны пересчитываются, слой пустой — старые не висят
+                    // поверх новых.
+                    activity: ref.watch(visibleActivityProvider),
+                    activityMode: ref.watch(activityModeProvider),
+                    anchor: anchor,
+                    focus: ref.watch(mapFocusProvider),
+                    filterActive: view.isFiltered,
+                    onPlaceTap: (place) => showPlaceSheet(context, place),
+                    onEventTap: (event) => showEventSheet(context, event),
+                    onPersonTap: (person) => showPersonSheet(context, person),
+                    onLongTap: picking
+                        ? (lat, lng) {
+                            ref
+                                .read(nearbyAnchorProvider.notifier)
+                                .set(
+                                  NearbyAnchor(latitude: lat, longitude: lng),
+                                );
+                            ref.read(pickingAnchorProvider.notifier).set(false);
+                          }
+                        : null,
                   ),
-                  const SizedBox(height: 8),
-                  const MapLayerChips(),
-                  if (picking) ...[
-                    const SizedBox(height: 8),
-                    _PickingBanner(
-                      onCancel: () =>
-                          ref.read(pickingAnchorProvider.notifier).set(false),
+                ),
+                Positioned(
+                  left: AppSpacing.gutter,
+                  right: AppSpacing.gutter,
+                  top: 12,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      MapSearchBar(
+                        onSelect: _onSelect,
+                        onOpenFilters: () =>
+                            showMapFiltersSheet(context, snapshot.places),
+                      ),
+                      const SizedBox(height: 8),
+                      const MapLayerChips(),
+                      if (picking) ...[
+                        const SizedBox(height: 8),
+                        _PickingBanner(
+                          onCancel: () => ref
+                              .read(pickingAnchorProvider.notifier)
+                              .set(false),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (view.isEmpty && view.isFiltered)
+                  const Positioned(
+                    left: AppSpacing.gutter,
+                    right: AppSpacing.gutter,
+                    bottom: 148,
+                    child: MapEmptyBanner(),
+                  ),
+                Positioned(
+                  left: AppSpacing.gutter,
+                  bottom: 92,
+                  child: const MapModeSwitch(),
+                ),
+                Positioned(
+                  right: AppSpacing.gutter,
+                  bottom: 92,
+                  child: ActionChip(
+                    avatar: Icon(
+                      Icons.radar,
+                      size: 18,
+                      color: AppColors.primaryTint,
                     ),
-                  ],
-                ],
-              ),
-            ),
-            if (view.isEmpty && view.isFiltered)
-              const Positioned(
-                left: AppSpacing.gutter,
-                right: AppSpacing.gutter,
-                bottom: 148,
-                child: MapEmptyBanner(),
-              ),
-            Positioned(
-              left: AppSpacing.gutter,
-              bottom: 92,
-              child: const MapModeSwitch(),
-            ),
-            Positioned(
-              right: AppSpacing.gutter,
-              bottom: 92,
-              child: ActionChip(
-                avatar: Icon(Icons.radar, size: 18, color: AppColors.primaryTint),
-                label: const Text('Рядом'),
-                onPressed: () => showNearbySheet(context, onSelect: _onSelect),
-                backgroundColor: AppColors.ink2,
-                side: BorderSide(color: AppColors.hairStrong),
-              ),
-            ),
-            Positioned(
-              left: AppSpacing.gutter,
-              right: AppSpacing.gutter,
-              bottom: 16,
-              child: _CityPulseCard(
-                data: snapshot,
-                view: view,
-                onOpen: () => context.push(Routes.events),
-              ),
-            ),
-            const MapIntro(),
-          ],
+                    label: const Text('Рядом'),
+                    onPressed: () =>
+                        showNearbySheet(context, onSelect: _onSelect),
+                    backgroundColor: AppColors.ink2,
+                    side: BorderSide(color: AppColors.hairStrong),
+                  ),
+                ),
+                Positioned(
+                  left: AppSpacing.gutter,
+                  right: AppSpacing.gutter,
+                  bottom: 16,
+                  child: _CityPulseCard(
+                    data: snapshot,
+                    view: view,
+                    onOpen: () => context.push(Routes.events),
+                  ),
+                ),
+                const MapIntro(),
+                // ВРЕМЕННЫЙ диагностический маркер (снять после проверки):
+                // если он не виден на экране, тело Scaffold вообще не
+                // компонуется/не красится, и дело не в самой карте.
+                const IgnorePointer(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ColoredBox(
+                      color: Color(0xFFCCFF00),
+                      child: Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Text(
+                          'PULSE ALIVE',
+                          style: TextStyle(color: Colors.black, fontSize: 22),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
         loading: () => const LoadingView(),
         error: (error, _) => _MapError(
@@ -215,10 +256,10 @@ class _MapError extends StatelessWidget {
           title: 'Не удалось загрузить район',
           text: vpn
               ? 'Включён VPN — из-за него карта может не грузиться. '
-                  'Отключите VPN и нажмите «Повторить». Если не помогло, '
-                  'закройте приложение и откройте снова.'
+                    'Отключите VPN и нажмите «Повторить». Если не помогло, '
+                    'закройте приложение и откройте снова.'
               : 'Проверьте соединение и нажмите «Повторить». Если вы только '
-                  'что выключили VPN, закройте приложение и откройте снова.',
+                    'что выключили VPN, закройте приложение и откройте снова.',
           onAction: onRetry,
         );
       },
@@ -240,7 +281,11 @@ class _PickingBanner extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
         child: Row(
           children: [
-            const Icon(Icons.touch_app_outlined, size: 18, color: Colors.black87),
+            const Icon(
+              Icons.touch_app_outlined,
+              size: 18,
+              color: Colors.black87,
+            ),
             const SizedBox(width: 10),
             const Expanded(
               child: Text(
@@ -250,7 +295,10 @@ class _PickingBanner extends StatelessWidget {
             ),
             TextButton(
               onPressed: onCancel,
-              child: const Text('Отмена', style: TextStyle(color: Colors.black87)),
+              child: const Text(
+                'Отмена',
+                style: TextStyle(color: Colors.black87),
+              ),
             ),
           ],
         ),
