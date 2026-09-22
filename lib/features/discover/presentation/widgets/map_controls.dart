@@ -211,77 +211,64 @@ class MapLayerChips extends ConsumerWidget {
       MapLayer.moments => view.momentCount,
     };
 
-    // Затухание у правого края вместо резкого обрыва: строка чипов длиннее
-    // экрана почти всегда (4 слоя + «Рядом»/«Сбросить»), и без подсказки,
-    // что дальше есть ещё, обрезанный на полуслове чип читается как баг,
-    // а не как «пролистни».
-    return ShaderMask(
-      shaderCallback: (bounds) => const LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [Colors.black, Colors.black, Colors.transparent],
-        stops: [0, 0.9, 1],
-      ).createShader(bounds),
-      blendMode: BlendMode.dstIn,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(right: 16),
-        child: Row(
-          children: [
-            if (anchor != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: InputChip(
-                  avatar: Icon(
-                    Icons.my_location,
-                    size: 16,
-                    color: AppColors.geo,
-                  ),
-                  label: Text('Рядом · ${_radius(anchor.radiusMeters)}'),
-                  onDeleted: () =>
-                      ref.read(nearbyAnchorProvider.notifier).clear(),
-                  deleteButtonTooltipMessage: 'Убрать точку «Рядом»',
-                  backgroundColor: AppColors.ink2,
-                  side: BorderSide(color: AppColors.geo.withValues(alpha: 0.6)),
-                ),
-              ),
-            for (final layer in MapLayer.values)
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: FilterChip(
-                  label: Text('${layer.label} ${countFor(layer)}'),
-                  selected: layers.contains(layer),
-                  onSelected: (_) =>
-                      ref.read(mapLayersProvider.notifier).toggle(layer),
-                  showCheckmark: false,
-                  tooltip: layers.contains(layer)
-                      ? 'Скрыть «${layer.label}»'
-                      : 'Показать «${layer.label}»',
-                  backgroundColor: AppColors.ink2,
-                  selectedColor: AppColors.primary,
-                  labelStyle: TextStyle(
-                    fontSize: 13,
-                    color: layers.contains(layer)
-                        ? AppColors.onPrimary
-                        : AppColors.textDim,
-                  ),
-                  side: BorderSide(color: AppColors.hair),
-                ),
-              ),
-            if (view.isFiltered)
-              ActionChip(
-                avatar: Icon(
-                  Icons.restart_alt,
-                  size: 16,
-                  color: AppColors.primaryTint,
-                ),
-                label: const Text('Сбросить'),
-                onPressed: () => resetMapFilters(ref),
+    // Без ShaderMask: он форсирует отрисовку через промежуточный слой
+    // (saveLayer) прямо поверх нативной карты, а это ровно тот случай, из-за
+    // которого платформенный слой на части телефонов перестаёт показываться.
+    // Обрыв чипа у края лечим отступом, а не эффектом.
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.only(right: 44),
+      child: Row(
+        children: [
+          if (anchor != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InputChip(
+                avatar: Icon(Icons.my_location, size: 16, color: AppColors.geo),
+                label: Text('Рядом · ${_radius(anchor.radiusMeters)}'),
+                onDeleted: () =>
+                    ref.read(nearbyAnchorProvider.notifier).clear(),
+                deleteButtonTooltipMessage: 'Убрать точку «Рядом»',
                 backgroundColor: AppColors.ink2,
+                side: BorderSide(color: AppColors.geo.withValues(alpha: 0.6)),
+              ),
+            ),
+          for (final layer in MapLayer.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text('${layer.label} ${countFor(layer)}'),
+                selected: layers.contains(layer),
+                onSelected: (_) =>
+                    ref.read(mapLayersProvider.notifier).toggle(layer),
+                showCheckmark: false,
+                tooltip: layers.contains(layer)
+                    ? 'Скрыть «${layer.label}»'
+                    : 'Показать «${layer.label}»',
+                backgroundColor: AppColors.ink2,
+                selectedColor: AppColors.primary,
+                labelStyle: TextStyle(
+                  fontSize: 13,
+                  color: layers.contains(layer)
+                      ? AppColors.onPrimary
+                      : AppColors.textDim,
+                ),
                 side: BorderSide(color: AppColors.hair),
               ),
-          ],
-        ),
+            ),
+          if (view.isFiltered)
+            ActionChip(
+              avatar: Icon(
+                Icons.restart_alt,
+                size: 16,
+                color: AppColors.primaryTint,
+              ),
+              label: const Text('Сбросить'),
+              onPressed: () => resetMapFilters(ref),
+              backgroundColor: AppColors.ink2,
+              side: BorderSide(color: AppColors.hair),
+            ),
+        ],
       ),
     );
   }

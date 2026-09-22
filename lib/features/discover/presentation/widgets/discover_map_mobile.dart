@@ -78,7 +78,6 @@ class _DiscoverMapState extends State<DiscoverMap> {
   ymk.MapObjectCollection? _objects;
   ymk.MapWindow? _window;
   ymk.UserLocationLayer? _userLocationLayer;
-  bool _locatingSelf = false;
 
   // Слушатели тапов живут ровно столько же, сколько метки: MapKit держит
   // на них слабую ссылку, и без своего списка они собираются сборщиком,
@@ -89,29 +88,6 @@ class _DiscoverMapState extends State<DiscoverMap> {
   bool _mapkitRunning = false;
   AppPalette? _appliedPalette;
 
-  // Pulse — стартовая вкладка, и go_router строит все пять веток нижней
-  // навигации разом через IndexedStack (см. app_router.dart), а не по
-  // требованию, одновременно с сетевой вознёй входа (auth, профиль).
-  // Если нативный слой карты создаётся прямо в эту секунду, на части
-  // телефонов (замечено на Xiaomi/MIUI) сам SurfaceView иногда не
-  // появляется вовсе — а плагин всё равно вызывает onMapCreated, так что
-  // определить сбой по обратному вызову нельзя (в логе просто нет второй
-  // строки создания SurfaceView, которая есть при удачном запуске).
-  // Поэтому первое монтирование виджета карты откладываем — даём стартовой
-  // суете улечься. Тот же виджет на отдельном запушенном экране (маршрут)
-  // создаётся сразу и нормально, потому что открывается позже, без этой
-  // одновременности.
-  static const _firstMountDelay = Duration(milliseconds: 700);
-  // Таймер повтора остаётся отдельной, более грубой страховкой: если после
-  // паузы onMapCreated всё равно не пришёл (настоящий сбой, не просто
-  // «молчаливый» как выше), пересоздаём карту под новым ключом.
-  static const _creationTimeout = Duration(seconds: 6);
-  static const _maxAttempts = 3;
-  int _attempt = 0;
-  Timer? _creationTimer;
-  bool _stalled = false;
-  bool _readyToMount = false;
-
   @override
   void initState() {
     super.initState();
@@ -121,41 +97,6 @@ class _DiscoverMapState extends State<DiscoverMap> {
       onInactive: _stopMapkit,
     );
     _inputListener.onLongTap = (lat, lng) => widget.onLongTap?.call(lat, lng);
-    Future.delayed(_firstMountDelay, () {
-      if (!mounted) return;
-      setState(() => _readyToMount = true);
-      // Таймер повтора считает с момента, когда мы реально попытались
-      // смонтировать платформенный виджет, а не с initState.
-      _armCreationTimer();
-    });
-  }
-
-  void _armCreationTimer() {
-    _creationTimer?.cancel();
-    _creationTimer = Timer(_creationTimeout, _onCreationStalled);
-  }
-
-  void _onCreationStalled() {
-    if (!mounted || _window != null) return;
-    AppLog.add(
-      'DiscoverMap: карта не создалась за ${_creationTimeout.inSeconds} с '
-      '(попытка ${_attempt + 1})',
-    );
-    if (_attempt + 1 >= _maxAttempts) {
-      setState(() => _stalled = true);
-      return;
-    }
-    setState(() => _attempt++);
-    _armCreationTimer();
-  }
-
-  void _retryNow() {
-    _creationTimer?.cancel();
-    setState(() {
-      _attempt++;
-      _stalled = false;
-    });
-    _armCreationTimer();
   }
 
   @override
@@ -213,7 +154,6 @@ class _DiscoverMapState extends State<DiscoverMap> {
     _userLocationLayer?.setVisible(false);
     _stopMapkit();
     _lifecycle.dispose();
-    _creationTimer?.cancel();
     super.dispose();
   }
 
@@ -234,33 +174,30 @@ class _DiscoverMapState extends State<DiscoverMap> {
   void _onMapCreated(ymk.MapWindow window) {
     AppLog.add(
       'DiscoverMap: onMapCreated, центр ${widget.data.centerLatitude},'
-      ' ${widget.data.centerLongitude} (попытка ${_attempt + 1})',
+      ' ${widget.data.centerLongitude}',
     );
-    _creationTimer?.cancel();
     _appliedPalette = AppColors.current;
     window.map.nightModeEnabled = AppColors.current.isDark;
     _window = window;
     _objects = window.map.mapObjects.addCollection();
     window.map.addInputListener(_inputListener);
 
-    // Штатный слой MapKit: синяя точка + окружность точности сама следит за
-    // сервисом геолокации, свою метку рисовать не нужно.
+    _resetCamera(animated: false);
+    _rebuildObjects();
+    _enableUserLocationLayer(window);
+  }
+
+  /// Штатный слой MapKit: синяя точка + окружность точности. Включаем его
+  /// только с выданным разрешением: без него нативная часть Яндекса каждые
+  /// десять секунд сыпала в лог `SecurityException: uid … does not have
+  /// ACCESS_COARSE_LOCATION`, а толку от слоя всё равно не было. Карта
+  /// маршрутов этот слой не создаёт вовсе — и работает без нареканий.
+  Future<void> _enableUserLocationLayer(ymk.MapWindow window) async {
+    if (!await hasLocationPermission()) return;
+    if (!mounted || _window != window) return;
     _userLocationLayer = mapkit.createUserLocationLayer(window)
       ..setVisible(true)
       ..setDefaultSource();
-
-    _resetCamera(animated: false);
-    _rebuildObjects();
-
-    // Известный класс багов Hybrid Composition: движок иногда не выводит на
-    // экран уже готовый кадр с платформенным слоем, пока не случится ещё
-    // один layout/paint — карта и всё, что нарисовано поверх неё, остаются
-    // невидимыми, хотя onMapCreated уже пришёл (проверено логом: разрыв
-    // между стартом и созданием совпадает с ожидаемой паузой, то есть
-    // создание отработало штатно). Просим у движка ещё один кадр явно.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
-    });
   }
 
   void _moveTo(double latitude, double longitude, {double zoom = 16}) {
@@ -355,27 +292,6 @@ class _DiscoverMapState extends State<DiscoverMap> {
     if (meters <= 1000) return 14.7;
     if (meters <= 3000) return 13.3;
     return 12.3;
-  }
-
-  Future<void> _recenterOnMe() async {
-    if (_locatingSelf) return;
-    setState(() => _locatingSelf = true);
-    try {
-      final result = await requestDevicePosition(context);
-      final position = result.position;
-      if (position != null) {
-        _moveTo(position.latitude, position.longitude, zoom: 15.5);
-      } else if (result.message != null) {
-        _snack(result.message!);
-      }
-    } finally {
-      if (mounted) setState(() => _locatingSelf = false);
-    }
-  }
-
-  void _snack(String text) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   void _rebuildObjects() {
@@ -553,66 +469,13 @@ class _DiscoverMapState extends State<DiscoverMap> {
             : 'MapKit не инициализировался: ${MapkitBoot.status}',
       );
     }
-    if (_stalled) {
-      return _MobileMapUnavailable(
-        title: 'Карта долго не отвечает',
-        text: 'Такое бывает при первом запуске. Нажмите «Повторить».',
-        onRetry: _retryNow,
-      );
-    }
-    // Короткая пауза перед первым монтированием — см. комментарий у
-    // _firstMountDelay. Спиннер, а не пусто: человек не должен решить, что
-    // экран завис.
-    if (!_readyToMount) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return Stack(
-      children: [
-        YandexMap(
-          // Новый ключ при каждой повторной попытке — иначе Flutter считает
-          // это тем же виджетом и не пересоздаёт зависший нативный слой.
-          key: ValueKey(_attempt),
-          onMapCreated: _onMapCreated,
-          // Hybrid — единственный режим, который на этом Xiaomi (MIUI +
-          // Mali) стабильно создаёт карту: сама причина пустого экрана Pulse
-          // не в нём (см. комментарий у _armCreationTimer), TextureHybrid и
-          // Virtual пробовались и не помогли, зато Virtual тяжелее по кадрам.
-          platformViewType: PlatformViewType.Hybrid,
-        ),
-        Positioned(
-          right: 16,
-          bottom: 160,
-          child: Semantics(
-            button: true,
-            label: _locatingSelf
-                ? 'Определяем местоположение'
-                : 'Показать моё местоположение',
-            child: Tooltip(
-              message: 'Моё местоположение',
-              child: Material(
-                color: AppColors.ink2,
-                shape: const CircleBorder(),
-                elevation: 4,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _recenterOnMe,
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: _locatingSelf
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(Icons.my_location, color: AppColors.primaryTint),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+    // Ровно то же, что и на рабочей карте маршрутов (route_map_mobile.dart):
+    // из build() возвращается голый YandexMap, без собственного Stack и без
+    // виджетов поверх платформенного слоя. Кнопка «моё местоположение»
+    // переехала в discover_screen.dart, к остальным элементам поверх карты.
+    return YandexMap(
+      onMapCreated: _onMapCreated,
+      platformViewType: PlatformViewType.Hybrid,
     );
   }
 }
@@ -641,15 +504,10 @@ class _InputListener implements ymk.MapInputListener {
 }
 
 class _MobileMapUnavailable extends StatelessWidget {
-  const _MobileMapUnavailable({
-    required this.title,
-    required this.text,
-    this.onRetry,
-  });
+  const _MobileMapUnavailable({required this.title, required this.text});
 
   final String title;
   final String text;
-  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -666,13 +524,6 @@ class _MobileMapUnavailable extends StatelessWidget {
               Text(title, style: AppTypography.serif(28)),
               const SizedBox(height: 8),
               Text(text, style: Theme.of(context).textTheme.bodyMedium),
-              if (onRetry != null) ...[
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: onRetry,
-                  child: const Text('Повторить'),
-                ),
-              ],
             ],
           ),
         ),

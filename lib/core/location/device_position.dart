@@ -56,6 +56,20 @@ Future<DevicePositionResult> requestDevicePosition(BuildContext context) async {
   }
 }
 
+/// Разрешение уже выдано? Ничего не спрашивает и не показывает — нужно там,
+/// где без разрешения работу просто не начинают (слой «где я» на карте):
+/// нативная часть MapKit без него молча сыплет SecurityException по таймеру.
+Future<bool> hasLocationPermission() async {
+  try {
+    final permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse;
+  } catch (error) {
+    AppLog.add('Проверка разрешения на геолокацию не удалась: $error');
+    return false;
+  }
+}
+
 Future<bool> _confirmRationale(BuildContext context) async {
   final go = await showDialog<bool>(
     context: context,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/debug/app_log.dart';
 import '../../../core/debug/log_viewer_screen.dart';
+import '../../../core/location/device_position.dart';
 import '../../../core/network/vpn_check.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -105,122 +106,117 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ),
       ),
       body: data.when(
-        // LayoutBuilder — не оформление, а обязательное условие: Pulse
-        // строится через StatefulShellRoute.indexedStack (app_router.dart),
-        // и go_router монтирует все пять веток нижней навигации разом при
-        // входе. Без LayoutBuilder Stack с картой строился в тот же кадр,
-        // что и остальные ветки, до того как Scaffold успевал отдать телу
-        // окончательные ограничения размера — нативный слой карты создавался
-        // с недоопределённым размером и не показывал ни себя, ни соседние
-        // виджеты поверх. LayoutBuilder строит детей только после того, как
-        // constraints уже посчитаны, и снимает эту гонку.
-        data: (snapshot) => LayoutBuilder(
-          builder: (context, constraints) {
-            return Stack(
-              children: [
-                Positioned.fill(
-                  child: DiscoverMap(
-                    data: snapshot,
-                    places: view.places,
-                    events: view.events,
-                    people: view.people,
-                    // Пока зоны пересчитываются, слой пустой — старые не висят
-                    // поверх новых.
-                    activity: ref.watch(visibleActivityProvider),
-                    activityMode: ref.watch(activityModeProvider),
-                    anchor: anchor,
-                    focus: ref.watch(mapFocusProvider),
-                    filterActive: view.isFiltered,
-                    onPlaceTap: (place) => showPlaceSheet(context, place),
-                    onEventTap: (event) => showEventSheet(context, event),
-                    onPersonTap: (person) => showPersonSheet(context, person),
-                    onLongTap: picking
-                        ? (lat, lng) {
-                            ref
-                                .read(nearbyAnchorProvider.notifier)
-                                .set(
-                                  NearbyAnchor(latitude: lat, longitude: lng),
-                                );
-                            ref.read(pickingAnchorProvider.notifier).set(false);
-                          }
-                        : null,
+        data: (snapshot) => Stack(
+          children: [
+            Positioned.fill(
+              child: DiscoverMap(
+                data: snapshot,
+                places: view.places,
+                events: view.events,
+                people: view.people,
+                // Пока зоны пересчитываются, слой пустой — старые не висят
+                // поверх новых.
+                activity: ref.watch(visibleActivityProvider),
+                activityMode: ref.watch(activityModeProvider),
+                anchor: anchor,
+                focus: ref.watch(mapFocusProvider),
+                filterActive: view.isFiltered,
+                onPlaceTap: (place) => showPlaceSheet(context, place),
+                onEventTap: (event) => showEventSheet(context, event),
+                onPersonTap: (person) => showPersonSheet(context, person),
+                onLongTap: picking
+                    ? (lat, lng) {
+                        ref
+                            .read(nearbyAnchorProvider.notifier)
+                            .set(NearbyAnchor(latitude: lat, longitude: lng));
+                        ref.read(pickingAnchorProvider.notifier).set(false);
+                      }
+                    : null,
+              ),
+            ),
+            Positioned(
+              left: AppSpacing.gutter,
+              right: AppSpacing.gutter,
+              top: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  MapSearchBar(
+                    onSelect: _onSelect,
+                    onOpenFilters: () =>
+                        showMapFiltersSheet(context, snapshot.places),
                   ),
-                ),
-                Positioned(
-                  left: AppSpacing.gutter,
-                  right: AppSpacing.gutter,
-                  top: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      MapSearchBar(
-                        onSelect: _onSelect,
-                        onOpenFilters: () =>
-                            showMapFiltersSheet(context, snapshot.places),
-                      ),
-                      const SizedBox(height: 8),
-                      const MapLayerChips(),
-                      if (picking) ...[
-                        const SizedBox(height: 8),
-                        _PickingBanner(
-                          onCancel: () => ref
-                              .read(pickingAnchorProvider.notifier)
-                              .set(false),
-                        ),
-                      ],
-                    ],
+                  const SizedBox(height: 8),
+                  const MapLayerChips(),
+                  if (picking) ...[
+                    const SizedBox(height: 8),
+                    _PickingBanner(
+                      onCancel: () =>
+                          ref.read(pickingAnchorProvider.notifier).set(false),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (view.isEmpty && view.isFiltered)
+              const Positioned(
+                left: AppSpacing.gutter,
+                right: AppSpacing.gutter,
+                bottom: 148,
+                child: MapEmptyBanner(),
+              ),
+            // Кнопка переехала сюда из DiscoverMap: внутри виджета карты не
+            // должно быть ничего, кроме самого платформенного слоя, — так же
+            // устроена рабочая карта маршрутов. Камеру двигаем тем же
+            // запросом наведения, что и выбор результата поиска.
+            Positioned(
+              right: AppSpacing.gutter,
+              bottom: 148,
+              child: _MyLocationButton(
+                onLocated: (lat, lng) => _focus(lat, lng, zoom: 15.5),
+              ),
+            ),
+            // Один Row вместо двух независимых Positioned: раньше оба
+            // считали, что для них хватит места, и на узких экранах
+            // переключатель режима наезжал текстом на кнопку «Рядом».
+            // Flexible + spaceBetween раздвигает их и ужимает текст
+            // переключателя, если места всё равно мало, вместо наложения.
+            Positioned(
+              left: AppSpacing.gutter,
+              right: AppSpacing.gutter,
+              bottom: 92,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Flexible(child: MapModeSwitch()),
+                  const SizedBox(width: 8),
+                  ActionChip(
+                    avatar: Icon(
+                      Icons.radar,
+                      size: 18,
+                      color: AppColors.primaryTint,
+                    ),
+                    label: const Text('Рядом'),
+                    onPressed: () =>
+                        showNearbySheet(context, onSelect: _onSelect),
+                    backgroundColor: AppColors.ink2,
+                    side: BorderSide(color: AppColors.hairStrong),
                   ),
-                ),
-                if (view.isEmpty && view.isFiltered)
-                  const Positioned(
-                    left: AppSpacing.gutter,
-                    right: AppSpacing.gutter,
-                    bottom: 148,
-                    child: MapEmptyBanner(),
-                  ),
-                // Один Row вместо двух независимых Positioned: раньше оба
-                // считали, что для них хватит места, и на узких экранах
-                // переключатель режима наезжал текстом на кнопку «Рядом».
-                // Flexible + spaceBetween раздвигает их и ужимает текст
-                // переключателя, если места всё равно мало, вместо наложения.
-                Positioned(
-                  left: AppSpacing.gutter,
-                  right: AppSpacing.gutter,
-                  bottom: 92,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Flexible(child: MapModeSwitch()),
-                      const SizedBox(width: 8),
-                      ActionChip(
-                        avatar: Icon(
-                          Icons.radar,
-                          size: 18,
-                          color: AppColors.primaryTint,
-                        ),
-                        label: const Text('Рядом'),
-                        onPressed: () =>
-                            showNearbySheet(context, onSelect: _onSelect),
-                        backgroundColor: AppColors.ink2,
-                        side: BorderSide(color: AppColors.hairStrong),
-                      ),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  left: AppSpacing.gutter,
-                  right: AppSpacing.gutter,
-                  bottom: 16,
-                  child: _CityPulseCard(
-                    data: snapshot,
-                    view: view,
-                    onOpen: () => context.push(Routes.events),
-                  ),
-                ),
-                const MapIntro(),
-              ],
-            );
-          },
+                ],
+              ),
+            ),
+            Positioned(
+              left: AppSpacing.gutter,
+              right: AppSpacing.gutter,
+              bottom: 16,
+              child: _CityPulseCard(
+                data: snapshot,
+                view: view,
+                onOpen: () => context.push(Routes.events),
+              ),
+            ),
+            const MapIntro(),
+          ],
         ),
         loading: () => const LoadingView(),
         error: (error, _) => _MapError(
@@ -258,6 +254,72 @@ class _MapError extends StatelessWidget {
           onAction: onRetry,
         );
       },
+    );
+  }
+}
+
+/// «Где я»: спрашивает положение устройства (с объяснением, зачем) и отдаёт
+/// его экрану, который наводит камеру. Сам по себе камеру не двигает — у
+/// виджета карты для этого есть обычный запрос наведения.
+class _MyLocationButton extends StatefulWidget {
+  const _MyLocationButton({required this.onLocated});
+
+  final void Function(double latitude, double longitude) onLocated;
+
+  @override
+  State<_MyLocationButton> createState() => _MyLocationButtonState();
+}
+
+class _MyLocationButtonState extends State<_MyLocationButton> {
+  bool _locating = false;
+
+  Future<void> _locate() async {
+    if (_locating) return;
+    setState(() => _locating = true);
+    try {
+      final result = await requestDevicePosition(context);
+      final position = result.position;
+      if (position != null) {
+        widget.onLocated(position.latitude, position.longitude);
+      } else if (result.message != null && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result.message!)));
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: _locating
+          ? 'Определяем местоположение'
+          : 'Показать моё местоположение',
+      child: Tooltip(
+        message: 'Моё местоположение',
+        child: Material(
+          color: AppColors.ink2,
+          shape: const CircleBorder(),
+          elevation: 4,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: _locate,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: _locating
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.my_location, color: AppColors.primaryTint),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
