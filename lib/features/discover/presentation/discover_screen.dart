@@ -178,25 +178,33 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                     bottom: 148,
                     child: MapEmptyBanner(),
                   ),
+                // Один Row вместо двух независимых Positioned: раньше оба
+                // считали, что для них хватит места, и на узких экранах
+                // переключатель режима наезжал текстом на кнопку «Рядом».
+                // Flexible + spaceBetween раздвигает их и ужимает текст
+                // переключателя, если места всё равно мало, вместо наложения.
                 Positioned(
                   left: AppSpacing.gutter,
-                  bottom: 92,
-                  child: const MapModeSwitch(),
-                ),
-                Positioned(
                   right: AppSpacing.gutter,
                   bottom: 92,
-                  child: ActionChip(
-                    avatar: Icon(
-                      Icons.radar,
-                      size: 18,
-                      color: AppColors.primaryTint,
-                    ),
-                    label: const Text('Рядом'),
-                    onPressed: () =>
-                        showNearbySheet(context, onSelect: _onSelect),
-                    backgroundColor: AppColors.ink2,
-                    side: BorderSide(color: AppColors.hairStrong),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Flexible(child: MapModeSwitch()),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: Icon(
+                          Icons.radar,
+                          size: 18,
+                          color: AppColors.primaryTint,
+                        ),
+                        label: const Text('Рядом'),
+                        onPressed: () =>
+                            showNearbySheet(context, onSelect: _onSelect),
+                        backgroundColor: AppColors.ink2,
+                        side: BorderSide(color: AppColors.hairStrong),
+                      ),
+                    ],
                   ),
                 ),
                 Positioned(

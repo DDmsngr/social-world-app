@@ -63,7 +63,9 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
   Widget build(BuildContext context) {
     final query = ref.watch(discoverSearchProvider);
     // Поле сбросили снаружи («Сбросить фильтры») — очищаем и текст.
-    if (query.isEmpty && _controller.text.isNotEmpty && _debounce?.isActive != true) {
+    if (query.isEmpty &&
+        _controller.text.isNotEmpty &&
+        _debounce?.isActive != true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && ref.read(discoverSearchProvider).isEmpty) {
           _controller.clear();
@@ -150,12 +152,12 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
                               ListTile(
                                 dense: true,
                                 leading: switch (result.kind) {
-                                  SearchKind.nearbyPerson || SearchKind.profile =>
-                                    UserAvatar(
-                                      name: result.title,
-                                      url: result.avatarUrl,
-                                      radius: 14,
-                                    ),
+                                  SearchKind.nearbyPerson ||
+                                  SearchKind.profile => UserAvatar(
+                                    name: result.title,
+                                    url: result.avatarUrl,
+                                    radius: 14,
+                                  ),
                                   SearchKind.event => Icon(
                                     Icons.event_outlined,
                                     color: AppColors.primaryTint,
@@ -165,7 +167,11 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
                                     color: AppColors.primaryTint,
                                   ),
                                 },
-                                title: Text(result.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                title: Text(
+                                  result.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                                 subtitle: result.subtitle == null
                                     ? null
                                     : Text(result.subtitle!),
@@ -205,53 +211,77 @@ class MapLayerChips extends ConsumerWidget {
       MapLayer.moments => view.momentCount,
     };
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          if (anchor != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: InputChip(
-                avatar: Icon(Icons.my_location, size: 16, color: AppColors.geo),
-                label: Text('Рядом · ${_radius(anchor.radiusMeters)}'),
-                onDeleted: () => ref.read(nearbyAnchorProvider.notifier).clear(),
-                deleteButtonTooltipMessage: 'Убрать точку «Рядом»',
-                backgroundColor: AppColors.ink2,
-                side: BorderSide(color: AppColors.geo.withValues(alpha: 0.6)),
-              ),
-            ),
-          for (final layer in MapLayer.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text('${layer.label} ${countFor(layer)}'),
-                selected: layers.contains(layer),
-                onSelected: (_) => ref.read(mapLayersProvider.notifier).toggle(layer),
-                showCheckmark: false,
-                tooltip: layers.contains(layer)
-                    ? 'Скрыть «${layer.label}»'
-                    : 'Показать «${layer.label}»',
-                backgroundColor: AppColors.ink2,
-                selectedColor: AppColors.primary,
-                labelStyle: TextStyle(
-                  fontSize: 13,
-                  color: layers.contains(layer)
-                      ? AppColors.onPrimary
-                      : AppColors.textDim,
+    // Затухание у правого края вместо резкого обрыва: строка чипов длиннее
+    // экрана почти всегда (4 слоя + «Рядом»/«Сбросить»), и без подсказки,
+    // что дальше есть ещё, обрезанный на полуслове чип читается как баг,
+    // а не как «пролистни».
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [Colors.black, Colors.black, Colors.transparent],
+        stops: [0, 0.9, 1],
+      ).createShader(bounds),
+      blendMode: BlendMode.dstIn,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(right: 16),
+        child: Row(
+          children: [
+            if (anchor != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: InputChip(
+                  avatar: Icon(
+                    Icons.my_location,
+                    size: 16,
+                    color: AppColors.geo,
+                  ),
+                  label: Text('Рядом · ${_radius(anchor.radiusMeters)}'),
+                  onDeleted: () =>
+                      ref.read(nearbyAnchorProvider.notifier).clear(),
+                  deleteButtonTooltipMessage: 'Убрать точку «Рядом»',
+                  backgroundColor: AppColors.ink2,
+                  side: BorderSide(color: AppColors.geo.withValues(alpha: 0.6)),
                 ),
+              ),
+            for (final layer in MapLayer.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: FilterChip(
+                  label: Text('${layer.label} ${countFor(layer)}'),
+                  selected: layers.contains(layer),
+                  onSelected: (_) =>
+                      ref.read(mapLayersProvider.notifier).toggle(layer),
+                  showCheckmark: false,
+                  tooltip: layers.contains(layer)
+                      ? 'Скрыть «${layer.label}»'
+                      : 'Показать «${layer.label}»',
+                  backgroundColor: AppColors.ink2,
+                  selectedColor: AppColors.primary,
+                  labelStyle: TextStyle(
+                    fontSize: 13,
+                    color: layers.contains(layer)
+                        ? AppColors.onPrimary
+                        : AppColors.textDim,
+                  ),
+                  side: BorderSide(color: AppColors.hair),
+                ),
+              ),
+            if (view.isFiltered)
+              ActionChip(
+                avatar: Icon(
+                  Icons.restart_alt,
+                  size: 16,
+                  color: AppColors.primaryTint,
+                ),
+                label: const Text('Сбросить'),
+                onPressed: () => resetMapFilters(ref),
+                backgroundColor: AppColors.ink2,
                 side: BorderSide(color: AppColors.hair),
               ),
-            ),
-          if (view.isFiltered)
-            ActionChip(
-              avatar: Icon(Icons.restart_alt, size: 16, color: AppColors.primaryTint),
-              label: const Text('Сбросить'),
-              onPressed: () => resetMapFilters(ref),
-              backgroundColor: AppColors.ink2,
-              side: BorderSide(color: AppColors.hair),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -260,7 +290,7 @@ class MapLayerChips extends ConsumerWidget {
 String _radius(int meters) =>
     meters >= 1000 ? '${meters ~/ 1000} км' : '$meters м';
 
-/// «Сейчас происходит» / «Где спокойнее» — два режима одного слоя активности.
+/// «Сейчас» / «Спокойнее» — два режима одного слоя активности.
 class MapModeSwitch extends ConsumerWidget {
   const MapModeSwitch({super.key});
 
@@ -279,7 +309,9 @@ class MapModeSwitch extends ConsumerWidget {
             for (final item in ActivityMode.values)
               _ModeButton(
                 label: item.label,
-                icon: item == ActivityMode.lively ? Icons.bolt : Icons.spa_outlined,
+                icon: item == ActivityMode.lively
+                    ? Icons.bolt
+                    : Icons.spa_outlined,
                 selected: mode == item,
                 onTap: () => ref.read(activityModeProvider.notifier).set(item),
               ),
@@ -327,11 +359,17 @@ class _ModeButton extends StatelessWidget {
                 color: selected ? AppColors.onPrimary : AppColors.textDim,
               ),
               const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: selected ? AppColors.onPrimary : AppColors.textDim,
+              // Flexible + ellipsis: если снаружи ужали место (крупный шрифт
+              // в настройках телефона, узкий экран), подпись обрежется
+              // многоточием, а не вылезет за рамку кнопки.
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: selected ? AppColors.onPrimary : AppColors.textDim,
+                  ),
                 ),
               ),
             ],
@@ -381,7 +419,10 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Text('Что показывать', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Что показывать',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     'Слои влияют и на объекты, и на зоны активности.',
@@ -396,8 +437,9 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                         FilterChip(
                           label: Text(layer.label),
                           selected: layers.contains(layer),
-                          onSelected: (_) =>
-                              ref.read(mapLayersProvider.notifier).toggle(layer),
+                          onSelected: (_) => ref
+                              .read(mapLayersProvider.notifier)
+                              .toggle(layer),
                           showCheckmark: false,
                           backgroundColor: AppColors.card,
                           selectedColor: AppColors.primary,
@@ -412,7 +454,10 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  Text('Категории мест', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Категории мест',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 10),
                   if (categories.isEmpty)
                     Text(
@@ -445,7 +490,10 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                       ],
                     ),
                   const SizedBox(height: 18),
-                  Text('Режим зон', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Режим зон',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 10),
                   SegmentedButton<ActivityMode>(
                     showSelectedIcon: false,
@@ -453,7 +501,10 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                       for (final item in ActivityMode.values)
                         ButtonSegment(
                           value: item,
-                          label: Text(item.label, style: const TextStyle(fontSize: 12.5)),
+                          label: Text(
+                            item.label,
+                            style: const TextStyle(fontSize: 12.5),
+                          ),
                         ),
                     ],
                     selected: {mode},
@@ -466,7 +517,10 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                         ? 'Ничего не подходит под эти фильтры'
                         : 'Показано: ${view.events.length} событий · '
                               '${view.places.length} мест · ${view.people.length} рядом',
-                    style: TextStyle(color: AppColors.primaryTint, fontSize: 13),
+                    style: TextStyle(
+                      color: AppColors.primaryTint,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   FilledButton(
@@ -509,9 +563,9 @@ Future<void> showNearbySheet(
               final position = result.position;
               if (position == null) {
                 if (result.message != null && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(result.message!)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(result.message!)));
                 }
                 return;
               }
@@ -525,11 +579,9 @@ Future<void> showNearbySheet(
                       isDevice: true,
                     ),
                   );
-              ref.read(mapFocusProvider.notifier).request(
-                position.latitude,
-                position.longitude,
-                zoom: 14.5,
-              );
+              ref
+                  .read(mapFocusProvider.notifier)
+                  .request(position.latitude, position.longitude, zoom: 14.5);
             }
 
             // Результаты: всё, что уже прошло фильтры и попало в радиус,
@@ -655,7 +707,10 @@ Future<void> showNearbySheet(
                       items.isEmpty
                           ? 'В радиусе ${_radius(radius)} ничего нет'
                           : 'В радиусе ${_radius(radius)}: ${items.length}',
-                      style: TextStyle(color: AppColors.primaryTint, fontSize: 13),
+                      style: TextStyle(
+                        color: AppColors.primaryTint,
+                        fontSize: 13,
+                      ),
                     ),
                     for (final (meters, item) in items.take(8))
                       ListTile(
@@ -667,7 +722,9 @@ Future<void> showNearbySheet(
                           _ => Icons.person_outline,
                         }, color: AppColors.primaryTint),
                         title: Text(item.title),
-                        subtitle: Text('${item.subtitle} · ${formatDistance(meters)}'),
+                        subtitle: Text(
+                          '${item.subtitle} · ${formatDistance(meters)}',
+                        ),
                         onTap: () {
                           Navigator.of(sheetContext).pop();
                           onSelect(item);
@@ -775,7 +832,7 @@ class _MapIntroState extends State<MapIntro> {
         Icons.tune,
         'Выбирай, что хочешь видеть',
         'Включай и выключай слои сверху, ищи по названию. Хочешь тишины — '
-            'переключи «Где спокойнее».',
+            'переключи «Спокойнее».',
       ),
     ];
     final (icon, title, text) = steps[_step];
@@ -801,10 +858,15 @@ class _MapIntroState extends State<MapIntro> {
                     const SizedBox(height: 18),
                     Row(
                       children: [
-                        TextButton(onPressed: _finish, child: const Text('Пропустить')),
+                        TextButton(
+                          onPressed: _finish,
+                          child: const Text('Пропустить'),
+                        ),
                         const Spacer(),
                         FilledButton(
-                          onPressed: last ? _finish : () => setState(() => _step++),
+                          onPressed: last
+                              ? _finish
+                              : () => setState(() => _step++),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size(0, 44),
                             padding: const EdgeInsets.symmetric(horizontal: 22),
