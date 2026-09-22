@@ -166,11 +166,31 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
 
-      - name: Upload APK artifacts
+      # Отдельные артефакты на архитектуру: тестируем всегда только на arm64
+      # (телефон тестировщика), и один общий zip с тремя APK заставлял качать
+      # все три ради одного. `gh run download -n social-world-release-apk-arm64`
+      # теперь тянет только нужный файл.
+      - name: Upload APK artifact (arm64)
         uses: actions/upload-artifact@v5
         with:
-          name: social-world-release-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          name: social-world-release-apk-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload APK artifact (armeabi-v7a)
+        uses: actions/upload-artifact@v5
+        with:
+          name: social-world-release-apk-armeabi-v7a
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload APK artifact (x86_64)
+        uses: actions/upload-artifact@v5
+        with:
+          name: social-world-release-apk-x86_64
+          path: build/app/outputs/flutter-apk/app-x86_64-release.apk
           if-no-files-found: error
           retention-days: 30
 
