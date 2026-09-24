@@ -211,65 +211,65 @@ class MapLayerChips extends ConsumerWidget {
       MapLayer.moments => view.momentCount,
     };
 
-    // Без ShaderMask: он форсирует отрисовку через промежуточный слой
-    // (saveLayer) прямо поверх нативной карты, а это ровно тот случай, из-за
-    // которого платформенный слой на части телефонов перестаёт показываться.
-    // Обрыв чипа у края лечим отступом, а не эффектом.
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(right: 44),
-      child: Row(
-        children: [
-          if (anchor != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: InputChip(
-                avatar: Icon(Icons.my_location, size: 16, color: AppColors.geo),
-                label: Text('Рядом · ${_radius(anchor.radiusMeters)}'),
-                onDeleted: () =>
-                    ref.read(nearbyAnchorProvider.notifier).clear(),
-                deleteButtonTooltipMessage: 'Убрать точку «Рядом»',
-                backgroundColor: AppColors.ink2,
-                side: BorderSide(color: AppColors.geo.withValues(alpha: 0.6)),
-              ),
+    // Wrap, а не горизонтальная прокрутка: четыре слоя плюс «Рядом» и
+    // «Сбросить» шире экрана, и последний чип («Моменты») всегда торчал за
+    // край обрубком. Теперь он не обрезается никогда — не влезло в строку,
+    // уходит на вторую. Чипы компактные, чтобы на обычном телефоне все
+    // четыре слоя помещались в одну строку.
+    const density = VisualDensity(horizontal: -2, vertical: -2);
+    const labelPadding = EdgeInsets.symmetric(horizontal: 2);
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        if (anchor != null)
+          InputChip(
+            visualDensity: density,
+            labelPadding: labelPadding,
+            avatar: Icon(Icons.my_location, size: 16, color: AppColors.geo),
+            label: Text('Рядом · ${_radius(anchor.radiusMeters)}'),
+            onDeleted: () => ref.read(nearbyAnchorProvider.notifier).clear(),
+            deleteButtonTooltipMessage: 'Убрать точку «Рядом»',
+            backgroundColor: AppColors.ink2,
+            side: BorderSide(color: AppColors.geo.withValues(alpha: 0.6)),
+          ),
+        for (final layer in MapLayer.values)
+          FilterChip(
+            visualDensity: density,
+            labelPadding: labelPadding,
+            label: Text('${layer.label} ${countFor(layer)}'),
+            selected: layers.contains(layer),
+            onSelected: (_) =>
+                ref.read(mapLayersProvider.notifier).toggle(layer),
+            showCheckmark: false,
+            tooltip: layers.contains(layer)
+                ? 'Скрыть «${layer.label}»'
+                : 'Показать «${layer.label}»',
+            backgroundColor: AppColors.ink2,
+            selectedColor: AppColors.primary,
+            labelStyle: TextStyle(
+              fontSize: 13,
+              color: layers.contains(layer)
+                  ? AppColors.onPrimary
+                  : AppColors.textDim,
             ),
-          for (final layer in MapLayer.values)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text('${layer.label} ${countFor(layer)}'),
-                selected: layers.contains(layer),
-                onSelected: (_) =>
-                    ref.read(mapLayersProvider.notifier).toggle(layer),
-                showCheckmark: false,
-                tooltip: layers.contains(layer)
-                    ? 'Скрыть «${layer.label}»'
-                    : 'Показать «${layer.label}»',
-                backgroundColor: AppColors.ink2,
-                selectedColor: AppColors.primary,
-                labelStyle: TextStyle(
-                  fontSize: 13,
-                  color: layers.contains(layer)
-                      ? AppColors.onPrimary
-                      : AppColors.textDim,
-                ),
-                side: BorderSide(color: AppColors.hair),
-              ),
+            side: BorderSide(color: AppColors.hair),
+          ),
+        if (view.isFiltered)
+          ActionChip(
+            visualDensity: density,
+            labelPadding: labelPadding,
+            avatar: Icon(
+              Icons.restart_alt,
+              size: 16,
+              color: AppColors.primaryTint,
             ),
-          if (view.isFiltered)
-            ActionChip(
-              avatar: Icon(
-                Icons.restart_alt,
-                size: 16,
-                color: AppColors.primaryTint,
-              ),
-              label: const Text('Сбросить'),
-              onPressed: () => resetMapFilters(ref),
-              backgroundColor: AppColors.ink2,
-              side: BorderSide(color: AppColors.hair),
-            ),
-        ],
-      ),
+            label: const Text('Сбросить'),
+            onPressed: () => resetMapFilters(ref),
+            backgroundColor: AppColors.ink2,
+            side: BorderSide(color: AppColors.hair),
+          ),
+      ],
     );
   }
 }

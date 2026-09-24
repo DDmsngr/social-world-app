@@ -161,36 +161,23 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # versionCode = номер запуска workflow — растёт с каждой сборкой,
-      # поэтому Android всегда видит новую версию и ставит поверх старой.
-      - name: Build release APK
-        run: flutter build apk --release --split-per-abi --build-number=${{ github.run_number }}
+      # versionCode = 5000 + номер запуска: растёт с каждой сборкой, поэтому
+      # Android всегда видит новую версию и ставит поверх старой. База 5000 и
+      # отказ от --split-per-abi — не случайность. Split-сборка добавляет к
+      # коду префикс архитектуры (arm64 = 2000+N), а манифест автообновления
+      # публикует код универсального APK. Раньше на телефоне стояло 2069, в
+      # манифесте лежало 70: 70 <= 2069, лампочка обновления не загоралась, а
+      # принудительная установка упала бы как понижение версии. Теперь тестовая
+      # сборка и универсальная для обновлений — одна монотонная шкала.
+      # Тестируем только на arm64 (телефон тестировщика): один файл вместо трёх.
+      - name: Build release APK (arm64)
+        run: flutter build apk --release --target-platform android-arm64 --build-number=$((5000 + ${{ github.run_number }}))
 
-      # Отдельные артефакты на архитектуру: тестируем всегда только на arm64
-      # (телефон тестировщика), и один общий zip с тремя APK заставлял качать
-      # все три ради одного. `gh run download -n social-world-release-apk-arm64`
-      # теперь тянет только нужный файл.
       - name: Upload APK artifact (arm64)
         uses: actions/upload-artifact@v5
         with:
           name: social-world-release-apk-arm64
-          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload APK artifact (armeabi-v7a)
-        uses: actions/upload-artifact@v5
-        with:
-          name: social-world-release-apk-armeabi-v7a
-          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload APK artifact (x86_64)
-        uses: actions/upload-artifact@v5
-        with:
-          name: social-world-release-apk-x86_64
-          path: build/app/outputs/flutter-apk/app-x86_64-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -209,13 +196,16 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
+          # В выражениях Actions нет арифметики — версию считаем здесь.
+          version_code=$((5000 + GITHUB_RUN_NUMBER))
           gh release create "${{ steps.release.outputs.tag }}" \
-            build/app/outputs/flutter-apk/*.apk \
+            build/app/outputs/flutter-apk/app-release.apk \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
             --title "Social World Android release ${{ steps.release.outputs.tag }}" \
-            --notes "Release APK (arm64/armeabi-v7a/x86_64), подписан постоянным ключом — ставится поверх предыдущей версии без удаления. versionCode ${{ github.run_number }}. Собран из коммита ${{ github.sha }}." \
+            --notes "Release APK (arm64), подписан постоянным ключом — ставится поверх предыдущей версии без удаления. versionCode ${version_code}. Собран из коммита ${{ github.sha }}." \
             --prerelease
 
       # Автообновление внутри приложения качает один APK по прямой ссылке,
@@ -223,7 +213,7 @@ jobs:
       # иначе клиенту пришлось бы самому определять ABI устройства.
       - name: Build universal APK for in-app updates
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
-        run: flutter build apk --release --build-number=${{ github.run_number }}
+        run: flutter build apk --release --build-number=$((5000 + ${{ github.run_number }}))
 
       # APK и манифест кладём в публичный на чтение бакет self-hosted Supabase
       # (см. supabase/migrations/0007_app_updates.sql). GitHub Releases для этого
@@ -244,11 +234,13 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          VERSION_CODE: ${{ github.run_number }}
         shell: bash
         run: |
           set -euo pipefail
 
+          # Тот же код, что и у универсального APK (см. комментарий у сборки):
+          # манифест обязан обещать ровно ту версию, что лежит в файле.
+          VERSION_CODE=$((5000 + GITHUB_RUN_NUMBER))
           apk_name="social-world-${VERSION_CODE}.apk"
           version_name=$(sed -n 's/^version: \([0-9.]*\).*/\1/p' pubspec.yaml)
 
