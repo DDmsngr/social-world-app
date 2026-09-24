@@ -106,7 +106,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ),
       ),
       body: data.when(
+        // StackFit.expand — страховка: Stack без НЕпозиционированных детей
+        // растягивается сам, но стоит появиться хоть одному (например,
+        // SizedBox.shrink от невидимого интро), как размер Stack берётся по
+        // нему — и весь экран схлопывается в ноль. Именно это и делало Pulse
+        // пустым. С expand размер всегда по родителю.
         data: (snapshot) => Stack(
+          fit: StackFit.expand,
           children: [
             Positioned.fill(
               child: DiscoverMap(
@@ -217,7 +223,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 onOpen: () => context.push(Routes.events),
               ),
             ),
-            const MapIntro(),
+            const Positioned.fill(child: MapIntro()),
           ],
         ),
         loading: () => const LoadingView(),

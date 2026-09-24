@@ -806,6 +806,12 @@ class _MapIntroState extends State<MapIntro> {
 
   @override
   Widget build(BuildContext context) {
+    // Никакого Positioned здесь: им оборачивает вызывающая сторона. Раньше
+    // этот виджет сам возвращал Positioned.fill, когда виден, и
+    // SizedBox.shrink, когда нет — а SizedBox.shrink это НЕпозиционированный
+    // ребёнок Stack нулевого размера. По правилам RenderStack один такой
+    // ребёнок задаёт размер всему Stack: экран Pulse схлопывался в 0×0 и
+    // обрезал всё остальное, включая карту. Отсюда и «пустой Pulse».
     if (!_visible) return const SizedBox.shrink();
 
     const steps = [
@@ -825,45 +831,43 @@ class _MapIntroState extends State<MapIntro> {
     final (icon, title, text) = steps[_step];
     final last = _step == steps.length - 1;
 
-    return Positioned.fill(
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.55),
-        child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.gutter),
-              child: SheetCard(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(icon, size: 30, color: AppColors.primaryTint),
-                    const SizedBox(height: 14),
-                    Text(title, style: AppTypography.serif(26)),
-                    const SizedBox(height: 10),
-                    Text(text, style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: _finish,
-                          child: const Text('Пропустить'),
+    return Material(
+      color: Colors.black.withValues(alpha: 0.55),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.gutter),
+            child: SheetCard(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, size: 30, color: AppColors.primaryTint),
+                  const SizedBox(height: 14),
+                  Text(title, style: AppTypography.serif(26)),
+                  const SizedBox(height: 10),
+                  Text(text, style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: _finish,
+                        child: const Text('Пропустить'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: last
+                            ? _finish
+                            : () => setState(() => _step++),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 22),
                         ),
-                        const Spacer(),
-                        FilledButton(
-                          onPressed: last
-                              ? _finish
-                              : () => setState(() => _step++),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(0, 44),
-                            padding: const EdgeInsets.symmetric(horizontal: 22),
-                          ),
-                          child: Text(last ? 'Понятно' : 'Дальше'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                        child: Text(last ? 'Понятно' : 'Дальше'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
