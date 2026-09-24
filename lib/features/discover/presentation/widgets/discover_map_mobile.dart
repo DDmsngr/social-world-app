@@ -13,6 +13,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/sw_widgets.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../events/domain/entities/event.dart';
+import '../../../needs/domain/entities/need_request.dart';
+import '../../../quests/domain/entities/quest.dart';
 import '../../domain/activity.dart';
 import '../../domain/entities/discover_snapshot.dart';
 import '../../domain/entities/nearby_person.dart';
@@ -29,6 +31,10 @@ class DiscoverMap extends StatefulWidget {
     required this.onPlaceTap,
     this.events = const [],
     this.people = const [],
+    this.quests = const [],
+    this.needs = const [],
+    this.onQuestTap,
+    this.onNeedTap,
     this.activity = const [],
     this.activityMode = ActivityMode.lively,
     this.anchor,
@@ -48,6 +54,13 @@ class DiscoverMap extends StatefulWidget {
   final List<NearbyPerson> people;
   final ValueChanged<Event>? onEventTap;
   final ValueChanged<NearbyPerson>? onPersonTap;
+
+  /// Квесты — самые заметные метки Pulse (п. 41); просьбы «Мне надо» — в
+  /// размытой точке, которую отдал сервер.
+  final List<Quest> quests;
+  final List<NeedRequest> needs;
+  final ValueChanged<Quest>? onQuestTap;
+  final ValueChanged<NeedRequest>? onNeedTap;
 
   /// Готовые зоны активности с сервера и режим, в котором их рисовать.
   final List<ActivityCell> activity;
@@ -108,6 +121,8 @@ class _DiscoverMapState extends State<DiscoverMap> {
         !identical(widget.places, old.places) ||
         !identical(widget.events, old.events) ||
         !identical(widget.people, old.people) ||
+        !identical(widget.quests, old.quests) ||
+        !identical(widget.needs, old.needs) ||
         !identical(widget.activity, old.activity) ||
         widget.activityMode != old.activityMode ||
         widget.anchor != old.anchor;
@@ -137,7 +152,9 @@ class _DiscoverMapState extends State<DiscoverMap> {
     final shownChanged =
         !identical(widget.places, old.places) ||
         !identical(widget.events, old.events) ||
-        !identical(widget.people, old.people);
+        !identical(widget.people, old.people) ||
+        !identical(widget.quests, old.quests) ||
+        !identical(widget.needs, old.needs);
     final searchJustStarted = widget.filterActive && !old.filterActive;
     if ((searchJustStarted || (widget.filterActive && shownChanged))) {
       _fitShown();
@@ -226,6 +243,10 @@ class _DiscoverMapState extends State<DiscoverMap> {
         if (event.hasLocation) (event.latitude!, event.longitude!),
       for (final person in widget.people)
         (person.blurredLatitude, person.blurredLongitude),
+      for (final quest in widget.quests)
+        if (quest.hasLocation) (quest.latitude!, quest.longitude!),
+      for (final need in widget.needs)
+        if (need.hasLocation) (need.latitude!, need.longitude!),
     ];
     if (points.isEmpty) return;
 
@@ -398,7 +419,64 @@ class _DiscoverMapState extends State<DiscoverMap> {
         ..zIndex = 5
         ..addTapListener(listener);
     }
+
+    // Просьба «Мне надо» — неяркая подпись: она про человека, а не про
+    // событие, и не должна перекрикивать квесты.
+    final onNeedTap = widget.onNeedTap;
+    for (final need in widget.needs) {
+      if (!need.hasLocation) continue;
+      final listener = _TapListener(() => onNeedTap?.call(need));
+      _tapListeners.add(listener);
+
+      collection.addPlacemarkWithPoint(
+          ymk.Point(latitude: need.latitude!, longitude: need.longitude!),
+        )
+        ..setText('Мне надо: ${_short(need.text, 28)}')
+        ..setTextStyle(
+          ymk.TextStyle(
+            size: 11,
+            color: AppColors.geo,
+            outlineColor: AppColors.ink,
+            placement: ymk.TextStylePlacement.Bottom,
+            offset: 8,
+          ),
+        )
+        ..zIndex = 6
+        ..addTapListener(listener);
+    }
+
+    // Квест — главный объект Pulse: подпись крупнее, со счётчиком мест.
+    // Завершённый квест (след на сутки, п. 42) — тусклее и без счётчика.
+    final onQuestTap = widget.onQuestTap;
+    for (final quest in widget.quests) {
+      if (!quest.hasLocation) continue;
+      final listener = _TapListener(() => onQuestTap?.call(quest));
+      _tapListeners.add(listener);
+
+      collection.addPlacemarkWithPoint(
+          ymk.Point(latitude: quest.latitude!, longitude: quest.longitude!),
+        )
+        ..setText(
+          quest.isTrail
+              ? _short(quest.title, 30)
+              : '${_short(quest.title, 30)} · ${quest.occupancy}',
+        )
+        ..setTextStyle(
+          ymk.TextStyle(
+            size: quest.isTrail ? 11 : 13,
+            color: quest.isTrail ? AppColors.textDim : AppColors.primaryTint,
+            outlineColor: AppColors.ink,
+            placement: ymk.TextStylePlacement.Top,
+            offset: 8,
+          ),
+        )
+        ..zIndex = 7
+        ..addTapListener(listener);
+    }
   }
+
+  static String _short(String text, int max) =>
+      text.length <= max ? text : '${text.substring(0, max - 1).trimRight()}…';
 
   /// Зона рисуется тремя вложенными кругами разной плотности — получается
   /// мягкое пятно без резкой границы. Цвет — по шкале активности Pulse

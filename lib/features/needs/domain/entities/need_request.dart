@@ -34,6 +34,7 @@ class NeedRequest {
     this.expiresAt,
     this.status = NeedStatus.open,
     this.replyCount = 0,
+    this.respondedByMe = false,
   });
 
   final String id;
@@ -56,7 +57,10 @@ class NeedRequest {
   final DateTime? expiresAt;
 
   final NeedStatus status;
+
+  /// Сколько человек откликнулись «могу помочь».
   final int replyCount;
+  final bool respondedByMe;
 
   bool get hasLocation => latitude != null && longitude != null;
 
@@ -65,4 +69,46 @@ class NeedRequest {
 
   /// Показывать на Pulse стоит только живые просьбы.
   bool get isVisible => status == NeedStatus.open && !isExpired;
+
+  NeedRequest copyWith({
+    NeedStatus? status,
+    int? replyCount,
+    bool? respondedByMe,
+    double? latitude,
+    double? longitude,
+  }) => NeedRequest(
+    id: id,
+    authorId: authorId,
+    authorName: authorName,
+    authorAvatarUrl: authorAvatarUrl,
+    text: text,
+    placeId: placeId,
+    placeTitle: placeTitle,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+    createdAt: createdAt,
+    expiresAt: expiresAt,
+    status: status ?? this.status,
+    replyCount: replyCount ?? this.replyCount,
+    respondedByMe: respondedByMe ?? this.respondedByMe,
+  );
+}
+
+/// Отклик на просьбу. Виден всем, кто видит просьбу, — как комментарий.
+class NeedResponse {
+  const NeedResponse({
+    required this.id,
+    required this.authorId,
+    required this.authorName,
+    required this.createdAt,
+    this.authorAvatarUrl,
+    this.text,
+  });
+
+  final String id;
+  final String authorId;
+  final String authorName;
+  final String? authorAvatarUrl;
+  final String? text;
+  final DateTime createdAt;
 }

@@ -18,10 +18,12 @@ class SupabaseFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<List<Post>> loadFeed({String? authorId, int limit = 50}) async {
+  Future<List<Post>> loadFeed({String? authorId, int limit = 50, String? city}) async {
     final rows = await _client.rpc(
       'city_feed',
-      params: {'in_author': authorId, 'in_limit': limit},
+      // in_city — только когда выбран «Город»: до миграции 0024 у функции
+      // нет этого параметра, и «Страна» должна работать и на старой базе.
+      params: {'in_author': authorId, 'in_limit': limit, 'in_city': ?city},
     ) as List<dynamic>;
 
     return rows
@@ -53,6 +55,7 @@ class SupabaseFeedRepository implements FeedRepository {
     double? placeLatitude,
     double? placeLongitude,
     String? routeId,
+    String? questId,
   }) async {
     // UID фиксируем один раз: между двумя await к _client.auth.currentUser
     // в теории может успеть смениться сессия, а вставлять и читать профиль
@@ -80,6 +83,9 @@ class SupabaseFeedRepository implements FeedRepository {
           'media_urls': mediaUrls,
           'place_id': placeId,
           'route_id': routeId,
+          // Только когда задан: до миграции 0023 колонки нет, и обычный пост
+          // с 'quest_id': null упал бы на неизвестном поле.
+          'quest_id': ?questId,
         })
         .select()
         .single();

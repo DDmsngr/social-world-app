@@ -22,7 +22,7 @@ class _FailingFeedRepository implements FeedRepository {
   var likeCalls = 0;
 
   @override
-  Future<List<Post>> loadFeed({String? authorId, int limit = 50}) async => [
+  Future<List<Post>> loadFeed({String? authorId, int limit = 50, String? city}) async => [
     _post,
   ];
 
@@ -68,6 +68,7 @@ class _FailingFeedRepository implements FeedRepository {
     double? placeLatitude,
     double? placeLongitude,
     String? routeId,
+    String? questId,
   }) async => _post;
 
   @override

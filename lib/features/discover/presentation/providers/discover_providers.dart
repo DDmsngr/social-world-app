@@ -9,7 +9,11 @@ import '../../../events/domain/entities/event.dart';
 import '../../../events/presentation/providers/events_providers.dart';
 import '../../../feed/domain/entities/post.dart';
 import '../../../feed/presentation/providers/feed_providers.dart';
+import '../../../needs/domain/entities/need_request.dart';
+import '../../../needs/presentation/providers/needs_providers.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
+import '../../../quests/domain/entities/quest.dart';
+import '../../../quests/presentation/providers/quests_providers.dart';
 import '../../data/local_discover_repository.dart';
 import '../../data/supabase_discover_repository.dart';
 import '../../domain/activity.dart';
@@ -49,6 +53,25 @@ final discoverRepositoryProvider = Provider<DiscoverRepository>((ref) {
               latitude: post.placeLatitude!,
               longitude: post.placeLongitude!,
               createdAt: post.createdAt,
+            ),
+        for (final quest in ref.read(pulseQuestsProvider).value ?? const <Quest>[])
+          if (quest.hasLocation && quest.isActive)
+            ActivityObject(
+              kind: ActivityKind.quest,
+              latitude: quest.latitude!,
+              longitude: quest.longitude!,
+              participants: quest.participantCount,
+              startsAt: quest.startsAt,
+              endsAt: quest.endsAt,
+            ),
+        for (final need in ref.read(pulseNeedsProvider).value ?? const <NeedRequest>[])
+          if (need.hasLocation && need.isVisible)
+            ActivityObject(
+              kind: ActivityKind.need,
+              latitude: need.latitude!,
+              longitude: need.longitude!,
+              createdAt: need.createdAt,
+              endsAt: need.expiresAt,
             ),
       ],
     );
@@ -183,10 +206,12 @@ final categoryFilterProvider =
 /// а выключение слоя сразу убирает его объекты и их вклад в активность.
 class MapLayersController extends Notifier<Set<MapLayer>> {
   static const all = {
+    MapLayer.quests,
     MapLayer.events,
     MapLayer.places,
     MapLayer.people,
     MapLayer.moments,
+    MapLayer.needs,
   };
 
   @override
@@ -258,11 +283,15 @@ class MapView {
     required this.people,
     required this.momentCount,
     required this.isFiltered,
+    this.quests = const [],
+    this.needs = const [],
   });
 
   final List<Place> places;
   final List<Event> events;
   final List<NearbyPerson> people;
+  final List<Quest> quests;
+  final List<NeedRequest> needs;
 
   /// Свежие моменты с привязкой к месту (в слое активности).
   final int momentCount;
@@ -270,7 +299,8 @@ class MapView {
   /// true, если что-то отличается от стандартного состояния карты.
   final bool isFiltered;
 
-  int get shown => places.length + events.length + people.length;
+  int get shown =>
+      places.length + events.length + people.length + quests.length + needs.length;
   bool get isEmpty => shown == 0;
 
   /// Сравнение по содержимому: провайдер пересчитывается от любого чиха
@@ -283,6 +313,12 @@ class MapView {
       other.momentCount == momentCount &&
       listEquals([for (final p in places) p.id], [for (final p in other.places) p.id]) &&
       listEquals([for (final e in events) e.id], [for (final e in other.events) e.id]) &&
+      // У квеста на карте меняется подпись «3/10» — она часть сравнения.
+      listEquals(
+        [for (final q in quests) '${q.id}${q.occupancy}${q.isTrail}'],
+        [for (final q in other.quests) '${q.id}${q.occupancy}${q.isTrail}'],
+      ) &&
+      listEquals([for (final n in needs) n.id], [for (final n in other.needs) n.id]) &&
       listEquals(
         [for (final p in people) '${p.id}${p.blurredLatitude}${p.blurredLongitude}'],
         [for (final p in other.people) '${p.id}${p.blurredLatitude}${p.blurredLongitude}'],
@@ -301,6 +337,8 @@ final mapViewProvider = Provider<MapView>((ref) {
   final blocked = ref.watch(blocksProvider).value?.keys.toSet() ?? const <String>{};
   final allEvents = ref.watch(eventsProvider).value ?? const <Event>[];
   final feed = ref.watch(feedProvider).value ?? const <Post>[];
+  final allQuests = ref.watch(pulseQuestsProvider).value ?? const <Quest>[];
+  final allNeeds = ref.watch(pulseNeedsProvider).value ?? const <NeedRequest>[];
 
   final filtered =
       layers.length != MapLayersController.all.length ||
@@ -378,10 +416,37 @@ final mapViewProvider = Provider<MapView>((ref) {
             .length
       : 0;
 
+  final quests = layers.contains(MapLayer.quests)
+      ? allQuests.where((quest) {
+          if (!quest.hasLocation || blocked.contains(quest.authorId)) return false;
+          if (categories.isNotEmpty &&
+              !categories.contains(categoryByPlaceId[quest.placeId])) {
+            return false;
+          }
+          if (!inAnchor(quest.latitude!, quest.longitude!)) return false;
+          return matches(
+            '${quest.title} ${quest.placeTitle ?? ''} ${quest.description ?? ''}',
+          );
+        }).toList(growable: false)
+      : const <Quest>[];
+
+  // У просьб категорий нет: при выбранной категории мест они скрываются —
+  // человек ищет «Еда», а не чужие просьбы (ТЗ, п. 12).
+  final needs = layers.contains(MapLayer.needs) && categories.isEmpty
+      ? allNeeds.where((need) {
+          if (!need.hasLocation || !need.isVisible) return false;
+          if (blocked.contains(need.authorId)) return false;
+          if (!inAnchor(need.latitude!, need.longitude!)) return false;
+          return matches('${need.text} ${need.placeTitle ?? ''}');
+        }).toList(growable: false)
+      : const <NeedRequest>[];
+
   return MapView(
     places: places,
     events: events,
     people: people,
+    quests: quests,
+    needs: needs,
     momentCount: moments,
     isFiltered: filtered,
   );
@@ -411,10 +476,12 @@ final activityProvider = FutureProvider<List<ActivityCell>>((ref) async {
       ? (latitude: anchor.latitude, longitude: anchor.longitude)
       : await ref.watch(discoverCenterProvider.future);
 
-  // События и посты влияют на локальный расчёт — следим за ними.
+  // События, посты, квесты и просьбы влияют на локальный расчёт — следим за ними.
   if (!Env.isConfigured) {
     ref.watch(eventsProvider);
     ref.watch(feedProvider);
+    ref.watch(pulseQuestsProvider);
+    ref.watch(pulseNeedsProvider);
   }
 
   final now = DateTime.now();
@@ -447,7 +514,7 @@ final visibleActivityProvider = Provider<List<ActivityCell>>((ref) {
 /// Что нашлось по запросу: места, события и люди с карты, плюс люди по имени
 /// с сервера. У каждого результата есть либо точка (карта наводится), либо
 /// профиль (открывается экран).
-enum SearchKind { place, event, nearbyPerson, profile }
+enum SearchKind { place, event, quest, need, nearbyPerson, profile }
 
 class MapSearchResult {
   const MapSearchResult({
@@ -513,6 +580,42 @@ final mapSearchResultsProvider =
               latitude: event.latitude,
               longitude: event.longitude,
               payload: event,
+            ),
+          );
+        }
+      }
+
+      for (final quest in ref.watch(pulseQuestsProvider).value ?? const <Quest>[]) {
+        if (!quest.hasLocation || blocked.contains(quest.authorId)) continue;
+        if (matches('${quest.title} ${quest.placeTitle ?? ''} ${quest.description ?? ''}')) {
+          results.add(
+            MapSearchResult(
+              kind: SearchKind.quest,
+              id: quest.id,
+              title: quest.title,
+              subtitle: 'Квест · ${quest.occupancy}',
+              latitude: quest.latitude,
+              longitude: quest.longitude,
+              payload: quest,
+            ),
+          );
+        }
+      }
+
+      for (final need in ref.watch(pulseNeedsProvider).value ?? const <NeedRequest>[]) {
+        if (!need.hasLocation || !need.isVisible || blocked.contains(need.authorId)) {
+          continue;
+        }
+        if (matches('${need.text} ${need.placeTitle ?? ''}')) {
+          results.add(
+            MapSearchResult(
+              kind: SearchKind.need,
+              id: need.id,
+              title: need.text,
+              subtitle: 'Мне надо',
+              latitude: need.latitude,
+              longitude: need.longitude,
+              payload: need,
             ),
           );
         }

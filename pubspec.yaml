@@ -71,6 +71,9 @@ dependencies:
   share_plus: ^13.3.0
   flutter_markdown_plus: ^1.0.12
   markdown: ^7.3.1
+  # QR прибытия на квест у организатора. Чистый Dart, без нативного кода;
+  # сканирует системная камера — своего сканера в приложении нет.
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

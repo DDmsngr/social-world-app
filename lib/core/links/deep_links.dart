@@ -8,7 +8,9 @@ enum LinkTarget {
   event('event'),
   place('place'),
   profile('profile'),
-  route('route');
+  route('route'),
+  quest('quest'),
+  need('need');
 
   const LinkTarget(this.segment);
 
@@ -24,20 +26,28 @@ enum LinkTarget {
 }
 
 class DeepLink {
-  const DeepLink(this.target, this.id);
+  const DeepLink(this.target, this.id, {this.arrivalCode});
 
   final LinkTarget target;
   final String id;
 
+  /// Код прибытия из QR квеста (`?arrive=`): карточка квеста сразу
+  /// предлагает отметиться на месте.
+  final String? arrivalCode;
+
   /// Экран приложения, на который ведёт ссылка.
-  String get location => DeepLinks.locationFor(target, id);
+  String get location =>
+      DeepLinks.locationFor(target, id, arrivalCode: arrivalCode);
 
   @override
   bool operator ==(Object other) =>
-      other is DeepLink && other.target == target && other.id == id;
+      other is DeepLink &&
+      other.target == target &&
+      other.id == id &&
+      other.arrivalCode == arrivalCode;
 
   @override
-  int get hashCode => Object.hash(target, id);
+  int get hashCode => Object.hash(target, id, arrivalCode);
 }
 
 abstract final class DeepLinks {
@@ -54,6 +64,16 @@ abstract final class DeepLinks {
   );
 
   static final _id = RegExp(r'^[A-Za-z0-9_-]{4,64}$');
+  static final _code = RegExp(r'^[A-Za-z0-9]{4,16}$');
+
+  /// Что зашито в QR квеста: `socialworld://quest/<id>?arrive=<код>`.
+  /// Открывается системной камерой — отдельный сканер в приложении не нужен.
+  static Uri arrivalUri(String questId, String code) => Uri(
+    scheme: scheme,
+    host: LinkTarget.quest.segment,
+    path: '/$questId',
+    queryParameters: {'arrive': code},
+  );
 
   /// Ссылка, которой делятся: `https://…/o/event/<id>`.
   static Uri shareUri(LinkTarget target, String id) =>
@@ -85,14 +105,27 @@ abstract final class DeepLinks {
 
     if (segment == null || id == null || !_id.hasMatch(id)) return null;
     final target = LinkTarget.fromSegment(segment);
-    return target == null ? null : DeepLink(target, id);
+    if (target == null) return null;
+    final code = uri.queryParameters['arrive'];
+    return DeepLink(
+      target,
+      id,
+      arrivalCode: target == LinkTarget.quest && code != null && _code.hasMatch(code)
+          ? code
+          : null,
+    );
   }
 
-  static String locationFor(LinkTarget target, String id) => switch (target) {
-    LinkTarget.post => '${Routes.posts}/$id',
-    LinkTarget.event => '${Routes.eventDetail}/$id',
-    LinkTarget.place => '${Routes.places}/$id',
-    LinkTarget.profile => '${Routes.user}/$id',
-    LinkTarget.route => '${Routes.routes}/$id',
-  };
+  static String locationFor(LinkTarget target, String id, {String? arrivalCode}) =>
+      switch (target) {
+        LinkTarget.post => '${Routes.posts}/$id',
+        LinkTarget.event => '${Routes.eventDetail}/$id',
+        LinkTarget.place => '${Routes.places}/$id',
+        LinkTarget.profile => '${Routes.user}/$id',
+        LinkTarget.route => '${Routes.routes}/$id',
+        LinkTarget.quest => arrivalCode == null
+            ? '${Routes.questDetail}/$id'
+            : '${Routes.questDetail}/$id?arrive=$arrivalCode',
+        LinkTarget.need => '${Routes.needDetail}/$id',
+      };
 }

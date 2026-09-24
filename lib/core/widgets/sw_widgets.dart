@@ -17,7 +17,11 @@ class SectionLabel extends StatelessWidget {
       children: [
         Container(width: 26, height: 1, color: AppColors.textFaint),
         const SizedBox(width: 10),
-        Text(text.toUpperCase(), style: Theme.of(context).textTheme.labelSmall),
+        // Flexible: длинная подпись («Мне надо · Актуально до 27 сен» на
+        // узком экране) переносится, а не вылезает за край.
+        Flexible(
+          child: Text(text.toUpperCase(), style: Theme.of(context).textTheme.labelSmall),
+        ),
       ],
     );
   }

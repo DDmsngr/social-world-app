@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:social_world/features/discover/domain/activity.dart';
 import 'package:social_world/features/discover/presentation/widgets/map_controls.dart';
 
 // Чип «Моменты» на карте торчал за край экрана обрубком: строка чипов была
-// горизонтальной прокруткой, а четыре слоя шире экрана. Теперь Wrap — ни один
+// горизонтальной прокруткой, а слои шире экрана. Теперь Wrap — ни один
 // чип не должен выходить за ширину, даже на узком телефоне.
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -31,7 +32,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       final chips = find.byType(FilterChip);
-      expect(chips, findsNWidgets(4));
+      expect(chips, findsNWidgets(MapLayer.values.length));
       for (final chip in chips.evaluate()) {
         final box = chip.renderObject! as RenderBox;
         final right = box.localToGlobal(Offset(box.size.width, 0)).dx;

@@ -35,6 +35,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     NotificationKind.eventChanged => Icons.edit_calendar_outlined,
     NotificationKind.eventCancelled => Icons.event_busy_outlined,
     NotificationKind.message => Icons.forum_outlined,
+    NotificationKind.questRequest || NotificationKind.questJoin => Icons.flag_outlined,
+    NotificationKind.questApproved => Icons.check_circle_outline,
+    NotificationKind.questRejected ||
+    NotificationKind.questRemoved ||
+    NotificationKind.questCancelled => Icons.flag_circle_outlined,
+    NotificationKind.needResponse => Icons.volunteer_activism_outlined,
   };
 
   @override

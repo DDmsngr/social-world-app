@@ -115,7 +115,7 @@ class _ReportSheetState extends ConsumerState<_ReportSheet> {
               },
               child: Column(
                 children: [
-                  for (final reason in ReportReason.values)
+                  for (final reason in ReportReason.forTarget(widget.target))
                     RadioListTile<ReportReason>(
                       value: reason,
                       title: Text(

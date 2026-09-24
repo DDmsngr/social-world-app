@@ -12,6 +12,10 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../events/domain/entities/event.dart';
+import '../../needs/domain/entities/need_request.dart';
+import '../../needs/presentation/widgets/need_widgets.dart';
+import '../../quests/domain/entities/quest.dart';
+import '../../quests/presentation/widgets/quest_sheet.dart';
 import '../domain/entities/discover_snapshot.dart';
 import '../domain/entities/nearby_person.dart';
 import '../domain/entities/place.dart';
@@ -61,6 +65,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         final event = result.payload! as Event;
         _focus(result.latitude, result.longitude);
         showEventSheet(context, event);
+      case SearchKind.quest:
+        _focus(result.latitude, result.longitude);
+        showQuestSheet(context, result.payload! as Quest);
+      case SearchKind.need:
+        _focus(result.latitude, result.longitude, zoom: 15);
+        showNeedSheet(context, result.payload! as NeedRequest);
       case SearchKind.nearbyPerson:
         _focus(result.latitude, result.longitude, zoom: 15);
         showPersonSheet(context, result.payload! as NearbyPerson);
@@ -120,6 +130,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 places: view.places,
                 events: view.events,
                 people: view.people,
+                quests: view.quests,
+                needs: view.needs,
                 // Пока зоны пересчитываются, слой пустой — старые не висят
                 // поверх новых.
                 activity: ref.watch(visibleActivityProvider),
@@ -130,6 +142,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 onPlaceTap: (place) => showPlaceSheet(context, place),
                 onEventTap: (event) => showEventSheet(context, event),
                 onPersonTap: (person) => showPersonSheet(context, person),
+                onQuestTap: (quest) => showQuestSheet(context, quest),
+                onNeedTap: (need) => showNeedSheet(context, need),
                 onLongTap: picking
                     ? (lat, lng) {
                         ref
@@ -390,6 +404,8 @@ class _CityPulseCard extends StatelessWidget {
     final level = data.pulseLevel;
     final dot = level >= 2 ? AppColors.primaryTint : AppColors.geo;
     final summary = [
+      if (view.quests.isNotEmpty)
+        _plural(view.quests.length, 'квест', 'квеста', 'квестов'),
       _plural(view.events.length, 'событие', 'события', 'событий'),
       _plural(view.places.length, 'место', 'места', 'мест'),
       '${view.people.length} рядом',

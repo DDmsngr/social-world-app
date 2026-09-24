@@ -1,4 +1,5 @@
 import '../../../core/permissions/content_permissions.dart';
+import '../../discover/domain/entities/city.dart';
 import '../domain/entities/post.dart';
 import '../domain/entities/publish_settings.dart';
 import '../domain/repositories/feed_repository.dart';
@@ -23,8 +24,11 @@ class LocalFeedRepository implements FeedRepository {
       post.authorId == currentUserId();
 
   @override
-  Future<List<Post>> loadFeed({String? authorId, int limit = 50}) async {
+  Future<List<Post>> loadFeed({String? authorId, int limit = 50, String? city}) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
+    // У заглушки все авторы — из пилотного города: в режиме «Город» с другим
+    // городом лента честно пустая.
+    if (city != null && city != Cities.fallback.name) return const [];
     final visible = _posts.where(
       (post) => _visible(post) && (authorId == null || post.authorId == authorId),
     );
@@ -53,6 +57,7 @@ class LocalFeedRepository implements FeedRepository {
     double? placeLatitude,
     double? placeLongitude,
     String? routeId,
+    String? questId,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     // Хранилища в моках нет, поэтому ссылкой служит сам путь к файлу — этого

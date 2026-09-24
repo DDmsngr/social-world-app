@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
+import '../../discover/presentation/providers/city_provider.dart';
 import '../../notifications/notifications.dart';
 import 'providers/feed_providers.dart';
 import 'widgets/post_card.dart';
@@ -18,6 +19,8 @@ class FeedScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final feed = ref.watch(feedProvider);
     final unread = ref.watch(unreadNotificationsProvider);
+    final scope = ref.watch(feedScopeProvider);
+    final cityName = ref.watch(cityProvider).name;
 
     return Scaffold(
       appBar: AppBar(
@@ -41,6 +44,33 @@ class FeedScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 8),
         ],
+        // «Страна | Город» (п. 47). Город — тот же, что выбран на Pulse.
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(52),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, 10),
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<FeedScope>(
+                showSelectedIcon: false,
+                segments: [
+                  for (final item in FeedScope.values)
+                    ButtonSegment(
+                      value: item,
+                      label: Text(
+                        item == FeedScope.city ? cityName : item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                selected: {scope},
+                onSelectionChanged: (selected) =>
+                    ref.read(feedScopeProvider.notifier).set(selected.first),
+              ),
+            ),
+          ),
+        ),
       ),
       body: feed.when(
         loading: () => const LoadingView(),
@@ -51,11 +81,18 @@ class FeedScreen extends ConsumerWidget {
         ),
         data: (posts) {
           if (posts.isEmpty) {
-            return const StateMessage(
+            return StateMessage(
               label: 'Моменты',
               title: 'Пока тихо',
-              text: 'В городе ещё никто ничего не опубликовал. '
-                  'Начните первым — вкладка «Создать».',
+              text: scope == FeedScope.city
+                  ? 'В городе «$cityName» пока никто ничего не опубликовал. '
+                        'Посмотрите всю страну или начните первым.'
+                  : 'Здесь ещё никто ничего не опубликовал. '
+                        'Начните первым — вкладка «Создать».',
+              actionLabel: scope == FeedScope.city ? 'Вся страна' : null,
+              onAction: scope == FeedScope.city
+                  ? () => ref.read(feedScopeProvider.notifier).set(FeedScope.country)
+                  : null,
             );
           }
 

@@ -166,6 +166,14 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
                                     Icons.place_outlined,
                                     color: AppColors.primaryTint,
                                   ),
+                                  SearchKind.quest => Icon(
+                                    Icons.flag_outlined,
+                                    color: AppColors.primaryTint,
+                                  ),
+                                  SearchKind.need => Icon(
+                                    Icons.volunteer_activism_outlined,
+                                    color: AppColors.primaryTint,
+                                  ),
                                 },
                                 title: Text(
                                   result.title,
@@ -209,13 +217,15 @@ class MapLayerChips extends ConsumerWidget {
       MapLayer.places => view.places.length,
       MapLayer.people => view.people.length,
       MapLayer.moments => view.momentCount,
+      MapLayer.quests => view.quests.length,
+      MapLayer.needs => view.needs.length,
     };
 
     // Wrap, а не горизонтальная прокрутка: четыре слоя плюс «Рядом» и
     // «Сбросить» шире экрана, и последний чип («Моменты») всегда торчал за
     // край обрубком. Теперь он не обрезается никогда — не влезло в строку,
-    // уходит на вторую. Чипы компактные, чтобы на обычном телефоне все
-    // четыре слоя помещались в одну строку.
+    // уходит на вторую. Чипы компактные; с квестами и «Мне надо» слоёв
+    // шесть, и на обычном телефоне они занимают две строки.
     const density = VisualDensity(horizontal: -2, vertical: -2);
     const labelPadding = EdgeInsets.symmetric(horizontal: 2);
     return Wrap(
@@ -502,7 +512,8 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                   Text(
                     view.isEmpty
                         ? 'Ничего не подходит под эти фильтры'
-                        : 'Показано: ${view.events.length} событий · '
+                        : 'Показано: ${view.quests.length} квестов · '
+                              '${view.events.length} событий · '
                               '${view.places.length} мест · ${view.people.length} рядом',
                     style: TextStyle(
                       color: AppColors.primaryTint,
@@ -605,6 +616,34 @@ Future<void> showNearbySheet(
                   ),
                 ));
               }
+              for (final q in view.quests) {
+                items.add((
+                  dist(q.latitude!, q.longitude!),
+                  MapSearchResult(
+                    kind: SearchKind.quest,
+                    id: q.id,
+                    title: q.title,
+                    subtitle: 'Квест · ${q.occupancy}',
+                    latitude: q.latitude,
+                    longitude: q.longitude,
+                    payload: q,
+                  ),
+                ));
+              }
+              for (final n in view.needs) {
+                items.add((
+                  dist(n.latitude!, n.longitude!),
+                  MapSearchResult(
+                    kind: SearchKind.need,
+                    id: n.id,
+                    title: n.text,
+                    subtitle: 'Мне надо',
+                    latitude: n.latitude,
+                    longitude: n.longitude,
+                    payload: n,
+                  ),
+                ));
+              }
               for (final p in view.people) {
                 items.add((
                   dist(p.blurredLatitude, p.blurredLongitude),
@@ -685,7 +724,7 @@ Future<void> showNearbySheet(
                     const SizedBox(height: 12),
                     Text(
                       'Выберите свою позицию или удерживайте палец на карте — '
-                      'покажем места, события и людей вокруг.',
+                      'покажем квесты, места, события и людей вокруг.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ] else ...[
@@ -706,9 +745,15 @@ Future<void> showNearbySheet(
                         leading: Icon(switch (item.kind) {
                           SearchKind.event => Icons.event_outlined,
                           SearchKind.place => Icons.place_outlined,
+                          SearchKind.quest => Icons.flag_outlined,
+                          SearchKind.need => Icons.volunteer_activism_outlined,
                           _ => Icons.person_outline,
                         }, color: AppColors.primaryTint),
-                        title: Text(item.title),
+                        title: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         subtitle: Text(
                           '${item.subtitle} · ${formatDistance(meters)}',
                         ),

@@ -118,6 +118,9 @@ class SupabaseDiscoverRepository implements DiscoverRepository {
           eventCount: (raw['event_count'] as num?)?.toInt() ?? 0,
           placeCount: (raw['place_count'] as num?)?.toInt() ?? 0,
           momentCount: (raw['moment_count'] as num?)?.toInt() ?? 0,
+          // До миграции 0023 этих колонок нет — тогда просто нули.
+          questCount: (raw['quest_count'] as num?)?.toInt() ?? 0,
+          needCount: (raw['need_count'] as num?)?.toInt() ?? 0,
         ),
     ];
   }

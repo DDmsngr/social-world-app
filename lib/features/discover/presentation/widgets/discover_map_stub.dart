@@ -6,6 +6,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
 import '../../../events/domain/entities/event.dart';
+import '../../../needs/domain/entities/need_request.dart';
+import '../../../quests/domain/entities/quest.dart';
 import '../../domain/activity.dart';
 import '../../domain/entities/discover_snapshot.dart';
 import '../../domain/entities/nearby_person.dart';
@@ -23,6 +25,10 @@ class DiscoverMap extends StatelessWidget {
     required this.onPlaceTap,
     this.events = const [],
     this.people = const [],
+    this.quests = const [],
+    this.needs = const [],
+    this.onQuestTap,
+    this.onNeedTap,
     this.activity = const [],
     this.activityMode = ActivityMode.lively,
     this.anchor,
@@ -40,6 +46,10 @@ class DiscoverMap extends StatelessWidget {
   final List<NearbyPerson> people;
   final ValueChanged<Event>? onEventTap;
   final ValueChanged<NearbyPerson>? onPersonTap;
+  final List<Quest> quests;
+  final List<NeedRequest> needs;
+  final ValueChanged<Quest>? onQuestTap;
+  final ValueChanged<NeedRequest>? onNeedTap;
   final List<ActivityCell> activity;
   final ActivityMode activityMode;
   final NearbyAnchor? anchor;
@@ -106,6 +116,24 @@ class DiscoverMap extends StatelessWidget {
                 child: _ZoneRow(cell: cell, mode: activityMode, data: data),
               ),
           ],
+          if (quests.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            const SectionLabel('Квесты'),
+            const SizedBox(height: 12),
+            for (final quest in quests)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _Row(
+                  icon: Icons.flag_outlined,
+                  title: quest.title,
+                  subtitle: [
+                    ?quest.placeTitle,
+                    'участников ${quest.occupancy}',
+                  ].join(' · '),
+                  onTap: () => onQuestTap?.call(quest),
+                ),
+              ),
+          ],
           if (events.isNotEmpty) ...[
             const SizedBox(height: 22),
             const SectionLabel('События'),
@@ -140,6 +168,21 @@ class DiscoverMap extends StatelessWidget {
                   onTap: () => onPlaceTap(place),
                 ),
               ),
+          if (needs.isNotEmpty) ...[
+            const SizedBox(height: 22),
+            const SectionLabel('Мне надо'),
+            const SizedBox(height: 12),
+            for (final need in needs)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _Row(
+                  icon: Icons.volunteer_activism_outlined,
+                  title: need.text,
+                  subtitle: need.placeTitle ?? need.authorName,
+                  onTap: () => onNeedTap?.call(need),
+                ),
+              ),
+          ],
           if (people.isNotEmpty) ...[
             const SizedBox(height: 22),
             const SectionLabel('Рядом'),
@@ -228,8 +271,8 @@ class _ZoneRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$away от центра · событий ${cell.eventCount}, мест ${cell.placeCount}, '
-                  'моментов ${cell.momentCount}',
+                  '$away от центра · квестов ${cell.questCount}, событий '
+                  '${cell.eventCount}, мест ${cell.placeCount}, моментов ${cell.momentCount}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 8),

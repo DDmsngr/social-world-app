@@ -1,12 +1,16 @@
 import 'dart:async';
 
 import '../permissions/content_permissions.dart';
+import 'rule_violation.dart';
 
 /// Человеческий текст вместо сырого исключения. Экран показывает его в
 /// snackbar; сырая причина при этом остаётся в AppLog.
 String friendlyError(Object error, {String fallback = 'Что-то пошло не так'}) {
   if (error is PermissionDeniedException) return error.message;
   if (error is TimeoutException) return 'Сервер долго не отвечает';
+
+  final rule = ruleCodeIn(error);
+  if (rule != null) return ruleMessages[rule]!;
 
   final text = error.toString();
   // Триггер enforce_rate_limit (миграция 0015) бросает 'rate_limit: …'.

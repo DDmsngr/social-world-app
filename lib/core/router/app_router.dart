@@ -24,6 +24,10 @@ import '../../features/feed/domain/entities/post.dart';
 import '../../features/feed/presentation/feed_screen.dart';
 import '../../features/feed/presentation/post_detail_screen.dart';
 import '../../features/feed/presentation/post_edit_screen.dart';
+import '../../features/needs/domain/entities/need_request.dart';
+import '../../features/needs/presentation/create_need_screen.dart';
+import '../../features/needs/presentation/my_needs_screen.dart';
+import '../../features/needs/presentation/need_detail_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/profile/presentation/blocked_users_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
@@ -31,6 +35,11 @@ import '../../features/profile/presentation/user_profile_screen.dart';
 import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/presentation/settings_screen.dart';
+import '../../features/quests/domain/entities/quest.dart';
+import '../../features/quests/presentation/create_quest_screen.dart';
+import '../../features/quests/presentation/my_quests_screen.dart';
+import '../../features/quests/presentation/quest_detail_screen.dart';
+import '../../features/quests/presentation/quest_moment_screen.dart';
 import '../../features/routes/presentation/route_detail_screen.dart';
 import '../../features/routes/presentation/route_recorder_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
@@ -70,6 +79,19 @@ abstract final class Routes {
 
   /// Карточка одного события — вне вкладок по той же причине, что и посты.
   static const eventDetail = '/event';
+
+  /// Квест: карточка `${questDetail}/id` (с `?arrive=код` из QR — сразу
+  /// отметка прибытия) и Quest Moment `${questDetail}/id/moment`.
+  static const questDetail = '/quest';
+  static const createQuest = '/create-quest';
+
+  /// Раздел «🎯 Квесты» профиля: активные, история, созданные мной (п. 43).
+  static const myQuests = '/profile/quests';
+
+  /// «Мне надо»: просьба, создание, мои просьбы.
+  static const needDetail = '/need';
+  static const createNeed = '/create-need';
+  static const myNeeds = '/profile/needs';
 
   static const authFlow = {splash, signIn, onboarding};
 }
@@ -190,6 +212,47 @@ final routerProvider = Provider<GoRouter>((ref) {
           eventId: state.pathParameters['eventId']!,
           event: state.extra as Event?,
         ),
+      ),
+      GoRoute(
+        path: '${Routes.questDetail}/:questId',
+        builder: (_, state) => QuestDetailScreen(
+          questId: state.pathParameters['questId']!,
+          quest: state.extra as Quest?,
+          // Из QR прибытия: socialworld://quest/<id>?arrive=<код>.
+          arrivalCode: state.uri.queryParameters['arrive'],
+        ),
+        routes: [
+          GoRoute(
+            path: 'moment',
+            builder: (_, state) => QuestMomentScreen(
+              questId: state.pathParameters['questId']!,
+              quest: state.extra as Quest?,
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: Routes.createQuest,
+        builder: (_, _) => const CreateQuestScreen(),
+      ),
+      GoRoute(
+        path: Routes.myQuests,
+        builder: (_, _) => const MyQuestsScreen(),
+      ),
+      GoRoute(
+        path: '${Routes.needDetail}/:needId',
+        builder: (_, state) => NeedDetailScreen(
+          needId: state.pathParameters['needId']!,
+          need: state.extra as NeedRequest?,
+        ),
+      ),
+      GoRoute(
+        path: Routes.createNeed,
+        builder: (_, _) => const CreateNeedScreen(),
+      ),
+      GoRoute(
+        path: Routes.myNeeds,
+        builder: (_, _) => const MyNeedsScreen(),
       ),
       GoRoute(
         path: '${Routes.posts}/:postId/edit',

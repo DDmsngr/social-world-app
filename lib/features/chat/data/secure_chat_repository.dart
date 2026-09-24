@@ -46,10 +46,14 @@ class SecureChatRepository implements ChatRepository {
   @override
   Future<List<Conversation>> loadConversations() async {
     await _ready;
+    // Только личные диалоги (direct_key задан). Квест-чаты (миграция 0023) —
+    // групповые, а этот репозиторий шифрует для одного собеседника: без
+    // фильтра квест-чат уронил бы разбор «собеседника» во всём списке.
     final memberships = await _client
         .from('chat_members')
-        .select('conversation_id, last_read_at')
+        .select('conversation_id, last_read_at, chat_conversations!inner(direct_key)')
         .eq('profile_id', currentUserId)
+        .not('chat_conversations.direct_key', 'is', null)
         .order('joined_at', ascending: false);
 
     return Future.wait([

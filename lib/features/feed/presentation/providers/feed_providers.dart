@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/env.dart';
 import '../../../../core/debug/app_log.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../discover/presentation/providers/city_provider.dart';
 import '../../../moderation/presentation/providers/report_providers.dart';
 import '../../../profile/presentation/providers/profile_providers.dart';
 import '../../data/local_feed_repository.dart';
@@ -25,6 +26,37 @@ final feedRepositoryProvider = Provider<FeedRepository>((ref) {
   return SupabaseFeedRepository(Supabase.instance.client);
 });
 
+/// Охват ленты «Моменты» (п. 47 ТЗ). По умолчанию — страна; выбор живёт до
+/// перезапуска, как и просит ТЗ («по умолчанию — страна»).
+enum FeedScope {
+  country('Страна'),
+  city('Город');
+
+  const FeedScope(this.label);
+
+  final String label;
+}
+
+class FeedScopeController extends Notifier<FeedScope> {
+  @override
+  FeedScope build() {
+    ref.keepAlive();
+    return FeedScope.country;
+  }
+
+  void set(FeedScope scope) => state = scope;
+}
+
+final feedScopeProvider = NotifierProvider<FeedScopeController, FeedScope>(
+  FeedScopeController.new,
+);
+
+/// Город для запроса ленты: выбранный на Pulse в режиме «Город», иначе null.
+final feedCityFilterProvider = Provider<String?>((ref) {
+  if (ref.watch(feedScopeProvider) == FeedScope.country) return null;
+  return ref.watch(cityProvider).name;
+});
+
 class FeedController extends AsyncNotifier<List<Post>> {
   @override
   Future<List<Post>> build() async {
@@ -33,14 +65,18 @@ class FeedController extends AsyncNotifier<List<Post>> {
     // стрелять запросом без сессии — city_feed доступна только authenticated,
     // без охраны это была бы гарантированная ошибка ровно в момент логаута.
     if (ref.watch(currentUserProvider) == null) return const [];
-    final posts = await ref.watch(feedRepositoryProvider).loadFeed();
+    final posts = await ref
+        .watch(feedRepositoryProvider)
+        .loadFeed(city: ref.watch(feedCityFilterProvider));
     return _withoutHidden(posts);
   }
 
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final posts = await ref.read(feedRepositoryProvider).loadFeed();
+      final posts = await ref
+          .read(feedRepositoryProvider)
+          .loadFeed(city: ref.read(feedCityFilterProvider));
       return _withoutHidden(posts);
     });
   }

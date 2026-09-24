@@ -3,10 +3,12 @@ import 'dart:math' as math;
 /// Что можно включить в слой активности. Совпадает со значениями `in_kinds`
 /// у серверной функции `city_activity`.
 enum MapLayer {
+  quests('Квесты', 'quests'),
   events('События', 'events'),
   places('Места', 'places'),
   people('Люди', 'people'),
-  moments('Моменты', 'moments');
+  moments('Моменты', 'moments'),
+  needs('Мне надо', 'needs');
 
   const MapLayer(this.label, this.wire);
 
@@ -41,6 +43,8 @@ class ActivityConfig {
     this.wParticipant = 0.15,
     this.wPlace = 0.6,
     this.wMoment = 1.5,
+    this.wQuest = 3.0,
+    this.wNeed = 1.0,
     this.halfLifeEventH = 3.0,
     this.halfLifeMomentH = 6.0,
     this.eventHorizonH = 12.0,
@@ -63,6 +67,11 @@ class ActivityConfig {
   final double wPlace;
   final double wMoment;
 
+  /// Квест весит как событие; просьба «Мне надо» — постоянный небольшой вес,
+  /// пока открыта (миграция 0023).
+  final double wQuest;
+  final double wNeed;
+
   /// Период полураспада веса по времени, часы.
   final double halfLifeEventH;
   final double halfLifeMomentH;
@@ -83,7 +92,7 @@ class ActivityConfig {
   final double minScore;
 }
 
-enum ActivityKind { event, place, moment }
+enum ActivityKind { event, place, moment, quest, need }
 
 /// Объект, из которого складывается активность. Собирается из событий,
 /// мест и постов; сам про экраны и репозитории ничего не знает.
@@ -104,7 +113,7 @@ class ActivityObject {
   final double longitude;
   final String? category;
 
-  /// Только для событий.
+  /// Только для событий и квестов.
   final int participants;
   final DateTime? startsAt;
   final DateTime? endsAt;
@@ -121,7 +130,13 @@ class ActivityQuery {
     required this.longitude,
     required this.at,
     this.radiusMeters = 5000,
-    this.layers = const {MapLayer.events, MapLayer.places, MapLayer.moments},
+    this.layers = const {
+      MapLayer.quests,
+      MapLayer.events,
+      MapLayer.places,
+      MapLayer.moments,
+      MapLayer.needs,
+    },
     this.categories = const {},
   });
 
@@ -155,6 +170,8 @@ class ActivityCell {
     this.eventCount = 0,
     this.placeCount = 0,
     this.momentCount = 0,
+    this.questCount = 0,
+    this.needCount = 0,
   });
 
   final double latitude;
@@ -167,6 +184,8 @@ class ActivityCell {
   final int eventCount;
   final int placeCount;
   final int momentCount;
+  final int questCount;
+  final int needCount;
 
   /// Интенсивность для рисования в выбранном режиме, 0..1; 0 — не рисовать.
   ///
@@ -205,10 +224,15 @@ abstract final class ActivityCalculator {
         ActivityKind.event => MapLayer.events,
         ActivityKind.place => MapLayer.places,
         ActivityKind.moment => MapLayer.moments,
+        ActivityKind.quest => MapLayer.quests,
+        ActivityKind.need => MapLayer.needs,
       };
       if (!query.layers.contains(kindLayer)) continue;
+      // У просьб категорий нет: с выбранной категорией их в слое нет вовсе
+      // (как и на сервере).
       if (query.categories.isNotEmpty &&
-          !query.categories.contains(object.category)) {
+          (object.kind == ActivityKind.need ||
+              !query.categories.contains(object.category))) {
         continue;
       }
 
@@ -273,6 +297,8 @@ abstract final class ActivityCalculator {
           eventCount: bucket.events,
           placeCount: bucket.places,
           momentCount: bucket.moments,
+          questCount: bucket.quests,
+          needCount: bucket.needs,
         ),
       );
     }
@@ -316,6 +342,26 @@ abstract final class ActivityCalculator {
 
         final crowd = 1 + config.wParticipant * math.min(object.participants, 50);
         return config.wEvent * crowd * math.pow(0.5, dtH / config.halfLifeEventH);
+
+      case ActivityKind.quest:
+        // Квест «идёт» с начала и до конца (или пока его не закроют — тогда
+        // он просто не попадает в выборку). Долгоживущий квест без конца
+        // весит полностью всё время, пока открыт.
+        final starts = object.startsAt;
+        if (starts == null) return 0;
+        final ends = object.endsAt;
+        if (ends != null && !at.isBefore(ends)) return 0;
+        final dtH = at.isBefore(starts) ? starts.difference(at).inMinutes / 60.0 : 0.0;
+        if (dtH > config.eventHorizonH) return 0;
+        final crowd = 1 + config.wParticipant * math.min(object.participants, 50);
+        return config.wQuest * crowd * math.pow(0.5, dtH / config.halfLifeEventH);
+
+      case ActivityKind.need:
+        final created = object.createdAt;
+        if (created != null && created.isAfter(at)) return 0;
+        final ends = object.endsAt;
+        if (ends != null && !at.isBefore(ends)) return 0;
+        return config.wNeed;
     }
   }
 
@@ -342,6 +388,8 @@ class _Bucket {
   int events = 0;
   int places = 0;
   int moments = 0;
+  int quests = 0;
+  int needs = 0;
 
   void add(ActivityKind kind) {
     switch (kind) {
@@ -351,6 +399,10 @@ class _Bucket {
         places++;
       case ActivityKind.moment:
         moments++;
+      case ActivityKind.quest:
+        quests++;
+      case ActivityKind.need:
+        needs++;
     }
   }
 }

@@ -299,6 +299,28 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             onSelectionChanged: (selected) =>
                 setState(() => _kind = selected.first),
           ),
+          const SizedBox(height: 10),
+          // Квест и «Мне надо» — со своими формами и правилами (п. 48), а не
+          // пятым-шестым сегментом: в одну строку они уже не помещаются.
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push(Routes.createQuest),
+                  icon: const Icon(Icons.flag_outlined, size: 18),
+                  label: const Text('Квест'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push(Routes.createNeed),
+                  icon: const Icon(Icons.volunteer_activism_outlined, size: 18),
+                  label: const Text('Мне надо'),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 18),
           // Маршрут не пишется формой: его записывает отдельный экран, пока
           // человек идёт по городу.

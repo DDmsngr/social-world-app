@@ -18,7 +18,14 @@ enum NotificationKind {
   eventJoin('event_join'),
   eventChanged('event_changed'),
   eventCancelled('event_cancelled'),
-  message;
+  message,
+  questRequest('quest_request'),
+  questJoin('quest_join'),
+  questApproved('quest_approved'),
+  questRejected('quest_rejected'),
+  questRemoved('quest_removed'),
+  questCancelled('quest_cancelled'),
+  needResponse('need_response');
 
   const NotificationKind([this._wire]);
 
@@ -76,6 +83,13 @@ class AppNotification {
       NotificationKind.eventChanged => 'Событие изменилось$about',
       NotificationKind.eventCancelled => 'Событие отменено$about',
       NotificationKind.message => '$who: новое сообщение',
+      NotificationKind.questRequest => '$who хочет в ваш квест$about',
+      NotificationKind.questJoin => '$who теперь в вашем квесте$about',
+      NotificationKind.questApproved => 'Вас приняли в квест$about',
+      NotificationKind.questRejected => 'Заявку в квест не приняли$about',
+      NotificationKind.questRemoved => 'Вас исключили из квеста$about',
+      NotificationKind.questCancelled => 'Квест отменён$about',
+      NotificationKind.needResponse => '$who готов помочь с вашей просьбой$about',
     };
   }
 

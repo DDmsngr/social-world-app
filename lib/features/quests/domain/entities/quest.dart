@@ -98,8 +98,11 @@ class Quest {
     this.maxParticipants,
     this.participantCount = 0,
     this.status = QuestStatus.active,
+    this.finishedAt,
     this.myStatus,
     this.extraInfo,
+    this.momentCount = 0,
+    this.isTrail = false,
   });
 
   final String id;
@@ -131,26 +134,97 @@ class Quest {
 
   final QuestStatus status;
 
+  /// Когда квест перестал идти: завершён организатором или истёк `endsAt`.
+  final DateTime? finishedAt;
+
   /// Участие того, кто смотрит. `null` — не подавал заявку.
   final QuestParticipationStatus? myStatus;
 
   /// Необязательное поле формы создания (ТЗ, п. 21).
   final String? extraInfo;
 
+  /// Сколько публичных Moments привязано к квесту (п. 40).
+  final int momentCount;
+
+  /// Квест уже завершён, но ещё сутки виден на Pulse, потому что у него есть
+  /// Moments (п. 42). Заявки такой квест не принимает.
+  final bool isTrail;
+
   final DateTime createdAt;
 
   bool get hasLocation => latitude != null && longitude != null;
+
+  bool get isActive => status == QuestStatus.active && !isTrail;
 
   /// Мест больше нет — новые заявки не принимаются (ТЗ, п. 24).
   bool get isFull =>
       maxParticipants != null && participantCount >= maxParticipants!;
 
-  bool get acceptsRequests => status == QuestStatus.active && !isFull;
+  bool get acceptsRequests => isActive && !isFull;
+
+  /// Без лимита заявка одобряется сразу — управлять нечем (п. 26).
+  bool get needsApproval => maxParticipants != null;
 
   /// Сколько мест занято, для подписи «3/10».
   String get occupancy => maxParticipants == null
       ? '$participantCount'
       : '$participantCount/$maxParticipants';
+
+  Quest copyWith({
+    int? participantCount,
+    QuestStatus? status,
+    DateTime? finishedAt,
+    QuestParticipationStatus? myStatus,
+    bool clearMyStatus = false,
+    double? latitude,
+    double? longitude,
+  }) => Quest(
+    id: id,
+    authorId: authorId,
+    authorName: authorName,
+    authorAvatarUrl: authorAvatarUrl,
+    title: title,
+    description: description,
+    photoUrl: photoUrl,
+    placeId: placeId,
+    placeTitle: placeTitle,
+    latitude: latitude ?? this.latitude,
+    longitude: longitude ?? this.longitude,
+    startsAt: startsAt,
+    endsAt: endsAt,
+    maxParticipants: maxParticipants,
+    participantCount: participantCount ?? this.participantCount,
+    status: status ?? this.status,
+    finishedAt: finishedAt ?? this.finishedAt,
+    myStatus: clearMyStatus ? null : (myStatus ?? this.myStatus),
+    extraInfo: extraInfo,
+    momentCount: momentCount,
+    isTrail: isTrail,
+    createdAt: createdAt,
+  );
+}
+
+/// Moment, привязанный к квесту, — строка социальной истории квеста (п. 40).
+/// Сам пост живёт в ленте по обычным правилам; здесь только то, что нужно
+/// ленточке «19:12 — Лев — фото».
+class QuestMoment {
+  const QuestMoment({
+    required this.postId,
+    required this.authorId,
+    required this.authorName,
+    required this.createdAt,
+    this.authorAvatarUrl,
+    this.photoUrl,
+    this.body,
+  });
+
+  final String postId;
+  final String authorId;
+  final String authorName;
+  final String? authorAvatarUrl;
+  final String? photoUrl;
+  final String? body;
+  final DateTime createdAt;
 }
 
 /// Заявка или участие конкретного человека. Отдельная сущность, потому что у
@@ -200,3 +274,8 @@ class QuestRulesConsent {
 
   bool get isCurrent => version >= currentVersion;
 }
+
+/// Код прибытия с QR или введённый руками: без пробелов и дефисов,
+/// заглавными — так же, как нормализует сервер (`quest_confirm_arrival`).
+String normalizeArrivalCode(String raw) =>
+    raw.replaceAll(RegExp('[^A-Za-z0-9]'), '').toUpperCase();

@@ -275,6 +275,18 @@ class _Body extends ConsumerWidget {
             label: const Text('Редактировать профиль'),
           ),
           const SizedBox(height: 14),
+          // Квесты — только в своём профиле: чужие активные квесты не
+          // показываются никому (п. 43, 44).
+          _MenuTile(
+            icon: Icons.flag_outlined,
+            title: '🎯 Квесты',
+            onTap: () => context.push(Routes.myQuests),
+          ),
+          _MenuTile(
+            icon: Icons.volunteer_activism_outlined,
+            title: 'Мне надо',
+            onTap: () => context.push(Routes.myNeeds),
+          ),
           _MenuTile(
             icon: Icons.bookmark_border,
             title: 'Сохранённое',
