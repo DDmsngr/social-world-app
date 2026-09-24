@@ -213,7 +213,10 @@ jobs:
       # иначе клиенту пришлось бы самому определять ABI устройства.
       - name: Build universal APK for in-app updates
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
-        run: flutter build apk --release --build-number=$((5000 + ${{ github.run_number }}))
+        run: |
+          # Универсальная сборка перезапишет app-release.apk — arm64 сохраняем заранее.
+          cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/app-arm64.apk"
+          flutter build apk --release --build-number=$((5000 + ${{ github.run_number }}))
 
       # APK и манифест кладём в публичный на чтение бакет self-hosted Supabase
       # (см. supabase/migrations/0007_app_updates.sql). GitHub Releases для этого
@@ -258,6 +261,13 @@ jobs:
           upload "${apk_name}" "application/vnd.android.package-archive" \
             "max-age=31536000" "build/app/outputs/flutter-apk/app-release.apk"
 
+          # Лёгкий файл только для arm64 (~70 МБ вместо ~175): на мобильной сети
+          # он доходит заметно чаще. Клиент выбирает его сам по архитектуре.
+          arm64_name="social-world-${VERSION_CODE}-arm64.apk"
+          arm64_url="${SUPABASE_URL}/storage/v1/object/public/app-releases/${arm64_name}"
+          upload "${arm64_name}" "application/vnd.android.package-archive" \
+            "max-age=31536000" "$RUNNER_TEMP/app-arm64.apk"
+
           # Манифест перезаписывается каждым релизом, поэтому кешировать его
           # надолго нельзя — иначе телефон ещё сутки не увидит новую версию.
           cat > manifest.json <<EOF
@@ -265,6 +275,7 @@ jobs:
             "versionCode": ${VERSION_CODE},
             "versionName": "${version_name}",
             "apkUrl": "${SUPABASE_URL}/storage/v1/object/public/app-releases/${apk_name}",
+            "apkUrlArm64": "${arm64_url}",
             "notes": "Сборка ${{ steps.release.outputs.tag }}"
           }
           EOF

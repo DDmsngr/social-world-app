@@ -12,6 +12,7 @@ import '../../../core/share/share_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
+import '../../../core/update/update_dot.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
@@ -99,7 +100,7 @@ class UserProfileScreen extends ConsumerWidget {
             IconButton(
               onPressed: () => context.push(Routes.settings),
               tooltip: 'Настройки',
-              icon: const Icon(Icons.settings_outlined),
+              icon: const UpdateDot(child: Icon(Icons.settings_outlined)),
             )
           else if (profile != null) ...[
             Builder(
@@ -167,7 +168,9 @@ class _OtherMenu extends ConsumerWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(friendlyError(error, fallback: 'Не удалось выполнить')),
+                    content: Text(
+                      friendlyError(error, fallback: 'Не удалось выполнить'),
+                    ),
                   ),
                 );
               }
@@ -176,7 +179,10 @@ class _OtherMenu extends ConsumerWidget {
       },
       itemBuilder: (_) => [
         if (blocked)
-          const PopupMenuItem(value: 'unblock', child: Text('Снять ограничение'))
+          const PopupMenuItem(
+            value: 'unblock',
+            child: Text('Снять ограничение'),
+          )
         else ...const [
           PopupMenuItem(value: 'mute', child: Text('Скрыть публикации')),
           PopupMenuItem(value: 'block', child: Text('Заблокировать')),
@@ -196,14 +202,18 @@ class _Body extends ConsumerWidget {
   Future<void> _toggleFollow(BuildContext context, WidgetRef ref) async {
     final follow = !profile.followedByMe;
     try {
-      await ref.read(profileRepositoryProvider).setFollow(profile.id, follow: follow);
+      await ref
+          .read(profileRepositoryProvider)
+          .setFollow(profile.id, follow: follow);
       ref.invalidate(userProfileProvider(profile.id));
     } catch (error) {
       AppLog.add('Подписка не сохранилась: $error');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(friendlyError(error, fallback: 'Не удалось выполнить')),
+            content: Text(
+              friendlyError(error, fallback: 'Не удалось выполнить'),
+            ),
           ),
         );
       }
@@ -360,7 +370,9 @@ class _Posts extends ConsumerWidget {
                       : 'Публикаций пока нет.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 )
-              : Column(children: [for (final post in items) PostCard(post: post)]),
+              : Column(
+                  children: [for (final post in items) PostCard(post: post)],
+                ),
         ),
       ],
     );
@@ -380,10 +392,7 @@ class _Stat extends StatelessWidget {
         children: [
           Text('$value', style: AppTypography.serif(24)),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 12, color: AppColors.textDim),
-          ),
+          Text(label, style: TextStyle(fontSize: 12, color: AppColors.textDim)),
         ],
       ),
     );

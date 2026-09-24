@@ -108,7 +108,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 /// разные вещи: разрешение ОС ничего не публикует, публикация включается
 /// только здесь и всегда размыта до района.
 enum _GeoMode {
-  hidden('Никому', 'Вас нет на карте у других. Карта для вас работает как обычно.', null),
+  hidden(
+    'Никому',
+    'Вас нет на карте у других. Карта для вас работает как обычно.',
+    null,
+  ),
   approximate('Приблизительно', 'Другие видят пятно района, около 1 км.', 1000),
   district('Район', 'Пятно около 500 м. Так по умолчанию.', 500),
   precise('Точнее', 'Пятно около 200 м — самое точное из возможных.', 200);
@@ -159,7 +163,11 @@ class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось сохранить'))),
+          SnackBar(
+            content: Text(
+              friendlyError(error, fallback: 'Не удалось сохранить'),
+            ),
+          ),
         );
       }
     } finally {
@@ -202,7 +210,10 @@ class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
               child: InkWell(
                 onTap: () => _choose(mode),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -212,7 +223,10 @@ class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
                             Text(mode.label),
                             Text(
                               mode.hint,
-                              style: TextStyle(fontSize: 12, color: AppColors.textDim),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textDim,
+                              ),
                             ),
                           ],
                         ),
@@ -222,7 +236,9 @@ class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : Icon(Icons.check, color: AppColors.primaryTint),
                     ],
@@ -243,6 +259,7 @@ class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
     );
   }
 }
+
 class _ThemePicker extends ConsumerWidget {
   const _ThemePicker();
 
@@ -313,9 +330,7 @@ class _VersionRow extends StatelessWidget {
             children: [
               const Text('Версия'),
               Text(
-                info == null
-                    ? '…'
-                    : '${info.version} (${info.buildNumber})',
+                info == null ? '…' : '${info.version} (${info.buildNumber})',
                 style: TextStyle(color: AppColors.textDim),
               ),
             ],
@@ -326,33 +341,108 @@ class _VersionRow extends StatelessWidget {
   }
 }
 
+/// Строка «Обновления». Пока обновления нет — обычная серая карточка «проверить».
+/// Как только оно есть — вся зелёная и превращается в кнопку, которая делает
+/// следующий шаг: скачать → (прогресс) → установить. Это конец цепочки
+/// «хлебных крошек» (см. UpdateDot).
+///
+/// Раньше нажатие всегда вызывало повторную проверку, поэтому на «Доступно
+/// обновление» кнопка казалась мёртвой: проверка находила то же самое и
+/// ничего не менялось.
 class _UpdateRow extends ConsumerWidget {
   const _UpdateRow();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(updateControllerProvider);
-    final label = switch (state.stage) {
-      UpdateStage.checking => 'Проверяем…',
-      UpdateStage.available => 'Доступно обновление',
-      UpdateStage.downloading => 'Скачивается…',
-      UpdateStage.readyToInstall => 'Готово к установке',
-      UpdateStage.failed => 'Не удалось проверить',
-      _ => 'Вы используете последнюю версию',
+    final controller = ref.read(updateControllerProvider.notifier);
+
+    final (title, hint, action) = switch (state.stage) {
+      UpdateStage.checking => ('Обновления', 'Проверяем…', null),
+      UpdateStage.available => (
+        'Доступно обновление',
+        'Нажмите, чтобы скачать',
+        controller.download,
+      ),
+      UpdateStage.downloading => (
+        'Скачивается…',
+        '${(state.progress * 100).round()}%',
+        null,
+      ),
+      UpdateStage.readyToInstall => (
+        'Обновление готово',
+        'Нажмите, чтобы установить',
+        controller.install,
+      ),
+      // Скачивание сорвалось, но обновление есть — предлагаем докачать, а не
+      // проверять заново: файл лежит на диске и продолжится с места обрыва.
+      UpdateStage.failed when state.info != null => (
+        'Не удалось скачать',
+        'Нажмите, чтобы докачать',
+        controller.download,
+      ),
+      UpdateStage.failed => (
+        'Обновления',
+        'Не удалось проверить — нажмите ещё раз',
+        () => controller.check(silent: false),
+      ),
+      _ => (
+        'Обновления',
+        'Вы используете последнюю версию',
+        () => controller.check(silent: false),
+      ),
     };
 
-    return GlassCard(
-      onTap: state.stage == UpdateStage.downloading
-          ? null
-          : () => ref
-                .read(updateControllerProvider.notifier)
-                .check(silent: false),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text('Обновления'),
-          Text(label, style: TextStyle(color: AppColors.textDim)),
-        ],
+    final lit = state.hasUpdate;
+    final green = AppColors.success;
+
+    return Material(
+      color: lit ? green.withValues(alpha: 0.18) : AppColors.card,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: InkWell(
+        onTap: action,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(
+              color: lit ? green : AppColors.hair,
+              width: lit ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  if (lit) ...[
+                    Icon(Icons.system_update_alt, color: green),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: lit ? FontWeight.w600 : null,
+                        color: lit ? green : null,
+                      ),
+                    ),
+                  ),
+                  Text(hint, style: TextStyle(color: AppColors.textDim)),
+                ],
+              ),
+              if (state.stage == UpdateStage.downloading) ...[
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                  value: state.progress > 0 ? state.progress : null,
+                  color: green,
+                  backgroundColor: green.withValues(alpha: 0.2),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

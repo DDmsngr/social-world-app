@@ -14,7 +14,15 @@ import '../debug/app_log.dart';
 import 'update_info.dart';
 import 'update_service.dart';
 
-enum UpdateStage { idle, checking, upToDate, available, downloading, readyToInstall, failed }
+enum UpdateStage {
+  idle,
+  checking,
+  upToDate,
+  available,
+  downloading,
+  readyToInstall,
+  failed,
+}
 
 class UpdateState {
   const UpdateState({
@@ -30,6 +38,21 @@ class UpdateState {
   final double progress;
   final String? localPath;
   final String? error;
+
+  /// Есть что показать человеку: новая версия найдена, качается или уже
+  /// скачана и ждёт установки. От этого горят «хлебные крошки»: точка на
+  /// вкладке «Профиль», точка у шестерёнки и зелёная строка в настройках.
+  /// `failed` без [info] — это сбой самой проверки (нет сети), а не обновление.
+  bool get hasUpdate =>
+      info != null &&
+      switch (stage) {
+        UpdateStage.available ||
+        UpdateStage.downloading ||
+        UpdateStage.readyToInstall => true,
+        // Скачивание сорвалось, а обновление по-прежнему есть — не гасим сигнал.
+        UpdateStage.failed => true,
+        _ => false,
+      };
 
   UpdateState copyWith({
     UpdateStage? stage,
@@ -58,6 +81,9 @@ class UpdateState {
 class UpdateController extends Notifier<UpdateState> {
   static const _prefsPathKey = 'pending_update_path';
   static const _prefsManifestKey = 'pending_update_manifest';
+
+  /// Сколько раз пробуем докачать, прежде чем показать ошибку.
+  static const _maxDownloadAttempts = 6;
 
   // Не final: при повторном build на том же объекте присваивание late final
   // упало бы LateInitializationError.
@@ -96,7 +122,8 @@ class UpdateController extends Notifier<UpdateState> {
     state = const UpdateState(stage: UpdateStage.checking);
     try {
       final manifest = await _service.fetchManifest();
-      if (manifest == null || manifest.versionCode <= await _currentVersionCode()) {
+      if (manifest == null ||
+          manifest.versionCode <= await _currentVersionCode()) {
         state = const UpdateState(stage: UpdateStage.upToDate);
         return;
       }
@@ -122,10 +149,27 @@ class UpdateController extends Notifier<UpdateState> {
     try {
       final directory =
           await getExternalStorageDirectory() ?? await getTemporaryDirectory();
-      final file = File('${directory.path}/social-world-${info.versionCode}.apk');
+      final file = File(
+        '${directory.path}/social-world-${info.versionCode}.apk',
+      );
 
-      await for (final progress in _service.downloadTo(info.apkUrl, file)) {
-        state = state.copyWith(progress: progress);
+      final url = info.urlFor();
+      // Обрыв на мобильной сети — обычное дело, а не повод сдаваться. Каждая
+      // новая попытка докачивает с того места, где остановилась предыдущая
+      // (см. UpdateService.downloadTo), так что повторы дёшевы.
+      for (var attempt = 1; ; attempt++) {
+        try {
+          await for (final progress in _service.downloadTo(url, file)) {
+            state = state.copyWith(progress: progress);
+          }
+          break;
+        } catch (error) {
+          AppLog.add(
+            'Скачивание: попытка $attempt из $_maxDownloadAttempts — $error',
+          );
+          if (attempt >= _maxDownloadAttempts) rethrow;
+          await Future<void>.delayed(Duration(seconds: 2 * attempt));
+        }
       }
 
       await _savePending(info, file.path);
@@ -138,7 +182,8 @@ class UpdateController extends Notifier<UpdateState> {
       AppLog.add('Скачивание обновления не удалось: $error');
       state = state.copyWith(
         stage: UpdateStage.failed,
-        error: 'Не удалось скачать обновление. Проверьте связь и попробуйте ещё раз.',
+        error:
+            'Связь оборвалась. Нажмите ещё раз — файл докачается с того места, где остановился.',
       );
     }
   }
@@ -150,10 +195,7 @@ class UpdateController extends Notifier<UpdateState> {
   Future<void> install() async {
     final path = state.localPath;
     if (path == null) return;
-    await OpenFilex.open(
-      path,
-      type: 'application/vnd.android.package-archive',
-    );
+    await OpenFilex.open(path, type: 'application/vnd.android.package-archive');
   }
 
   Future<int> _currentVersionCode() async {
@@ -193,6 +235,7 @@ class UpdateController extends Notifier<UpdateState> {
         'versionCode': info.versionCode,
         'versionName': info.versionName,
         'apkUrl': info.apkUrl,
+        'apkUrlArm64': info.apkUrlArm64,
         'notes': info.notes,
       }),
     );

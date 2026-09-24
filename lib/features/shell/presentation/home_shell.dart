@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/update/update_badge.dart';
 import '../../../core/update/update_controller.dart';
+import '../../../core/update/update_dot.dart';
 import '../../notifications/notifications.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
 import '../../saved/saved.dart';
@@ -62,12 +62,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          widget.navigationShell,
-          const UpdateBadge(),
-        ],
-      ),
+      body: widget.navigationShell,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.hair)),
@@ -81,7 +76,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
             initialLocation: index == widget.navigationShell.currentIndex,
           ),
           // Порядок вкладок должен совпадать с порядком веток роутера.
-          destinations: const [
+          destinations: [
             NavigationDestination(
               icon: Icon(Icons.photo_library_outlined),
               selectedIcon: Icon(Icons.photo_library),
@@ -103,8 +98,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
               label: 'Чаты',
             ),
             NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
+              icon: UpdateDot(child: Icon(Icons.person_outline)),
+              selectedIcon: UpdateDot(child: Icon(Icons.person)),
               label: 'Профиль',
             ),
           ],
