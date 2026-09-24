@@ -77,7 +77,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 26),
           const SectionLabel('Приложение'),
           const SizedBox(height: 12),
-          const _UpdateRow(),
+          const UpdateSettingsRow(),
           const SizedBox(height: 10),
           const _VersionRow(),
           const SizedBox(height: 26),
@@ -349,8 +349,8 @@ class _VersionRow extends StatelessWidget {
 /// Раньше нажатие всегда вызывало повторную проверку, поэтому на «Доступно
 /// обновление» кнопка казалась мёртвой: проверка находила то же самое и
 /// ничего не менялось.
-class _UpdateRow extends ConsumerWidget {
-  const _UpdateRow();
+class UpdateSettingsRow extends ConsumerWidget {
+  const UpdateSettingsRow({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -358,9 +358,13 @@ class _UpdateRow extends ConsumerWidget {
     final controller = ref.read(updateControllerProvider.notifier);
 
     final (title, hint, action) = switch (state.stage) {
-      UpdateStage.checking => ('Обновления', 'Проверяем…', null),
+      UpdateStage.checking => (
+        'Версия актуальна',
+        'Проверяем обновления…',
+        null,
+      ),
       UpdateStage.available => (
-        'Доступно обновление',
+        'Есть обновления',
         'Нажмите, чтобы скачать',
         controller.download,
       ),
@@ -382,13 +386,13 @@ class _UpdateRow extends ConsumerWidget {
         controller.download,
       ),
       UpdateStage.failed => (
-        'Обновления',
-        'Не удалось проверить — нажмите ещё раз',
+        'Не удалось проверить',
+        'Нажмите, чтобы попробовать ещё раз',
         () => controller.check(silent: false),
       ),
       _ => (
-        'Обновления',
-        'Вы используете последнюю версию',
+        'Версия актуальна',
+        'Нажмите, чтобы проверить обновления',
         () => controller.check(silent: false),
       ),
     };
@@ -414,6 +418,10 @@ class _UpdateRow extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Заголовок и подсказка друг под другом, а не в одну строку:
+              // длинная подсказка («Вы используете последнюю версию»)
+              // забирала почти всю ширину, и слово «Обновления» переносилось
+              // по слогам.
               Row(
                 children: [
                   if (lit) ...[
@@ -421,15 +429,27 @@ class _UpdateRow extends ConsumerWidget {
                     const SizedBox(width: 12),
                   ],
                   Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: lit ? FontWeight.w600 : null,
-                        color: lit ? green : null,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: lit ? FontWeight.w600 : null,
+                            color: lit ? green : null,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hint,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textDim,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Text(hint, style: TextStyle(color: AppColors.textDim)),
                 ],
               ),
               if (state.stage == UpdateStage.downloading) ...[

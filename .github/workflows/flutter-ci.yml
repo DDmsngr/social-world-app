@@ -171,6 +171,9 @@ jobs:
       # сборка и универсальная для обновлений — одна монотонная шкала.
       # Тестируем только на arm64 (телефон тестировщика): один файл вместо трёх.
       - name: Build release APK (arm64)
+        env:
+          # Оставляет в APK только arm64-библиотеки — см. build.gradle.kts.
+          ARM64_ONLY: "1"
         run: flutter build apk --release --target-platform android-arm64 --build-number=$((5000 + ${{ github.run_number }}))
 
       - name: Upload APK artifact (arm64)

@@ -36,6 +36,18 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // ARM64_ONLY=1 задаёт CI для тестовой сборки и лёгкого файла обновления.
+        // `flutter build --target-platform android-arm64` режет только движок
+        // Flutter, а нативные библиотеки Яндекс-карт всё равно приезжают для
+        // всех трёх архитектур: APK выходил 139 МБ вместо ~74 (лишние
+        // armeabi-v7a и x86_64 ≈ 65 МБ, которые arm64-телефону не нужны).
+        // Универсальный APK для остальных телефонов собирается без флага.
+        if (System.getenv("ARM64_ONLY") == "1") {
+            ndk {
+                abiFilters += listOf("arm64-v8a")
+            }
+        }
     }
 
     signingConfigs {
