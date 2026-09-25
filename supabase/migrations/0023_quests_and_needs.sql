@@ -112,6 +112,14 @@ create function quest_rules_version() returns integer
 language sql immutable as $$ select 1 $$;
 
 grant execute on function quest_rules_version to authenticated;
+-- Связь момента с квестом (Quest Moment, п. 37–39). Колонка нужна уже функциям
+-- чтения ниже: SQL-функции проверяют колонки при создании, а не при вызове.
+-- Один момент на человека на квест — уникальный индекс; остальные проверки
+-- (участник, одно фото) — триггер в конце файла.
+alter table posts add column quest_id uuid references quests on delete set null;
+
+create unique index posts_one_moment_per_quest
+  on posts (author_id, quest_id) where quest_id is not null;
 
 -- ── служебное ───────────────────────────────────────────────────────────────
 
@@ -752,10 +760,6 @@ create trigger quest_chat_on_close after update of status on quests
 -- больше одной фотографии (п. 38). Лимит 30 в сутки/час — общий, тот же
 -- триггер posts_rate_limit.
 
-alter table posts add column quest_id uuid references quests on delete set null;
-
-create unique index posts_one_moment_per_quest
-  on posts (author_id, quest_id) where quest_id is not null;
 
 create function trg_check_quest_moment() returns trigger
 language plpgsql security definer set search_path = public as $$
