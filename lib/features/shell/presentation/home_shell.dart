@@ -80,7 +80,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
             NavigationDestination(
               icon: Icon(Icons.photo_library_outlined),
               selectedIcon: Icon(Icons.photo_library),
-              label: 'Моменты',
+              // Тестовое имя вкладки; позже уйдёт в перевод по выбору языка.
+              label: 'Flow',
             ),
             NavigationDestination(
               icon: Icon(Icons.map_outlined),

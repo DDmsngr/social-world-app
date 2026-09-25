@@ -24,7 +24,7 @@ class FeedScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Моменты'),
+        title: const Text('Flow'),
         actions: [
           IconButton(
             onPressed: () => context.push(Routes.notifications),
