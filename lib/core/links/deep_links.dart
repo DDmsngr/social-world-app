@@ -66,6 +66,25 @@ abstract final class DeepLinks {
   static final _id = RegExp(r'^[A-Za-z0-9_-]{4,64}$');
   static final _code = RegExp(r'^[A-Za-z0-9]{4,16}$');
 
+  /// Хост, зарезервированный под реферальный код места — не объект, а
+  /// статистика установки (см. миграцию 0025). Не должен совпадать ни с
+  /// одним [LinkTarget.segment], иначе `parse` и `parseReferralCode` спорили
+  /// бы за одну и ту же ссылку.
+  static const _referralHost = 'ref';
+
+  /// Что зашито в QR у места: `socialworld://ref/<код>`. В отличие от
+  /// остальных ссылок не открывает экран — только отмечает, что установка
+  /// пришла отсюда. Награду (например, кофе) кассир на месте выдаёт сам,
+  /// так же как по бумажному купону; код нужен только для статистики.
+  static Uri referralAppUri(String code) =>
+      Uri(scheme: scheme, host: _referralHost, path: '/$code');
+
+  /// Веб-версия того же кода — для человека без приложения:
+  /// `https://…/o/ref/<код>`. Страница показывает кнопку «Скачать» и код
+  /// текстом на случай, если ссылка сама не сработает.
+  static Uri referralShareUri(String code) =>
+      Uri.parse('$shareBase/$_referralHost/$code');
+
   /// Что зашито в QR квеста: `socialworld://quest/<id>?arrive=<код>`.
   /// Открывается системной камерой — отдельный сканер в приложении не нужен.
   static Uri arrivalUri(String questId, String code) => Uri(
@@ -114,6 +133,28 @@ abstract final class DeepLinks {
           ? code
           : null,
     );
+  }
+
+  /// Код места из входящей ссылки — если это она, а не ссылка на объект.
+  /// `null` для всего остального, включая обычные [LinkTarget]-ссылки.
+  static String? parseReferralCode(Uri uri) {
+    String? host;
+    String? code;
+
+    if (uri.scheme == scheme) {
+      host = uri.host;
+      code = uri.pathSegments.isEmpty ? null : uri.pathSegments.first;
+    } else if (uri.scheme == 'https' || uri.scheme == 'http') {
+      final base = Uri.parse(shareBase);
+      if (uri.host != base.host) return null;
+      final parts = uri.pathSegments.where((part) => part.isNotEmpty).toList();
+      if (parts.length < 2) return null;
+      host = parts[parts.length - 2];
+      code = parts.last;
+    }
+
+    if (host != _referralHost || code == null || !_code.hasMatch(code)) return null;
+    return code.toUpperCase();
   }
 
   static String locationFor(LinkTarget target, String id, {String? arrivalCode}) =>

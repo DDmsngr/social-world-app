@@ -13,6 +13,7 @@ import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
 import '../../discover/presentation/providers/presence_publisher.dart';
+import '../../referrals/presentation/widgets/referral_code_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -70,6 +71,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Icon(Icons.block_outlined, color: AppColors.primaryTint),
                 const SizedBox(width: 14),
                 const Expanded(child: Text('Заблокированные и скрытые')),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
+          const SizedBox(height: 26),
+          const SectionLabel('Приглашение'),
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            onTap: () => showReferralCodeSheet(context),
+            child: Row(
+              children: [
+                Icon(Icons.qr_code_2, color: AppColors.primaryTint),
+                const SizedBox(width: 14),
+                const Expanded(child: Text('Ввести код места')),
                 Icon(Icons.chevron_right, color: AppColors.textFaint),
               ],
             ),

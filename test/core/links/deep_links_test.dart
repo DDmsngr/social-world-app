@@ -21,6 +21,26 @@ void main() {
     });
   });
 
+  group('Реферальный код места', () {
+    test('своя схема и веб-ссылка дают один и тот же код', () {
+      final app = DeepLinks.parseReferralCode(Uri.parse('socialworld://ref/abcd23'));
+      final web = DeepLinks.parseReferralCode(DeepLinks.referralShareUri('abcd23'));
+      expect(app, 'ABCD23');
+      expect(web, app);
+    });
+
+    test('код не путается с обычной ссылкой на объект', () {
+      expect(DeepLinks.parseReferralCode(Uri.parse('socialworld://event/abc-123')), isNull);
+      expect(DeepLinks.parse(Uri.parse('socialworld://ref/abcd23')), isNull);
+    });
+
+    test('слишком короткий или мусорный код отбрасывается', () {
+      expect(DeepLinks.parseReferralCode(Uri.parse('socialworld://ref/ab')), isNull);
+      expect(DeepLinks.parseReferralCode(Uri.parse('socialworld://ref/')), isNull);
+      expect(DeepLinks.parseReferralCode(Uri.parse('https://evil.example/o/ref/abcd23')), isNull);
+    });
+  });
+
   group('ContentPermissions', () {
     test('чужое: жалоба можно, править нельзя', () {
       const p = ContentPermissions(viewerId: 'me', ownerId: 'other');
