@@ -178,7 +178,7 @@ jobs:
         env:
           # Оставляет в APK только arm64-библиотеки — см. build.gradle.kts.
           ARM64_ONLY: "1"
-        run: flutter build apk --release --target-platform android-arm64 --build-number=$((5000 + ${{ github.run_number }}))
+        run: flutter build apk --release --target-platform android-arm64 --build-number=$((5000 + ${{ github.run_number }})) --dart-define=FEATURE_CHAT=true
 
       - name: Upload APK artifact (arm64)
         uses: actions/upload-artifact@v5
@@ -223,7 +223,7 @@ jobs:
         run: |
           # Универсальная сборка перезапишет app-release.apk — arm64 сохраняем заранее.
           cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/app-arm64.apk"
-          flutter build apk --release --build-number=$((5000 + ${{ github.run_number }}))
+          flutter build apk --release --build-number=$((5000 + ${{ github.run_number }})) --dart-define=FEATURE_CHAT=true
 
       # Манифест и сам APK кладём не в Supabase Storage, а в публичное
       # репо-зеркало DDmsngr/social-world-releases (только файлы релиза, без
