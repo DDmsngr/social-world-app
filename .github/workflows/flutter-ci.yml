@@ -177,6 +177,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # Вторая (универсальная) сборка в том же демоне падала в R8 с
+      # OutOfMemoryError при 2 ГБ кучи. Пользовательский gradle.properties
+      # перекрывает проектный, поэтому ноутбук остаётся на 2 ГБ.
+      - name: Raise Gradle heap for CI
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -XX:ReservedCodeCacheSize=512m" >> ~/.gradle/gradle.properties
+
       # versionCode = 5000 + номер запуска: растёт с каждой сборкой, поэтому
       # Android всегда видит новую версию и ставит поверх старой. База 5000 и
       # отказ от --split-per-abi — не случайность. Split-сборка добавляет к
