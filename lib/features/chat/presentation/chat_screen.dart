@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
+import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -36,9 +37,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _sending = false;
   String? _sendError;
 
+  late final PushService _push;
+
   @override
   void initState() {
     super.initState();
+    _push = ref.read(pushServiceProvider)
+      ..activeConversationId = widget.conversationId
+      ..clearConversation(widget.conversationId);
     _markRead();
   }
 
@@ -52,6 +58,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    if (_push.activeConversationId == widget.conversationId) {
+      _push.activeConversationId = null;
+    }
     _controller.dispose();
     super.dispose();
   }

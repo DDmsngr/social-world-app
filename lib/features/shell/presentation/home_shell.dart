@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/feature_flags.dart';
 import '../../../core/debug/app_log.dart';
+import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update/update_controller.dart';
@@ -51,8 +52,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
           AppLog.add('Чаты не инициализировались: $error');
         }
       }
+      ref.read(pushServiceProvider).start();
     });
-    // Push (FCM) — отдельная инфраструктура; пока значок обновляется опросом.
+    // Опрос остаётся страховкой на случай, если пуши выключены в системе.
     _poll = Timer.periodic(
       const Duration(seconds: 90),
       (_) => ref.read(notificationsProvider.notifier).refreshQuietly(),

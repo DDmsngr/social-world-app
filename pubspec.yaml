@@ -74,6 +74,9 @@ dependencies:
   # QR прибытия на квест у организатора. Чистый Dart, без нативного кода;
   # сканирует системная камера — своего сканера в приложении нет.
   qr_flutter: ^4.1.0
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
+  flutter_local_notifications: ^22.3.1
 
 dev_dependencies:
   flutter_test:

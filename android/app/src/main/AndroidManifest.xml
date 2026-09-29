@@ -9,6 +9,9 @@
     <!-- Приложение раздаётся APK мимо Google Play, поэтому обновляет себя само:
          скачивает новый файл и отдаёт его системному установщику. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Push-уведомления (FCM). На Android 13+ разрешение спрашивается при
+         первом запуске после входа. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="ChaWo"
         android:name=".MainApplication"
@@ -59,6 +62,14 @@
                 <data android:scheme="https" android:host="ddmsngr.github.io" android:pathPrefix="/social-world/o"/>
             </intent-filter>
         </activity>
+        <!-- Пуши, пришедшие в фоне, рисует система: ей нужны монохромная иконка
+             и канал по умолчанию (каналы создаёт приложение, lib/core/push). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="activity" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

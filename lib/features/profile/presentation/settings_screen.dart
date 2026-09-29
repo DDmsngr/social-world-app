@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/errors/friendly_error.dart';
+import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -109,6 +110,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               } catch (_) {
                 // Не повод не дать выйти из аккаунта.
               }
+              // По той же причине — токен пушей: без сессии его не отвязать.
+              await ref.read(pushServiceProvider).stop();
               await ref.read(authRepositoryProvider).signOut();
             },
             child: const Text('Выйти'),
