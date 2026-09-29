@@ -3,24 +3,24 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-import '../config/env.dart';
 import 'update_info.dart';
 
-/// Обращения к бакету `app-releases`: манифест версии и сам APK.
+/// Обращения к публичному репозиторию DDmsngr/social-world-releases:
+/// манифест версии (raw-файл на main) и сам APK (ассет GitHub Release).
 ///
-/// Бакет публичный на чтение, поэтому обычный GET без токена — ключ
-/// приложения (anon) тут вообще не нужен, только базовый URL self-hosted
-/// Supabase.
+/// Не Supabase Storage: на текущем бэкенде (Supabase Cloud, free tier)
+/// лимит на файл — 50 МБ, наш APK туда не помещается. GitHub Release —
+/// без такого лимита и, раз репозиторий публичный, скачивается анонимно.
 class UpdateService {
   UpdateService(this._client);
 
   final http.Client _client;
 
-  static const _manifestPath =
-      'storage/v1/object/public/app-releases/manifest.json';
+  static const _manifestUrl =
+      'https://raw.githubusercontent.com/DDmsngr/social-world-releases/main/manifest.json';
 
   Future<UpdateInfo?> fetchManifest() async {
-    final uri = Uri.parse('${Env.supabaseUrl}/$_manifestPath');
+    final uri = Uri.parse(_manifestUrl);
     final response = await _client.get(uri).timeout(const Duration(seconds: 8));
     if (response.statusCode != 200) return null;
     return UpdateInfo.fromJson(

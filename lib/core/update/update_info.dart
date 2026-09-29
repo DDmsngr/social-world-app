@@ -1,6 +1,6 @@
 import 'dart:io';
 
-/// Описание доступного обновления из `manifest.json` в бакете `app-releases`.
+/// Описание доступного обновления из `manifest.json` в DDmsngr/social-world-releases.
 class UpdateInfo {
   const UpdateInfo({
     required this.versionCode,

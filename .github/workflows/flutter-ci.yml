@@ -225,62 +225,39 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/app-arm64.apk"
           flutter build apk --release --build-number=$((5000 + ${{ github.run_number }}))
 
-      # APK и манифест кладём в публичный на чтение бакет self-hosted Supabase
-      # (см. supabase/migrations/0007_app_updates.sql). GitHub Releases для этого
-      # не годятся: репозиторий приватный, и приложению пришлось бы носить в себе
-      # токен с доступом к исходникам.
-      - name: Verify service-role secret
+      # Манифест и сам APK кладём не в Supabase Storage, а в публичное
+      # репо-зеркало DDmsngr/social-world-releases (только файлы релиза, без
+      # исходников) — тот же приём, что и в KOTT. Причины две: репозиторий
+      # приложения приватный (анонимно ни raw.githubusercontent.com, ни
+      # Release-ассет не отдать), а на self-hosted лимит файла Storage поднят
+      # до 250 МБ, но на текущем временном бэкенде (Supabase Cloud, free tier)
+      # он жёстко зашит в 50 МБ — наш APK (даже arm64) туда не помещается.
+      # Нужен секрет SOCIAL_WORLD_RELEASES_TOKEN — PAT с правом записи в
+      # DDmsngr/social-world-releases (обычный GITHUB_TOKEN на кросс-репо
+      # запись не годится). Нет секрета — публикация тихо пропускается,
+      # остальная сборка не страдает.
+      - name: Publish release and manifest to social-world-releases
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo "::error::SUPABASE_SERVICE_ROLE_KEY пуст — публикация манифеста обновления упадёт, лучше остановиться здесь"
-            exit 1
-          fi
-
-      - name: Publish update manifest to Supabase Storage
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
-        env:
+          GH_TOKEN: ${{ secrets.SOCIAL_WORLD_RELEASES_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         shell: bash
         run: |
           set -euo pipefail
 
-          # Тот же код, что и у универсального APK (см. комментарий у сборки):
-          # манифест обязан обещать ровно ту версию, что лежит в файле.
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::warning::SOCIAL_WORLD_RELEASES_TOKEN не задан — публикация в social-world-releases пропущена, автообновление в приложении не сработает для этого релиза."
+            exit 0
+          fi
+
           VERSION_CODE=$((5000 + GITHUB_RUN_NUMBER))
-          apk_name="social-world-${VERSION_CODE}.apk"
           version_name=$(sed -n 's/^version: \([0-9.]*\).*/\1/p' pubspec.yaml)
-
-          upload() {
-            curl --fail --silent --show-error \
-              -X POST "${SUPABASE_URL}/storage/v1/object/app-releases/$1" \
-              -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-              -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-              -H "Content-Type: $2" \
-              -H "Cache-Control: $3" \
-              -H "x-upsert: true" \
-              --data-binary @"$4" > /dev/null
-          }
-
-          apk_path="build/app/outputs/flutter-apk/app-release.apk"
-          apk_url="${SUPABASE_URL}/storage/v1/object/public/app-releases/${apk_name}"
-
-          upload "${apk_name}" "application/vnd.android.package-archive" \
-            "max-age=31536000" "${apk_path}"
-
-          # Лёгкий файл только для arm64 (~70 МБ вместо ~175): на мобильной сети
-          # он доходит заметно чаще. Клиент выбирает его сам по архитектуре.
-          arm64_name="social-world-${VERSION_CODE}-arm64.apk"
-          arm64_url="${SUPABASE_URL}/storage/v1/object/public/app-releases/${arm64_name}"
-          upload "${arm64_name}" "application/vnd.android.package-archive" \
-            "max-age=31536000" "$RUNNER_TEMP/app-arm64.apk"
+          TAG="android-release-${GITHUB_RUN_NUMBER}"
 
           # Черновик описания — заголовки коммитов с предыдущей сборки. Её
-          # коммит берём из каталога релизов; если каталога ещё нет (первая
-          # сборка) или коммит пропал из истории, показываем последние 15.
+          # коммит берём из каталога релизов в дашборде; если каталога ещё
+          # нет или коммит пропал из истории, показываем последние 15.
           prev_sha=$(curl --silent \
             "${SUPABASE_URL}/rest/v1/ws_app_releases?select=commit_sha&order=version_code.desc&limit=1" \
             -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
@@ -290,20 +267,40 @@ jobs:
           else
             notes=$(git log --no-merges --pretty=format:'- %s' -n 15 "${GITHUB_SHA}")
           fi
-          [ -n "${notes}" ] || notes="Сборка ${{ steps.release.outputs.tag }}"
+          [ -n "${notes}" ] || notes="Сборка ${TAG}"
 
-          # Манифест перезаписывается каждым релизом, поэтому кешировать его
-          # надолго нельзя — иначе телефон ещё сутки не увидит новую версию.
+          apk_name="social-world-${VERSION_CODE}.apk"
+          arm64_name="social-world-${VERSION_CODE}-arm64.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "${apk_name}"
+          cp "$RUNNER_TEMP/app-arm64.apk" "${arm64_name}"
+
+          gh release create "$TAG" "${apk_name}" "${arm64_name}" \
+            --repo DDmsngr/social-world-releases \
+            --title "Social World Android release ${TAG}" \
+            --notes "${notes}" \
+            --latest
+
+          apk_url="https://github.com/DDmsngr/social-world-releases/releases/download/${TAG}/${apk_name}"
+          arm64_url="https://github.com/DDmsngr/social-world-releases/releases/download/${TAG}/${arm64_name}"
+
+          rm -rf /tmp/sw-releases
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/DDmsngr/social-world-releases.git" /tmp/sw-releases
           jq -n --argjson code "${VERSION_CODE}" --arg name "${version_name}" \
             --arg url "${apk_url}" --arg arm64 "${arm64_url}" --arg notes "${notes}" \
-            '{versionCode: $code, versionName: $name, apkUrl: $url, apkUrlArm64: $arm64, notes: $notes}' > manifest.json
-
-          upload "manifest.json" "application/json" "max-age=60" "manifest.json"
+            '{versionCode: $code, versionName: $name, apkUrl: $url, apkUrlArm64: $arm64, notes: $notes}' \
+            > /tmp/sw-releases/manifest.json
+          cd /tmp/sw-releases
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git diff --staged --quiet || git commit -m "chore: манифест ${version_name}+${VERSION_CODE}"
+          git push
+          cd "${GITHUB_WORKSPACE}"
 
           # Каталог для дашборда: описание можно потом поправить руками, повторный
           # запуск той же сборки правленый текст не затирает (см. 0022). Люди
           # качают APK с телефона, поэтому ссылка на лёгкий arm64-файл.
-          arm64_size=$(stat -c %s "$RUNNER_TEMP/app-arm64.apk")
+          arm64_size=$(stat -c %s "${arm64_name}")
           jq -n --argjson code "${VERSION_CODE}" --arg name "${version_name}" \
             --arg url "${arm64_url}" --argjson size "${arm64_size}" \
             --arg sha "${GITHUB_SHA}" --arg notes "${notes}" \
