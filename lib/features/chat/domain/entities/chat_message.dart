@@ -14,7 +14,11 @@ class ChatMessage {
     this.mediaUrl,
     this.status = MessageStatus.sent,
     this.signatureValid,
+    this.senderName,
   });
+
+  /// Имя автора — показывается в группах над чужими сообщениями.
+  final String? senderName;
 
   final String id;
   final String conversationId;
@@ -45,5 +49,6 @@ class ChatMessage {
         mediaUrl: mediaUrl,
         status: status ?? this.status,
         signatureValid: signatureValid ?? this.signatureValid,
+        senderName: senderName,
       );
 }

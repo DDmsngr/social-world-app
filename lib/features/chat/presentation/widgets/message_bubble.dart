@@ -5,10 +5,18 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/chat_message.dart';
 
 class MessageBubble extends StatelessWidget {
-  const MessageBubble({super.key, required this.message, required this.mine});
+  const MessageBubble({
+    super.key,
+    required this.message,
+    required this.mine,
+    this.showSender = false,
+  });
 
   final ChatMessage message;
   final bool mine;
+
+  /// В группах над чужим сообщением — имя автора.
+  final bool showSender;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +43,21 @@ class MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            if (showSender && message.senderName != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    message.senderName!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryTint,
+                    ),
+                  ),
+                ),
+              ),
             Text(
               message.text ?? '',
               style: TextStyle(

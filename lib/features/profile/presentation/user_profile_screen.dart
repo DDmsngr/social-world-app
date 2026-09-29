@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/feature_flags.dart';
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
 import '../../../core/links/deep_links.dart';
@@ -17,6 +18,7 @@ import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../chat/presentation/providers/chat_providers.dart';
 import '../../feed/presentation/post_actions.dart';
 import '../../feed/presentation/widgets/post_card.dart';
 import '../../moderation/domain/entities/report_reason.dart';
@@ -220,6 +222,31 @@ class _Body extends ConsumerWidget {
     }
   }
 
+  Future<void> _openChat(BuildContext context, WidgetRef ref) async {
+    try {
+      final conversationId = await ref
+          .read(chatRepositoryProvider)
+          .openDirect(profile.id);
+      if (context.mounted) {
+        context.go(
+          '${Routes.chats}/$conversationId',
+          extra: profile.displayName,
+        );
+      }
+    } catch (error) {
+      AppLog.add('Диалог не открылся: $error');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              friendlyError(error, fallback: 'Не удалось открыть переписку'),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -262,8 +289,20 @@ class _Body extends ConsumerWidget {
         const SizedBox(height: 18),
         Row(
           children: [
-            _Stat(value: profile.followerCount, label: 'подписчиков'),
-            _Stat(value: profile.followingCount, label: 'подписок'),
+            _Stat(
+              value: profile.followerCount,
+              label: 'подписчиков',
+              onTap: () => context.push(
+                '${Routes.user}/${profile.id}/followers',
+              ),
+            ),
+            _Stat(
+              value: profile.followingCount,
+              label: 'подписок',
+              onTap: () => context.push(
+                '${Routes.user}/${profile.id}/following',
+              ),
+            ),
             _Stat(value: profile.socialScore, label: 'Social Score'),
           ],
         ),
@@ -329,15 +368,33 @@ class _Body extends ConsumerWidget {
             ),
           )
         else
-          FilledButton(
-            onPressed: () => _toggleFollow(context, ref),
-            style: profile.followedByMe
-                ? FilledButton.styleFrom(
-                    backgroundColor: AppColors.card,
-                    foregroundColor: AppColors.primaryTint,
-                  )
-                : null,
-            child: Text(profile.followedByMe ? 'Вы подписаны' : 'Подписаться'),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => _toggleFollow(context, ref),
+                  style: profile.followedByMe
+                      ? FilledButton.styleFrom(
+                          backgroundColor: AppColors.card,
+                          foregroundColor: AppColors.primaryTint,
+                        )
+                      : null,
+                  child: Text(
+                    profile.followedByMe ? 'Вы подписаны' : 'Подписаться',
+                  ),
+                ),
+              ),
+              if (Features.chat) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openChat(context, ref),
+                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                    label: const Text('Написать'),
+                  ),
+                ),
+              ],
+            ],
           ),
         const SizedBox(height: 26),
         if (blockKind == null) _Posts(userId: profile.id, isMe: isMe),
@@ -392,20 +449,31 @@ class _Posts extends ConsumerWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
+  const _Stat({required this.value, required this.label, this.onTap});
 
   final int value;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
-        children: [
-          Text('$value', style: AppTypography.serif(24)),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 12, color: AppColors.textDim)),
-        ],
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.chip),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            children: [
+              Text('$value', style: AppTypography.serif(24)),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: AppColors.textDim),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

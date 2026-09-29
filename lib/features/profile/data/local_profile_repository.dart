@@ -80,4 +80,25 @@ class LocalProfileRepository implements ProfileRepository {
           ProfileHit(id: entry.key, displayName: entry.value),
     ];
   }
+
+  @override
+  Future<List<ProfileHit>> loadFollowList(
+    String userId,
+    FollowList list, {
+    int offset = 0,
+  }) async {
+    if (offset > 0) return const [];
+    final ids = list == FollowList.following && userId == currentUserId()
+        ? _followed
+        : _people.keys.where((id) => id != userId).take(4);
+    return [
+      for (final id in ids)
+        if (!_blocks.containsKey(id))
+          ProfileHit(
+            id: id,
+            displayName: _people[id] ?? 'Без имени',
+            followedByMe: _followed.contains(id),
+          ),
+    ];
+  }
 }

@@ -71,15 +71,20 @@ class BlockedUser {
   final BlockKind kind;
 }
 
-/// Результат поиска людей.
+/// Человек в списке: результат поиска, подписчик, подписка.
 class ProfileHit {
   const ProfileHit({
     required this.id,
     required this.displayName,
     this.avatarUrl,
+    this.followedByMe = false,
   });
 
   final String id;
   final String displayName;
   final String? avatarUrl;
+  final bool followedByMe;
 }
+
+/// Какой список связей открыт: кто подписан на человека или на кого он.
+enum FollowList { followers, following }

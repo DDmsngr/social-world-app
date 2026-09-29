@@ -9,6 +9,9 @@ import '../domain/repositories/chat_repository.dart';
 import 'crypto/chat_crypto_service.dart';
 import 'crypto/chat_key_storage.dart';
 
+/// Боевой чат на Supabase. Личные диалоги — сквозное шифрование, сервер
+/// видит только шифротекст. Группы и квест-чаты — открытый текст в `body`
+/// (решение 29.09): доступ к ним режут RLS и членство.
 class SecureChatRepository implements ChatRepository {
   SecureChatRepository(
     this._client, {
@@ -16,13 +19,27 @@ class SecureChatRepository implements ChatRepository {
     ChatKeyStorage? keyStorage,
   }) : _keyStorage = keyStorage ?? SecureChatKeyStorage() {
     _ready = _initialize();
+    // Ошибку публикации ключей получит тот, кто дождётся _ready; без
+    // ожидающих она не должна всплывать как необработанная.
+    _ready.ignore();
   }
+
+  /// Сколько последних сообщений держит экран переписки.
+  static const _historyLimit = 300;
 
   final SupabaseClient _client;
   final String currentUserId;
   final ChatKeyStorage _keyStorage;
   final _uuid = const Uuid();
   late final Future<ChatCryptoService> _ready;
+
+  /// Тип чата не меняется — запоминаем, чтобы не спрашивать сервер на
+  /// каждое сообщение.
+  final _kinds = <String, ConversationKind>{};
+
+  /// Опубликованные ключи не меняются без смены устройства; пустой ответ не
+  /// кэшируется — собеседник может опубликовать ключи позже.
+  final _keys = <String, ChatPublicKeys>{};
 
   @override
   bool get endToEndEncryptionEnabled => true;
@@ -46,80 +63,156 @@ class SecureChatRepository implements ChatRepository {
   @override
   Future<List<Conversation>> loadConversations() async {
     await _ready;
-    // Только личные диалоги (direct_key задан). Квест-чаты (миграция 0023) —
-    // групповые, а этот репозиторий шифрует для одного собеседника: без
-    // фильтра квест-чат уронил бы разбор «собеседника» во всём списке.
-    final memberships = await _client
-        .from('chat_members')
-        .select('conversation_id, last_read_at, chat_conversations!inner(direct_key)')
-        .eq('profile_id', currentUserId)
-        .not('chat_conversations.direct_key', 'is', null)
-        .order('joined_at', ascending: false);
-
+    final rows = await _client.rpc('my_chats') as List<dynamic>;
     return Future.wait([
-      for (final membership in memberships)
-        _loadConversation(Map<String, dynamic>.from(membership)),
+      for (final row in rows) _conversationFromRow(row as Map<String, dynamic>),
     ]);
   }
 
-  Future<Conversation> _loadConversation(
-    Map<String, dynamic> membership,
-  ) async {
-    final conversationId = membership['conversation_id'] as String;
-    final peer = await _loadPeer(conversationId);
-    final keys = await _loadPublicKeys(peer.id);
-    final rows = await _client
-        .from('chat_messages')
-        .select()
-        .eq('conversation_id', conversationId)
-        .order('sent_at');
-    final messages = keys == null
-        ? const <ChatMessage>[]
-        : await _decodeMessages(
-            rows: rows,
-            conversationId: conversationId,
-            peer: peer,
-            peerKeys: keys,
-          );
-    final lastReadAt = _date(membership['last_read_at']);
-    final unreadCount = messages.where((message) {
-      return message.senderId != currentUserId &&
-          (lastReadAt == null || message.sentAt.isAfter(lastReadAt));
-    }).length;
+  @override
+  Future<Conversation> loadConversation(String conversationId) async {
+    await _ready;
+    final rows = await _client.rpc(
+      'my_chats',
+      params: {'in_conversation': conversationId},
+    ) as List<dynamic>;
+    if (rows.isEmpty) throw StateError('Чат недоступен');
+    return _conversationFromRow(rows.first as Map<String, dynamic>);
+  }
+
+  Future<Conversation> _conversationFromRow(Map<String, dynamic> row) async {
+    final id = row['id'] as String;
+    final kind = ConversationKind.parse(row['kind']);
+    _kinds[id] = kind;
+
+    final peerId = row['peer_id'] as String?;
+    final peerKeys = kind == ConversationKind.direct && peerId != null
+        ? await _loadPublicKeys(peerId)
+        : null;
+
+    ChatMessage? last;
+    final lastId = row['last_id'] as String?;
+    if (lastId != null) {
+      final senderId = row['last_sender_id'] as String;
+      final sentAt = DateTime.parse(row['last_sent_at'] as String).toLocal();
+      if (kind == ConversationKind.direct) {
+        last = peerKeys == null
+            ? ChatMessage(
+                id: lastId,
+                conversationId: id,
+                senderId: senderId,
+                sentAt: sentAt,
+                text: 'Зашифрованное сообщение',
+              )
+            : await _decodeDirect(
+                row: {
+                  'id': lastId,
+                  'sender_id': senderId,
+                  'sent_at': row['last_sent_at'],
+                  'ciphertext': row['last_ciphertext'],
+                  'nonce': row['last_nonce'],
+                  'mac': row['last_mac'],
+                  'signature': row['last_signature'],
+                },
+                conversationId: id,
+                peerKeys: peerKeys,
+                peerLastReadAt: _date(row['peer_last_read_at']),
+              );
+      } else {
+        last = ChatMessage(
+          id: lastId,
+          conversationId: id,
+          senderId: senderId,
+          sentAt: sentAt,
+          text: row['last_body'] as String?,
+          senderName: row['last_sender_name'] as String?,
+        );
+      }
+    }
 
     return Conversation(
-      id: conversationId,
-      peerId: peer.id,
-      peerName: peer.name,
-      peerAvatarUrl: peer.avatarUrl,
-      lastMessage: messages.lastOrNull,
-      unreadCount: unreadCount,
-      encrypted: keys != null,
+      id: id,
+      kind: kind,
+      peerId: peerId,
+      peerName: row['peer_name'] as String?,
+      peerAvatarUrl: row['peer_avatar'] as String?,
+      title: row['title'] as String?,
+      memberCount: (row['member_count'] as num?)?.toInt() ?? 0,
+      isOwner: row['my_role'] == 'owner',
+      closed: row['closed'] as bool? ?? false,
+      lastMessage: last,
+      unreadCount: (row['unread_count'] as num?)?.toInt() ?? 0,
+      encrypted: kind == ConversationKind.direct && peerKeys != null,
     );
   }
+
+  Future<ConversationKind> _kind(String conversationId) async =>
+      _kinds[conversationId] ?? (await loadConversation(conversationId)).kind;
 
   @override
   Stream<List<ChatMessage>> watchMessages(String conversationId) async* {
     await _ready;
-    final peer = await _loadPeer(conversationId);
-    final keys = await _loadPublicKeys(peer.id);
-    if (keys == null) {
-      throw StateError('Собеседник ещё не опубликовал ключи шифрования');
-    }
-
-    yield* _client
+    final conversation = await loadConversation(conversationId);
+    final rows = _client
         .from('chat_messages')
         .stream(primaryKey: ['id'])
         .eq('conversation_id', conversationId)
-        .order('sent_at')
-        .asyncMap(
-          (rows) => _decodeMessages(
-            rows: rows,
+        .order('sent_at', ascending: false)
+        .limit(_historyLimit);
+
+    if (conversation.isDirect) {
+      final peerId = conversation.peerId;
+      final keys = peerId == null ? null : await _loadPublicKeys(peerId);
+      if (keys == null) {
+        throw StateError('Собеседник ещё не опубликовал ключи шифрования');
+      }
+      final peerLastReadAt = await _peerLastReadAt(conversationId);
+      yield* rows.asyncMap(
+        (batch) => Future.wait([
+          for (final row in batch.reversed)
+            _decodeDirect(
+              row: row,
+              conversationId: conversationId,
+              peerKeys: keys,
+              peerLastReadAt: peerLastReadAt,
+            ),
+        ]),
+      );
+      return;
+    }
+
+    final names = {
+      for (final member in await loadMembers(conversationId))
+        member.id: member.name,
+    };
+    yield* rows.asyncMap((batch) async {
+      // Автор мог уже выйти из группы — имя добираем из профилей.
+      final unknown = {
+        for (final row in batch)
+          if (!names.containsKey(row['sender_id'])) row['sender_id'] as String,
+      };
+      if (unknown.isNotEmpty) {
+        final profiles = await _client
+            .from('profiles')
+            .select('id, display_name')
+            .inFilter('id', unknown.toList());
+        for (final p in profiles) {
+          names[p['id'] as String] =
+              p['display_name'] as String? ?? 'Участник';
+        }
+      }
+      return [
+        for (final row in batch.reversed)
+          ChatMessage(
+            id: row['id'] as String,
             conversationId: conversationId,
-            peer: peer,
-            peerKeys: keys,
+            senderId: row['sender_id'] as String,
+            senderName: names[row['sender_id']] ?? 'Участник',
+            sentAt: DateTime.parse(row['sent_at'] as String).toLocal(),
+            text: row['body'] as String?,
           ),
-        );
+      ];
+    });
   }
 
   @override
@@ -128,40 +221,51 @@ class SecureChatRepository implements ChatRepository {
     required String text,
   }) async {
     final crypto = await _ready;
-    final peer = await _loadPeer(conversationId);
-    final keys = await _loadPublicKeys(peer.id);
-    if (keys == null) {
-      throw StateError('Собеседник ещё не опубликовал ключи шифрования');
-    }
-
-    final sentAt = DateTime.now().toUtc();
+    final clean = text.trim();
     final id = _uuid.v4();
-    final payload = await crypto.encrypt(
-      conversationId: conversationId,
-      messageId: id,
-      senderId: currentUserId,
-      recipientExchangeKey: keys.exchangeKey,
-      text: text.trim(),
-    );
-    await _client.from('chat_messages').insert({
-      'id': id,
-      'conversation_id': conversationId,
-      'sender_id': currentUserId,
-      'kind': 'text',
-      'ciphertext': payload.ciphertext,
-      'nonce': payload.nonce,
-      'mac': payload.mac,
-      'signature': payload.signature,
-      'protocol_version': ChatCryptoService.protocolVersion,
-      'sent_at': sentAt.toIso8601String(),
-    });
+    final kind = await _kind(conversationId);
+
+    if (kind != ConversationKind.direct) {
+      await _client.from('chat_messages').insert({
+        'id': id,
+        'conversation_id': conversationId,
+        'sender_id': currentUserId,
+        'kind': 'text',
+        'body': clean,
+      });
+    } else {
+      final peerId = await _peerId(conversationId);
+      final keys = await _loadPublicKeys(peerId);
+      if (keys == null) {
+        throw StateError('Собеседник ещё не опубликовал ключи шифрования');
+      }
+      final payload = await crypto.encrypt(
+        conversationId: conversationId,
+        messageId: id,
+        senderId: currentUserId,
+        recipientExchangeKey: keys.exchangeKey,
+        text: clean,
+      );
+      // sent_at проставляет сервер (0030).
+      await _client.from('chat_messages').insert({
+        'id': id,
+        'conversation_id': conversationId,
+        'sender_id': currentUserId,
+        'kind': 'text',
+        'ciphertext': payload.ciphertext,
+        'nonce': payload.nonce,
+        'mac': payload.mac,
+        'signature': payload.signature,
+        'protocol_version': ChatCryptoService.protocolVersion,
+      });
+    }
 
     return ChatMessage(
       id: id,
       conversationId: conversationId,
       senderId: currentUserId,
-      sentAt: sentAt,
-      text: text.trim(),
+      sentAt: DateTime.now(),
+      text: clean,
       status: MessageStatus.sent,
       signatureValid: true,
     );
@@ -180,8 +284,7 @@ class SecureChatRepository implements ChatRepository {
   @override
   Future<String> securityCode(String conversationId) async {
     final crypto = await _ready;
-    final peer = await _loadPeer(conversationId);
-    final keys = await _loadPublicKeys(peer.id);
+    final keys = await _loadPublicKeys(await _peerId(conversationId));
     if (keys == null) return 'Ключи собеседника ещё не получены';
     return crypto.securityCode(
       conversationId: conversationId,
@@ -189,35 +292,82 @@ class SecureChatRepository implements ChatRepository {
     );
   }
 
-  Future<List<ChatMessage>> _decodeMessages({
-    required List<Map<String, dynamic>> rows,
+  @override
+  Future<String> openDirect(String peerId) async {
+    await _ready;
+    final id = await _client.rpc(
+      'create_direct_conversation',
+      params: {'in_peer': peerId},
+    ) as String;
+    _kinds[id] = ConversationKind.direct;
+    return id;
+  }
+
+  @override
+  Future<String> createGroup({
+    required String title,
+    required List<String> memberIds,
+  }) async {
+    await _ready;
+    final id = await _client.rpc(
+      'create_group_chat',
+      params: {'in_title': title.trim(), 'in_members': memberIds},
+    ) as String;
+    _kinds[id] = ConversationKind.group;
+    return id;
+  }
+
+  @override
+  Future<List<ChatMember>> loadMembers(String conversationId) async {
+    final rows = await _client
+        .from('chat_members')
+        .select(
+          'profile_id, role, '
+          'profiles!chat_members_profile_id_fkey(display_name, avatar_url)',
+        )
+        .eq('conversation_id', conversationId)
+        .order('joined_at');
+    return [
+      for (final row in rows)
+        ChatMember(
+          id: row['profile_id'] as String,
+          name:
+              (row['profiles'] as Map?)?['display_name'] as String? ??
+              'Участник',
+          avatarUrl: (row['profiles'] as Map?)?['avatar_url'] as String?,
+          isOwner: row['role'] == 'owner',
+        ),
+    ];
+  }
+
+  @override
+  Future<void> addMembers(String conversationId, List<String> memberIds) =>
+      _client.rpc(
+        'add_chat_members',
+        params: {'in_conversation': conversationId, 'in_members': memberIds},
+      );
+
+  @override
+  Future<void> removeMember(String conversationId, String memberId) =>
+      _client.rpc(
+        'remove_chat_member',
+        params: {'in_conversation': conversationId, 'in_profile': memberId},
+      );
+
+  @override
+  Future<void> renameGroup(String conversationId, String title) => _client.rpc(
+    'rename_group_chat',
+    params: {'in_conversation': conversationId, 'in_title': title.trim()},
+  );
+
+  Future<ChatMessage> _decodeDirect({
+    required Map<String, dynamic> row,
     required String conversationId,
-    required _Peer peer,
     required ChatPublicKeys peerKeys,
+    required DateTime? peerLastReadAt,
   }) async {
     final crypto = await _ready;
     final myKeys = await crypto.publicKeys;
-    return Future.wait([
-      for (final row in rows)
-        _decodeMessage(
-          crypto: crypto,
-          row: row,
-          conversationId: conversationId,
-          peer: peer,
-          peerKeys: peerKeys,
-          myKeys: myKeys,
-        ),
-    ]);
-  }
-
-  Future<ChatMessage> _decodeMessage({
-    required ChatCryptoService crypto,
-    required Map<String, dynamic> row,
-    required String conversationId,
-    required _Peer peer,
-    required ChatPublicKeys peerKeys,
-    required ChatPublicKeys myKeys,
-  }) async {
     final senderId = row['sender_id'] as String;
     final senderKeys = senderId == currentUserId ? myKeys : peerKeys;
     final sentAt = DateTime.parse(row['sent_at'] as String).toLocal();
@@ -242,7 +392,7 @@ class SecureChatRepository implements ChatRepository {
         senderId: senderId,
         sentAt: sentAt,
         text: decrypted.text ?? 'Сообщение не прошло проверку подписи',
-        status: _status(sentAt, peer.lastReadAt),
+        status: _status(sentAt, peerLastReadAt),
         signatureValid: decrypted.signatureValid,
       );
     } catch (_) {
@@ -258,28 +408,32 @@ class SecureChatRepository implements ChatRepository {
     }
   }
 
-  Future<_Peer> _loadPeer(String conversationId) async {
+  Future<String> _peerId(String conversationId) async {
     final row = await _client
         .from('chat_members')
-        .select(
-          'profile_id, last_read_at, '
-          'profiles!chat_members_profile_id_fkey(display_name, avatar_url)',
-        )
+        .select('profile_id')
         .eq('conversation_id', conversationId)
         .neq('profile_id', currentUserId)
         .limit(1)
         .maybeSingle();
     if (row == null) throw StateError('Собеседник не найден');
-    final profile = Map<String, dynamic>.from(row['profiles'] as Map);
-    return _Peer(
-      id: row['profile_id'] as String,
-      name: profile['display_name'] as String? ?? 'Пользователь',
-      avatarUrl: profile['avatar_url'] as String?,
-      lastReadAt: _date(row['last_read_at']),
-    );
+    return row['profile_id'] as String;
+  }
+
+  Future<DateTime?> _peerLastReadAt(String conversationId) async {
+    final row = await _client
+        .from('chat_members')
+        .select('last_read_at')
+        .eq('conversation_id', conversationId)
+        .neq('profile_id', currentUserId)
+        .limit(1)
+        .maybeSingle();
+    return _date(row?['last_read_at']);
   }
 
   Future<ChatPublicKeys?> _loadPublicKeys(String profileId) async {
+    final cached = _keys[profileId];
+    if (cached != null) return cached;
     final row = await _client
         .from('chat_public_keys')
         .select('x25519_public_key, ed25519_public_key, protocol_version')
@@ -289,7 +443,7 @@ class SecureChatRepository implements ChatRepository {
         row['protocol_version'] != ChatCryptoService.protocolVersion) {
       return null;
     }
-    return ChatPublicKeys(
+    return _keys[profileId] = ChatPublicKeys(
       exchangeKey: row['x25519_public_key'] as String,
       signingKey: row['ed25519_public_key'] as String,
     );
@@ -302,18 +456,4 @@ class SecureChatRepository implements ChatRepository {
       peerLastReadAt != null && !peerLastReadAt.isBefore(sentAt)
       ? MessageStatus.read
       : MessageStatus.sent;
-}
-
-class _Peer {
-  const _Peer({
-    required this.id,
-    required this.name,
-    required this.avatarUrl,
-    required this.lastReadAt,
-  });
-
-  final String id;
-  final String name;
-  final String? avatarUrl;
-  final DateTime? lastReadAt;
 }

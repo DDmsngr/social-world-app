@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/feature_flags.dart';
+import '../../../core/debug/app_log.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update/update_controller.dart';
 import '../../../core/update/update_dot.dart';
+import '../../chat/presentation/providers/chat_providers.dart';
 import '../../notifications/notifications.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
 import '../../saved/saved.dart';
@@ -37,6 +41,16 @@ class _HomeShellState extends ConsumerState<HomeShell>
       ref.read(blocksProvider);
       ref.read(savedProvider);
       ref.read(notificationsProvider);
+      // Ключи шифрования публикуются при создании репозитория чатов. Делаем
+      // это сразу после входа, а не при первом заходе во вкладку «Чаты»:
+      // иначе человеку нельзя написать, пока он сам туда не заглянет.
+      if (Features.chat) {
+        try {
+          ref.read(chatRepositoryProvider);
+        } catch (error) {
+          AppLog.add('Чаты не инициализировались: $error');
+        }
+      }
     });
     // Push (FCM) — отдельная инфраструктура; пока значок обновляется опросом.
     _poll = Timer.periodic(
@@ -59,8 +73,35 @@ class _HomeShellState extends ConsumerState<HomeShell>
     super.dispose();
   }
 
+  /// Системный «назад»: сначала на предыдущий экран (с уважением к PopScope —
+  /// например, к подтверждению в записи маршрута), со дна любой вкладки — на
+  /// Pulse, и только с Pulse приложение закрывается. Оболочка остаётся в дереве
+  /// под открытыми поверх неё экранами, поэтому слушатель ловит и их.
+  Future<bool> _onSystemBack() async {
+    final router = ref.read(routerProvider);
+    if (await router.routerDelegate.popRoute()) return true;
+    // Страховка: стандартный разбор не всегда видит экран, открытый поверх
+    // вкладок, и тогда Android закрывал приложение прямо из настроек.
+    if (router.canPop()) {
+      router.pop();
+      return true;
+    }
+    if (router.state.matchedLocation != Routes.home) {
+      router.go(Routes.home);
+      return true;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
+    return BackButtonListener(
+      onBackButtonPressed: _onSystemBack,
+      child: _buildShell(context),
+    );
+  }
+
+  Widget _buildShell(BuildContext context) {
     return Scaffold(
       body: widget.navigationShell,
       bottomNavigationBar: DecoratedBox(

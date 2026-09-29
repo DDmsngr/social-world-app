@@ -11,6 +11,7 @@ import '../../features/auth/domain/entities/app_user.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/chat/presentation/chats_soon_screen.dart';
 import '../../features/chat/presentation/conversations_screen.dart';
+import '../../features/chat/presentation/group_screens.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
@@ -30,7 +31,9 @@ import '../../features/needs/presentation/my_needs_screen.dart';
 import '../../features/needs/presentation/need_detail_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/profile/presentation/blocked_users_screen.dart';
+import '../../features/profile/domain/profile_models.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
+import '../../features/profile/presentation/follow_list_screen.dart';
 import '../../features/profile/presentation/user_profile_screen.dart';
 import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
@@ -265,6 +268,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '${Routes.user}/:userId',
         builder: (_, state) =>
             UserProfileScreen(userId: state.pathParameters['userId']!),
+        routes: [
+          GoRoute(
+            path: 'followers',
+            builder: (_, state) => FollowListScreen(
+              userId: state.pathParameters['userId']!,
+              list: FollowList.followers,
+            ),
+          ),
+          GoRoute(
+            path: 'following',
+            builder: (_, state) => FollowListScreen(
+              userId: state.pathParameters['userId']!,
+              list: FollowList.following,
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: '${Routes.places}/:placeId',
@@ -331,14 +350,29 @@ final routerProvider = Provider<GoRouter>((ref) {
                     ? const ConversationsScreen()
                     : const ChatsSoonScreen(),
                 routes: [
-                  if (Features.chat)
+                  if (Features.chat) ...[
+                    // Раньше ':conversationId', иначе 'new-group' примется за id.
+                    GoRoute(
+                      path: 'new-group',
+                      builder: (_, _) => const CreateGroupScreen(),
+                    ),
                     GoRoute(
                       path: ':conversationId',
                       builder: (_, state) => ChatScreen(
                         conversationId: state.pathParameters['conversationId']!,
                         peerName: state.extra as String? ?? 'Чат',
                       ),
+                      routes: [
+                        GoRoute(
+                          path: 'info',
+                          builder: (_, state) => GroupInfoScreen(
+                            conversationId:
+                                state.pathParameters['conversationId']!,
+                          ),
+                        ),
+                      ],
                     ),
+                  ],
                 ],
               ),
             ],

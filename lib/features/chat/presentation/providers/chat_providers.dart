@@ -32,9 +32,19 @@ final conversationsProvider = FutureProvider<List<Conversation>>((ref) {
   return ref.watch(chatRepositoryProvider).loadConversations();
 });
 
-final messagesProvider = StreamProvider.family<List<ChatMessage>, String>((
-  ref,
-  conversationId,
-) {
-  return ref.watch(chatRepositoryProvider).watchMessages(conversationId);
-});
+final messagesProvider = StreamProvider.autoDispose
+    .family<List<ChatMessage>, String>((ref, conversationId) {
+      return ref.watch(chatRepositoryProvider).watchMessages(conversationId);
+    });
+
+/// Карточка одного чата: заголовок, тип, права. Пустой личный диалог в
+/// общем списке не виден, поэтому берётся отдельным запросом.
+final conversationProvider = FutureProvider.autoDispose
+    .family<Conversation, String>((ref, conversationId) {
+      return ref.watch(chatRepositoryProvider).loadConversation(conversationId);
+    });
+
+final chatMembersProvider = FutureProvider.autoDispose
+    .family<List<ChatMember>, String>((ref, conversationId) {
+      return ref.watch(chatRepositoryProvider).loadMembers(conversationId);
+    });

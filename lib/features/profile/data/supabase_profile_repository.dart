@@ -95,4 +95,25 @@ class SupabaseProfileRepository implements ProfileRepository {
         ),
     ];
   }
+
+  @override
+  Future<List<ProfileHit>> loadFollowList(
+    String userId,
+    FollowList list, {
+    int offset = 0,
+  }) async {
+    final rows = await _client.rpc(
+      list == FollowList.followers ? 'profile_followers' : 'profile_following',
+      params: {'in_profile': userId, 'in_limit': 50, 'in_offset': offset},
+    ) as List<dynamic>;
+    return [
+      for (final raw in rows)
+        ProfileHit(
+          id: (raw as Map<String, dynamic>)['id'] as String,
+          displayName: (raw['display_name'] as String?) ?? 'Без имени',
+          avatarUrl: raw['avatar_url'] as String?,
+          followedByMe: raw['followed_by_me'] as bool? ?? false,
+        ),
+    ];
+  }
 }

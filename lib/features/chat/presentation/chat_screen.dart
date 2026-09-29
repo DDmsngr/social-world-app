@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/debug/app_log.dart';
+import '../../../core/errors/friendly_error.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/chat_message.dart';
+import 'conversations_screen.dart';
 import 'providers/chat_providers.dart';
 import 'widgets/message_bubble.dart';
 
@@ -18,6 +23,8 @@ class ChatScreen extends ConsumerStatefulWidget {
   });
 
   final String conversationId;
+
+  /// Имя из списка — показывается, пока карточка чата не загрузилась.
   final String peerName;
 
   @override
@@ -26,23 +33,26 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _controller = TextEditingController();
-  final _scrollController = ScrollController();
   bool _sending = false;
   String? _sendError;
 
   @override
   void initState() {
     super.initState();
+    _markRead();
+  }
+
+  void _markRead() {
     ref
         .read(chatRepositoryProvider)
         .markRead(widget.conversationId)
-        .then((_) => ref.invalidate(conversationsProvider));
+        .then((_) => ref.invalidate(conversationsProvider))
+        .catchError((Object error) => AppLog.add('Отметка прочтения: $error'));
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
@@ -59,78 +69,151 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           .read(chatRepositoryProvider)
           .send(conversationId: widget.conversationId, text: text);
       _controller.clear();
-    } catch (_) {
+      // Новый личный диалог появляется в списке только после первого
+      // сообщения.
+      ref.invalidate(conversationsProvider);
+    } catch (error) {
+      AppLog.add('Сообщение не ушло: $error');
       if (mounted) {
         setState(() {
-          _sendError = 'Не удалось отправить защищённое сообщение';
+          _sendError = friendlyError(
+            error,
+            fallback: 'Не удалось отправить сообщение',
+          );
         });
       }
-      return;
     } finally {
       if (mounted) setState(() => _sending = false);
     }
-
-    if (!mounted || !_scrollController.hasClients) return;
-    await _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent + 120,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOut,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final messages = ref.watch(messagesProvider(widget.conversationId));
+    final conversation = ref.watch(conversationProvider(widget.conversationId));
+    final info = conversation.value;
     final myId = ref.watch(currentUserProvider)?.id ?? 'local-user';
+    final isDirect = info?.isDirect ?? true;
+
+    // Пока экран открыт, входящие сразу считаются прочитанными.
+    ref.listen(messagesProvider(widget.conversationId), (previous, next) {
+      final before = previous?.value?.length ?? 0;
+      if ((next.value?.length ?? 0) > before && before > 0) _markRead();
+    });
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.peerName),
+        title: InkWell(
+          onTap: info == null || isDirect
+              ? null
+              : () => context.push(
+                  '${Routes.chats}/${widget.conversationId}/info',
+                ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                info?.displayName ?? widget.peerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (info != null && !isDirect)
+                Text(
+                  membersLabel(info.memberCount),
+                  style: TextStyle(fontSize: 12, color: AppColors.textDim),
+                ),
+            ],
+          ),
+        ),
         titleTextStyle: Theme.of(context).textTheme.titleLarge,
         actions: [
-          IconButton(
-            onPressed: _showSecurityCode,
-            tooltip: 'Код безопасности',
-            icon: const Icon(Icons.verified_user_outlined),
-          ),
+          if (info != null && isDirect)
+            IconButton(
+              onPressed: _showSecurityCode,
+              tooltip: 'Код безопасности',
+              icon: const Icon(Icons.verified_user_outlined),
+            )
+          else if (info != null)
+            IconButton(
+              onPressed: () => context.push(
+                '${Routes.chats}/${widget.conversationId}/info',
+              ),
+              tooltip: 'О группе',
+              icon: const Icon(Icons.info_outline),
+            ),
         ],
       ),
       body: Column(
         children: [
+          if (info != null && !isDirect) const _PlainTextNotice(),
           Expanded(
             child: messages.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, _) => Center(
+              error: (error, _) => _ErrorView(
+                keysMissing: error.toString().contains('ключи'),
+                onRetry: () =>
+                    ref.invalidate(messagesProvider(widget.conversationId)),
+              ),
+              data: (items) {
+                if (items.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.gutter),
+                      child: Text(
+                        isDirect
+                            ? 'Напишите первое сообщение. Переписка защищена '
+                                  'сквозным шифрованием.'
+                            : 'Сообщений пока нет.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                  );
+                }
+                // reverse: новые снизу, и лента сама держится у последнего
+                // сообщения при входящих.
+                return ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.gutter,
+                    14,
+                    AppSpacing.gutter,
+                    14,
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final message = items[items.length - 1 - index];
+                    final mine = message.senderId == myId;
+                    return MessageBubble(
+                      message: message,
+                      mine: mine,
+                      showSender: !isDirect && !mine,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          if (info?.closed ?? false)
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
                 child: Text(
-                  'Не удалось загрузить переписку',
+                  'Чат закрыт — квест завершён',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-              data: (items) => ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.gutter,
-                  14,
-                  AppSpacing.gutter,
-                  14,
-                ),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final message = items[index];
-                  return MessageBubble(
-                    message: message,
-                    mine: message.senderId == myId,
-                  );
-                },
-              ),
+            )
+          else
+            _Composer(
+              controller: _controller,
+              onChanged: (_) => setState(() {}),
+              error: _sendError,
+              onSend: _controller.text.trim().isEmpty || _sending
+                  ? null
+                  : _send,
             ),
-          ),
-          _Composer(
-            controller: _controller,
-            onChanged: (_) => setState(() {}),
-            error: _sendError,
-            onSend: _controller.text.trim().isEmpty || _sending ? null : _send,
-          ),
         ],
       ),
     );
@@ -194,6 +277,69 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
+/// Группы не шифруются сквозным шифрованием — это видно сразу.
+class _PlainTextNotice extends StatelessWidget {
+  const _PlainTextNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gutter,
+        vertical: 8,
+      ),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.hair)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_open, size: 14, color: AppColors.textFaint),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Групповой чат без сквозного шифрования',
+              style: TextStyle(fontSize: 12, color: AppColors.textFaint),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.keysMissing, required this.onRetry});
+
+  final bool keysMissing;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.gutter),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              keysMissing
+                  ? 'Собеседник ещё не заходил в приложение с включёнными '
+                        'чатами. Как только он обновится и откроет приложение, '
+                        'здесь можно будет переписываться.'
+                  : 'Не удалось загрузить переписку',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            TextButton(onPressed: onRetry, child: const Text('Повторить')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
@@ -237,6 +383,14 @@ class _Composer extends StatelessWidget {
                     onChanged: onChanged,
                     minLines: 1,
                     maxLines: 4,
+                    maxLength: 4000,
+                    buildCounter:
+                        (
+                          _, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) => null,
                     textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
                       hintText: 'Написать сообщение',

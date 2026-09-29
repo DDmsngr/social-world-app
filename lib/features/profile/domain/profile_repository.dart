@@ -16,4 +16,11 @@ abstract interface class ProfileRepository {
 
   /// Поиск людей по имени (от двух символов).
   Future<List<ProfileHit>> searchProfiles(String query);
+
+  /// Подписчики или подписки человека. Заблокированные пары сервер не отдаёт.
+  Future<List<ProfileHit>> loadFollowList(
+    String userId,
+    FollowList list, {
+    int offset = 0,
+  });
 }
