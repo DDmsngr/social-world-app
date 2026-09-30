@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
 async function forMessage(messageId: string) {
   const { data: message } = await db
     .from("chat_messages")
-    .select("id, conversation_id, sender_id, body")
+    .select("id, conversation_id, sender_id, body, kind")
     .eq("id", messageId)
     .maybeSingle();
   if (!message) return null;
@@ -105,7 +105,7 @@ async function forMessage(messageId: string) {
     title ??= "Группа";
     push = {
       title,
-      body: `${senderName}: ${truncate(message.body ?? "", 140)}`,
+      body: `${senderName}: ${groupPreview(message.kind, message.body)}`,
       channel: "messages",
       tag: conversation.id,
       data: { type: "message", conversation_id: conversation.id, title },
@@ -143,6 +143,20 @@ async function forNotification(notificationId: string) {
       },
     } satisfies Push,
   };
+}
+
+// Те же подписи, что в списке чатов (MessageKind.preview).
+function groupPreview(kind: string, body: string | null): string {
+  const label: Record<string, string> = {
+    image: "📷 Фото",
+    video: "🎬 Видео",
+    video_note: "🎥 Видеосообщение",
+    voice: "🎤 Голосовое",
+    file: "📎 Файл",
+  };
+  const text = body ? truncate(body, 140) : "";
+  if (kind === "text" || kind === "sticker") return text || "Сообщение";
+  return text ? `${label[kind] ?? "Вложение"} · ${text}` : label[kind] ?? "Вложение";
 }
 
 // Те же формулировки, что в приложении (AppNotification.text).

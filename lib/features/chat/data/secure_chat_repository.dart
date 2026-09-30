@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -6,8 +9,21 @@ import 'package:uuid/uuid.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/conversation.dart';
 import '../domain/repositories/chat_repository.dart';
+import 'chat_media_cache.dart';
 import 'crypto/chat_crypto_service.dart';
 import 'crypto/chat_key_storage.dart';
+
+/// Потолок файла в Supabase Cloud (бесплатный тариф) — 50 МБ.
+const maxAttachmentBytes = 50 * 1024 * 1024;
+
+class ChatAttachmentTooLarge implements Exception {
+  const ChatAttachmentTooLarge();
+
+  @override
+  String toString() => 'Файл больше 50 МБ — такой не отправить';
+}
+
+const _bucket = 'chat-media';
 
 /// Боевой чат на Supabase. Личные диалоги — сквозное шифрование, сервер
 /// видит только шифротекст. Группы и квест-чаты — открытый текст в `body`
@@ -95,6 +111,7 @@ class SecureChatRepository implements ChatRepository {
     if (lastId != null) {
       final senderId = row['last_sender_id'] as String;
       final sentAt = DateTime.parse(row['last_sent_at'] as String).toLocal();
+      final lastKind = MessageKind.parse(row['last_kind']);
       if (kind == ConversationKind.direct) {
         last = peerKeys == null
             ? ChatMessage(
@@ -107,6 +124,7 @@ class SecureChatRepository implements ChatRepository {
             : await _decodeDirect(
                 row: {
                   'id': lastId,
+                  'kind': row['last_kind'],
                   'sender_id': senderId,
                   'sent_at': row['last_sent_at'],
                   'ciphertext': row['last_ciphertext'],
@@ -124,6 +142,7 @@ class SecureChatRepository implements ChatRepository {
           conversationId: id,
           senderId: senderId,
           sentAt: sentAt,
+          kind: lastKind,
           text: row['last_body'] as String?,
           senderName: row['last_sender_name'] as String?,
         );
@@ -209,7 +228,9 @@ class SecureChatRepository implements ChatRepository {
             senderId: row['sender_id'] as String,
             senderName: names[row['sender_id']] ?? 'Участник',
             sentAt: DateTime.parse(row['sent_at'] as String).toLocal(),
+            kind: MessageKind.parse(row['kind']),
             text: row['body'] as String?,
+            attachment: ChatAttachment.fromJson(row['media']),
           ),
       ];
     });
@@ -219,39 +240,170 @@ class SecureChatRepository implements ChatRepository {
   Future<ChatMessage> send({
     required String conversationId,
     required String text,
+    MessageKind kind = MessageKind.text,
   }) async {
-    final crypto = await _ready;
     final clean = text.trim();
     final id = _uuid.v4();
-    final kind = await _kind(conversationId);
+    await _insert(
+      id: id,
+      conversationId: conversationId,
+      kind: kind,
+      text: clean,
+    );
+    return ChatMessage(
+      id: id,
+      conversationId: conversationId,
+      senderId: currentUserId,
+      sentAt: DateTime.now(),
+      kind: kind,
+      text: clean,
+      status: MessageStatus.sent,
+      signatureValid: true,
+    );
+  }
 
-    if (kind != ConversationKind.direct) {
-      await _client.from('chat_messages').insert({
-        'id': id,
-        'conversation_id': conversationId,
-        'sender_id': currentUserId,
-        'kind': 'text',
-        'body': clean,
-      });
+  @override
+  Future<ChatMessage> sendAttachment({
+    required String conversationId,
+    required MessageKind kind,
+    required String filePath,
+    String? name,
+    String? mime,
+    int? durationMs,
+    List<double>? waveform,
+    String? caption,
+  }) async {
+    await _ready;
+    final clear = await File(filePath).readAsBytes();
+    if (clear.length > maxAttachmentBytes) {
+      throw const ChatAttachmentTooLarge();
+    }
+    final direct = await _kind(conversationId) == ConversationKind.direct;
+    final id = _uuid.v4();
+    final storagePath = '$conversationId/$id';
+
+    String? key;
+    Uint8List upload = clear;
+    if (direct) {
+      final encrypted = await ChatCryptoService.encryptFile(clear);
+      upload = encrypted.bytes;
+      key = encrypted.key;
+    }
+    await _client.storage
+        .from(_bucket)
+        .uploadBinary(
+          storagePath,
+          upload,
+          fileOptions: FileOptions(
+            contentType: direct
+                ? 'application/octet-stream'
+                : (mime ?? 'application/octet-stream'),
+          ),
+        );
+
+    final attachment = ChatAttachment(
+      path: storagePath,
+      size: clear.length,
+      name: name,
+      mime: mime,
+      durationMs: durationMs,
+      waveform: waveform,
+      key: key,
+    );
+    final text = caption?.trim();
+    try {
+      await _insert(
+        id: id,
+        conversationId: conversationId,
+        kind: kind,
+        text: text == null || text.isEmpty ? null : text,
+        attachment: attachment,
+      );
+    } catch (_) {
+      // Сообщение не записалось — файл без сообщения никому не нужен.
+      await _client.storage.from(_bucket).remove([storagePath]).catchError(
+        (_) => <FileObject>[],
+      );
+      rethrow;
+    }
+    await ChatMediaCache.keepSent(id, kind, filePath, name).catchError((_) {});
+
+    return ChatMessage(
+      id: id,
+      conversationId: conversationId,
+      senderId: currentUserId,
+      sentAt: DateTime.now(),
+      kind: kind,
+      text: text,
+      attachment: attachment,
+      status: MessageStatus.sent,
+      signatureValid: true,
+    );
+  }
+
+  @override
+  Future<String> attachmentFile(ChatMessage message) async {
+    final attachment = message.attachment;
+    if (attachment == null) throw StateError('У сообщения нет вложения');
+    final file = await ChatMediaCache.fileFor(message);
+    if (await file.exists() && await file.length() > 0) return file.path;
+
+    final downloaded = await _client.storage
+        .from(_bucket)
+        .download(attachment.path);
+    final key = attachment.key;
+    final bytes = key == null
+        ? downloaded
+        : await ChatCryptoService.decryptFile(downloaded, key);
+    await file.writeAsBytes(bytes, flush: true);
+    return file.path;
+  }
+
+  /// Запись сообщения. Личный диалог — всё содержимое внутри шифротекста:
+  /// текст как есть (так пишутся сообщения с первой версии), а для вложений и
+  /// стикеров — JSON-конверт с типом, подписью и описанием файла вместе с
+  /// ключом. Группа — открытые body и media, ключа у файла нет.
+  Future<void> _insert({
+    required String id,
+    required String conversationId,
+    required MessageKind kind,
+    String? text,
+    ChatAttachment? attachment,
+  }) async {
+    final crypto = await _ready;
+    final row = <String, Object?>{
+      'id': id,
+      'conversation_id': conversationId,
+      'sender_id': currentUserId,
+      'kind': kind.wire,
+    };
+
+    if (await _kind(conversationId) != ConversationKind.direct) {
+      row['body'] = text;
+      if (attachment != null) row['media'] = attachment.toJson(withKey: false);
     } else {
       final peerId = await _peerId(conversationId);
       final keys = await _loadPublicKeys(peerId);
       if (keys == null) {
         throw StateError('Собеседник ещё не опубликовал ключи шифрования');
       }
+      final clear = kind == MessageKind.text
+          ? text ?? ''
+          : jsonEncode({
+              'v': 1,
+              'kind': kind.wire,
+              'text': ?text,
+              'a': ?attachment?.toJson(),
+            });
       final payload = await crypto.encrypt(
         conversationId: conversationId,
         messageId: id,
         senderId: currentUserId,
         recipientExchangeKey: keys.exchangeKey,
-        text: clean,
+        text: clear,
       );
       // sent_at проставляет сервер (0030).
-      await _client.from('chat_messages').insert({
-        'id': id,
-        'conversation_id': conversationId,
-        'sender_id': currentUserId,
-        'kind': 'text',
+      row.addAll({
         'ciphertext': payload.ciphertext,
         'nonce': payload.nonce,
         'mac': payload.mac,
@@ -259,16 +411,7 @@ class SecureChatRepository implements ChatRepository {
         'protocol_version': ChatCryptoService.protocolVersion,
       });
     }
-
-    return ChatMessage(
-      id: id,
-      conversationId: conversationId,
-      senderId: currentUserId,
-      sentAt: DateTime.now(),
-      text: clean,
-      status: MessageStatus.sent,
-      signatureValid: true,
-    );
+    await _client.from('chat_messages').insert(row);
   }
 
   @override
@@ -386,12 +529,26 @@ class SecureChatRepository implements ChatRepository {
           signature: row['signature'] as String,
         ),
       );
+      final clear = decrypted.text;
+      var kind = MessageKind.text;
+      var text = clear ?? 'Сообщение не прошло проверку подписи';
+      ChatAttachment? attachment;
+      // Тип берём из зашифрованного конверта, а не из открытой колонки kind:
+      // её мог подменить сервер.
+      if (clear != null && MessageKind.parse(row['kind']) != MessageKind.text) {
+        final envelope = jsonDecode(clear) as Map<String, dynamic>;
+        kind = MessageKind.parse(envelope['kind']);
+        text = envelope['text'] as String? ?? '';
+        attachment = ChatAttachment.fromJson(envelope['a']);
+      }
       return ChatMessage(
         id: row['id'] as String,
         conversationId: conversationId,
         senderId: senderId,
         sentAt: sentAt,
-        text: decrypted.text ?? 'Сообщение не прошло проверку подписи',
+        kind: kind,
+        text: text,
+        attachment: attachment,
         status: _status(sentAt, peerLastReadAt),
         signatureValid: decrypted.signatureValid,
       );

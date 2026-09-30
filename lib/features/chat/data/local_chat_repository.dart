@@ -62,17 +62,58 @@ class LocalChatRepository implements ChatRepository {
   Future<ChatMessage> send({
     required String conversationId,
     required String text,
-  }) async {
-    final message = ChatMessage(
+    MessageKind kind = MessageKind.text,
+  }) async => _add(
+    ChatMessage(
       id: 'local-msg-${_nextId++}',
       conversationId: conversationId,
       senderId: currentUserId(),
       sentAt: DateTime.now(),
+      kind: kind,
       text: text.trim(),
       status: MessageStatus.sent,
       signatureValid: true,
-    );
+    ),
+  );
 
+  @override
+  Future<ChatMessage> sendAttachment({
+    required String conversationId,
+    required MessageKind kind,
+    required String filePath,
+    String? name,
+    String? mime,
+    int? durationMs,
+    List<double>? waveform,
+    String? caption,
+  }) async => _add(
+    ChatMessage(
+      id: 'local-msg-${_nextId++}',
+      conversationId: conversationId,
+      senderId: currentUserId(),
+      sentAt: DateTime.now(),
+      kind: kind,
+      text: caption,
+      // В заглушке «хранилище» — сам файл на устройстве.
+      attachment: ChatAttachment(
+        path: filePath,
+        size: 0,
+        name: name,
+        mime: mime,
+        durationMs: durationMs,
+        waveform: waveform,
+      ),
+      status: MessageStatus.sent,
+      signatureValid: true,
+    ),
+  );
+
+  @override
+  Future<String> attachmentFile(ChatMessage message) async =>
+      message.attachment?.path ?? (throw StateError('Нет вложения'));
+
+  ChatMessage _add(ChatMessage message) {
+    final conversationId = message.conversationId;
     final thread = _messages.putIfAbsent(conversationId, () => []);
     thread.add(message);
     _controllers[conversationId]?.add(List.unmodifiable(thread));

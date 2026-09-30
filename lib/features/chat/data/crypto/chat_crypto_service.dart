@@ -181,6 +181,36 @@ class ChatCryptoService {
     );
   }
 
+  /// Шифрует файл вложения собственным случайным ключом. В DDChat файлы
+  /// шифровались общим ключом переписки; отдельный ключ на файл значит, что
+  /// утечка одного вложения не раскрывает остальные. Ключ возвращается для
+  /// отправки внутри зашифрованного сообщения. Формат: nonce + шифротекст + mac.
+  static Future<({Uint8List bytes, String key})> encryptFile(
+    List<int> clear,
+  ) async {
+    final cipher = Chacha20.poly1305Aead();
+    final key = await cipher.newSecretKey();
+    final box = await cipher.encrypt(clear, secretKey: key);
+    return (
+      bytes: Uint8List.fromList(box.concatenation()),
+      key: base64Encode(await key.extractBytes()),
+    );
+  }
+
+  static Future<Uint8List> decryptFile(List<int> encrypted, String key) async {
+    final cipher = Chacha20.poly1305Aead();
+    final box = SecretBox.fromConcatenation(
+      encrypted,
+      nonceLength: cipher.nonceLength,
+      macLength: cipher.macAlgorithm.macLength,
+    );
+    final clear = await cipher.decrypt(
+      box,
+      secretKey: SecretKey(base64Decode(key)),
+    );
+    return Uint8List.fromList(clear);
+  }
+
   Future<String> securityCode({
     required String conversationId,
     required String peerExchangeKey,

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/debug/app_log.dart';
-import '../../../core/errors/friendly_error.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -14,6 +13,7 @@ import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/chat_message.dart';
 import 'conversations_screen.dart';
 import 'providers/chat_providers.dart';
+import 'widgets/chat_composer.dart';
 import 'widgets/message_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -33,10 +33,6 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
-  final _controller = TextEditingController();
-  bool _sending = false;
-  String? _sendError;
-
   late final PushService _push;
 
   @override
@@ -61,39 +57,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (_push.activeConversationId == widget.conversationId) {
       _push.activeConversationId = null;
     }
-    _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || _sending) return;
-
-    setState(() {
-      _sending = true;
-      _sendError = null;
-    });
-    try {
-      await ref
-          .read(chatRepositoryProvider)
-          .send(conversationId: widget.conversationId, text: text);
-      _controller.clear();
-      // Новый личный диалог появляется в списке только после первого
-      // сообщения.
-      ref.invalidate(conversationsProvider);
-    } catch (error) {
-      AppLog.add('Сообщение не ушло: $error');
-      if (mounted) {
-        setState(() {
-          _sendError = friendlyError(
-            error,
-            fallback: 'Не удалось отправить сообщение',
-          );
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
   }
 
   @override
@@ -215,14 +179,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             )
           else
-            _Composer(
-              controller: _controller,
-              onChanged: (_) => setState(() {}),
-              error: _sendError,
-              onSend: _controller.text.trim().isEmpty || _sending
-                  ? null
-                  : _send,
-            ),
+            ChatComposer(conversationId: widget.conversationId),
         ],
       ),
     );
@@ -342,89 +299,6 @@ class _ErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             TextButton(onPressed: onRetry, child: const Text('Повторить')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Composer extends StatelessWidget {
-  const _Composer({
-    required this.controller,
-    required this.onChanged,
-    required this.error,
-    required this.onSend,
-  });
-
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final String? error;
-  final VoidCallback? onSend;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.hair)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (error != null) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  error!,
-                  style: TextStyle(color: AppColors.danger, fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    onChanged: onChanged,
-                    minLines: 1,
-                    maxLines: 4,
-                    maxLength: 4000,
-                    buildCounter:
-                        (
-                          _, {
-                          required currentLength,
-                          required isFocused,
-                          maxLength,
-                        }) => null,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      hintText: 'Написать сообщение',
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: onSend,
-                  tooltip: 'Отправить',
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.onPrimary,
-                    disabledBackgroundColor: AppColors.card,
-                    disabledForegroundColor: AppColors.textFaint,
-                    minimumSize: const Size(46, 46),
-                  ),
-                  icon: const Icon(Icons.send, size: 19),
-                ),
-              ],
-            ),
           ],
         ),
       ),

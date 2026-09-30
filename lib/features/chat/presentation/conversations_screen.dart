@@ -87,8 +87,8 @@ class _ConversationTile extends StatelessWidget {
     final preview = last == null
         ? 'Нет сообщений'
         : conversation.isDirect || last.senderName == null
-        ? last.text ?? ''
-        : '${last.senderName}: ${last.text ?? ''}';
+        ? last.preview
+        : '${last.senderName}: ${last.preview}';
 
     return GlassCard(
       padding: const EdgeInsets.all(14),

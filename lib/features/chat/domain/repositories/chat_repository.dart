@@ -18,10 +18,29 @@ abstract interface class ChatRepository {
   /// Поток сообщений одного чата: история плюс входящие в реальном времени.
   Stream<List<ChatMessage>> watchMessages(String conversationId);
 
+  /// Текст или стикер ([kind] = sticker, [text] — эмодзи).
   Future<ChatMessage> send({
     required String conversationId,
     required String text,
+    MessageKind kind = MessageKind.text,
   });
+
+  /// Фото, видео, кружок, голосовое или файл. Файл с устройства по [filePath]
+  /// загружается в хранилище (в личных диалогах — зашифрованным).
+  Future<ChatMessage> sendAttachment({
+    required String conversationId,
+    required MessageKind kind,
+    required String filePath,
+    String? name,
+    String? mime,
+    int? durationMs,
+    List<double>? waveform,
+    String? caption,
+  });
+
+  /// Путь к файлу вложения на устройстве: скачивает и расшифровывает при
+  /// первом обращении, дальше берёт из кэша.
+  Future<String> attachmentFile(ChatMessage message);
 
   Future<void> markRead(String conversationId);
 
