@@ -10,15 +10,16 @@ import 'package:record/record.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/errors/friendly_error.dart';
+import '../../../../core/network/vpn_check.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/secure_chat_repository.dart';
 import '../../domain/entities/chat_message.dart';
 import '../providers/chat_providers.dart';
 import 'attachment_views.dart';
-import 'sticker_picker.dart';
+import 'emoji_panel.dart';
 import 'video_note_recorder.dart';
 
-/// Поле ввода чата: текст, стикеры, вложения (фото, камера, видео, файл),
+/// Поле ввода чата: текст с эмодзи, вложения (фото, камера, видео, файл),
 /// голосовое и кружок. Всё, что умел DDChat, кроме звонков.
 class ChatComposer extends ConsumerStatefulWidget {
   const ChatComposer({super.key, required this.conversationId});
@@ -32,7 +33,13 @@ class ChatComposer extends ConsumerStatefulWidget {
 class _ChatComposerState extends ConsumerState<ChatComposer> {
   static const _maxVoice = Duration(minutes: 5);
 
+  /// Сколько ждать ответа сервера на текст. Без предела отправка после
+  /// выключения VPN висела молча: сокет остаётся на исчезнувшей сети.
+  static const sendTimeout = Duration(seconds: 20);
+
   final _controller = TextEditingController();
+  final _focus = FocusNode();
+  bool _emojiOpen = false;
   final _picker = ImagePicker();
   final _recorder = AudioRecorder();
 
@@ -49,14 +56,51 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   Timer? _ticker;
 
   @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onFocus);
+  }
+
+  void _onFocus() {
+    // Клавиатура и панель эмодзи занимают одно место — открыта одна из них.
+    if (_focus.hasFocus && _emojiOpen) setState(() => _emojiOpen = false);
+    _syncActive();
+  }
+
+  void _syncActive() => chatInputActive.value = _focus.hasFocus || _emojiOpen;
+
+  void _toggleEmoji() {
+    if (_emojiOpen) {
+      setState(() => _emojiOpen = false);
+      _focus.requestFocus();
+    } else {
+      _focus.unfocus();
+      setState(() => _emojiOpen = true);
+    }
+    _syncActive();
+  }
+
+  void _insertEmoji(String emoji) {
+    _controller.value = insertAtSelection(_controller.value, emoji);
+    setState(() {});
+  }
+
+  void _backspace() {
+    _controller.value = deleteBeforeSelection(_controller.value);
+    setState(() {});
+  }
+
+  @override
   void dispose() {
+    chatInputActive.value = false;
+    _focus.dispose();
     _ticker?.cancel();
     _recorder.dispose();
     _controller.dispose();
     super.dispose();
   }
 
-  // ── текст и стикеры ──────────────────────────────────────────────────────
+  // ── текст ─────────────────────────────────────────────────────────────
 
   Future<void> _sendText() async {
     final text = _controller.text.trim();
@@ -68,28 +112,24 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     try {
       await ref
           .read(chatRepositoryProvider)
-          .send(conversationId: widget.conversationId, text: text);
+          .send(conversationId: widget.conversationId, text: text)
+          .timeout(sendTimeout);
       _controller.clear();
       _afterSend();
+    } on TimeoutException catch (error) {
+      AppLog.add('Отправка не дождалась ответа: $error');
+      final vpn = await isVpnActive();
+      if (!mounted) return;
+      setState(() {
+        _error = vpn
+            ? 'Сервер не ответил. Включён VPN — отключите его и отправьте ещё раз.'
+            : 'Сервер не ответил. Проверьте интернет. Если вы только что '
+                  'выключили VPN, закройте приложение и откройте снова.';
+      });
     } catch (error) {
       _fail(error, 'Не удалось отправить сообщение');
     } finally {
       if (mounted) setState(() => _sendingText = false);
-    }
-  }
-
-  Future<void> _pickSticker() async {
-    final sticker = await showStickerPicker(context);
-    if (sticker == null) return;
-    try {
-      await ref.read(chatRepositoryProvider).send(
-        conversationId: widget.conversationId,
-        text: sticker,
-        kind: MessageKind.sticker,
-      );
-      _afterSend();
-    } catch (error) {
-      _fail(error, 'Стикер не отправился');
     }
   }
 
@@ -109,15 +149,17 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       _error = null;
     });
     try {
-      await ref.read(chatRepositoryProvider).sendAttachment(
-        conversationId: widget.conversationId,
-        kind: kind,
-        filePath: path,
-        name: name,
-        mime: mime,
-        durationMs: durationMs,
-        waveform: waveform,
-      );
+      await ref
+          .read(chatRepositoryProvider)
+          .sendAttachment(
+            conversationId: widget.conversationId,
+            kind: kind,
+            filePath: path,
+            name: name,
+            mime: mime,
+            durationMs: durationMs,
+            waveform: waveform,
+          );
       _afterSend();
     } catch (error) {
       _fail(error, 'Не удалось отправить: $label');
@@ -142,7 +184,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               ('file', Icons.attach_file, 'Файл'),
             ])
               ListTile(
-                leading: Icon(icon, color: AppColors.primaryTint),
+                leading: Icon(icon, color: AppColors.textDim),
                 title: Text(label),
                 onTap: () => Navigator.of(context).pop(value),
               ),
@@ -340,7 +382,10 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                         'Отправляется: ${_uploads.join(', ')}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: AppColors.textDim),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textDim,
+                        ),
                       ),
                     ),
                   ],
@@ -364,10 +409,27 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               const SizedBox(height: 6),
             ],
             if (_recording) _recordingBar() else _inputRow(hasText),
+            if (_emojiOpen && !_recording)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: EmojiPanel(
+                  onPick: _insertEmoji,
+                  onBackspace: _backspace,
+                ),
+              ),
           ],
         ),
       ),
     );
+  }
+
+  /// До скольких строк растёт поле: около трети экрана над клавиатурой,
+  /// дальше текст прокручивается внутри.
+  int _maxLines(BuildContext context) {
+    final height =
+        MediaQuery.sizeOf(context).height -
+        MediaQuery.viewInsetsOf(context).bottom;
+    return (height * 0.35 / 24).floor().clamp(4, 12);
   }
 
   Widget _inputRow(bool hasText) {
@@ -375,9 +437,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         IconButton(
-          onPressed: _pickSticker,
-          tooltip: 'Стикеры',
-          icon: Icon(Icons.emoji_emotions_outlined, color: AppColors.textDim),
+          onPressed: _toggleEmoji,
+          tooltip: _emojiOpen ? 'Клавиатура' : 'Эмодзи',
+          icon: Icon(
+            _emojiOpen
+                ? Icons.keyboard_alt_outlined
+                : Icons.emoji_emotions_outlined,
+            color: _emojiOpen ? AppColors.champagne : AppColors.textDim,
+          ),
         ),
         IconButton(
           onPressed: _showAttachMenu,
@@ -385,19 +452,42 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           icon: Icon(Icons.attach_file, color: AppColors.textDim),
         ),
         Expanded(
-          child: TextField(
-            controller: _controller,
-            onChanged: (_) => setState(() {}),
-            minLines: 1,
-            maxLines: 5,
-            maxLength: 4000,
-            buildCounter:
-                (_, {required currentLength, required isFocused, maxLength}) =>
-                    null,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              hintText: 'Сообщение',
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 120),
+            alignment: Alignment.bottomCenter,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focus,
+              onChanged: (_) => setState(() {}),
+              onTap: () {
+                if (_emojiOpen) setState(() => _emojiOpen = false);
+              },
+              minLines: 1,
+              maxLines: _maxLines(context),
+              maxLength: 4000,
+              keyboardType: TextInputType.multiline,
+              buildCounter:
+                  (
+                    _, {
+                    required currentLength,
+                    required isFocused,
+                    maxLength,
+                  }) => null,
+              textCapitalization: TextCapitalization.sentences,
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.35,
+                color: AppColors.text,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Сообщение',
+                isDense: true,
+                constraints: const BoxConstraints(minHeight: 48),
+                contentPadding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+                border: _fieldBorder(AppColors.hair),
+                enabledBorder: _fieldBorder(AppColors.hair),
+                focusedBorder: _fieldBorder(AppColors.hairStrong),
+              ),
             ),
           ),
         ),
@@ -406,6 +496,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           _RoundButton(
             icon: Icons.send,
             tooltip: 'Отправить',
+            accent: true,
             onPressed: _sendingText ? null : _sendText,
           )
         else ...[
@@ -423,6 +514,11 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       ],
     );
   }
+
+  OutlineInputBorder _fieldBorder(Color color) => OutlineInputBorder(
+    borderRadius: BorderRadius.circular(24),
+    borderSide: BorderSide(color: color),
+  );
 
   Widget _recordingBar() {
     final bars = downsample(
@@ -463,7 +559,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                       margin: const EdgeInsets.symmetric(horizontal: 0.8),
                       height: 3 + 25 * v,
                       decoration: BoxDecoration(
-                        color: AppColors.primaryTint,
+                        color: AppColors.champagne,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -476,6 +572,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
         _RoundButton(
           icon: Icons.send,
           tooltip: 'Отправить голосовое',
+          accent: true,
           onPressed: () => _stopVoice(send: true),
         ),
       ],
@@ -488,11 +585,16 @@ class _RoundButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.accent = false,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
+
+  /// Отправка — единственная акцентная кнопка; микрофон и остальное
+  /// нейтральные, чтобы нижняя панель не спорила с перепиской.
+  final bool accent;
 
   @override
   Widget build(BuildContext context) {
@@ -500,11 +602,11 @@ class _RoundButton extends StatelessWidget {
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
+        backgroundColor: accent ? AppColors.champagne : AppColors.bubbleMine,
+        foregroundColor: accent ? AppColors.ink : AppColors.onBubbleMine,
         disabledBackgroundColor: AppColors.card,
         disabledForegroundColor: AppColors.textFaint,
-        minimumSize: const Size(44, 44),
+        minimumSize: const Size(48, 48),
       ),
       icon: Icon(icon, size: 20),
     );
@@ -532,7 +634,8 @@ String? mimeFromName(String name) {
     'docx' =>
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'xls' => 'application/vnd.ms-excel',
-    'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'xlsx' =>
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'ppt' => 'application/vnd.ms-powerpoint',
     'pptx' =>
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',

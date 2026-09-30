@@ -26,6 +26,8 @@ class AppPalette {
     required this.textFaint,
     required this.hair,
     required this.hairStrong,
+    required this.bubbleMine,
+    required this.onBubbleMine,
   });
 
   final Brightness brightness;
@@ -70,6 +72,12 @@ class AppPalette {
   final Color hair;
   final Color hairStrong;
 
+  /// Свой пузырь в чате. Нейтральный, а не [primary]: переписка — это
+  /// длинное чтение, и сплошной акцент на половине экрана утомляет и
+  /// спорит с кнопками действия.
+  final Color bubbleMine;
+  final Color onBubbleMine;
+
   bool get isDark => brightness == Brightness.dark;
 
   /// «Бургунди и шампань» — зафиксированная фирменная палитра ChaWo
@@ -95,6 +103,8 @@ class AppPalette {
     textFaint: Color(0x99BBA9AF),
     hair: Color(0x80513843),
     hairStrong: Color(0xFF513843),
+    bubbleMine: Color(0xFF473A41),
+    onBubbleMine: Color(0xFFFFF8F0),
   );
 
   /// «Тёплый песок» — светлая тема. Коды сняты со скриншота макета, их
@@ -118,6 +128,8 @@ class AppPalette {
     textFaint: Color(0x997A635A),
     hair: Color(0x80E3D2C3),
     hairStrong: Color(0xFFDCC6B4),
+    bubbleMine: Color(0xFFF0E4D8),
+    onBubbleMine: Color(0xFF3A2A24),
   );
 }
 
@@ -146,4 +158,6 @@ abstract final class AppColors {
   static Color get textFaint => current.textFaint;
   static Color get hair => current.hair;
   static Color get hairStrong => current.hairStrong;
+  static Color get bubbleMine => current.bubbleMine;
+  static Color get onBubbleMine => current.onBubbleMine;
 }

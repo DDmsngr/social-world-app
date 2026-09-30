@@ -17,10 +17,18 @@ import '../providers/chat_providers.dart';
 /// Вложение сообщения: скачивается (и расшифровывается) при показе, дальше
 /// живёт в кэше на устройстве. Что рисовать, решает тип сообщения.
 class AttachmentView extends ConsumerStatefulWidget {
-  const AttachmentView({super.key, required this.message, required this.mine});
+  const AttachmentView({
+    super.key,
+    required this.message,
+    required this.mine,
+    this.onMore,
+  });
 
   final ChatMessage message;
   final bool mine;
+
+  /// «⋮» в полноэкранном просмотре — то же меню, что по долгому тапу.
+  final Future<bool> Function(BuildContext context)? onMore;
 
   @override
   ConsumerState<AttachmentView> createState() => _AttachmentViewState();
@@ -86,7 +94,12 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
         onRetry: _load,
         placeholderSize: const Size(220, 220),
         builder: (path) => GestureDetector(
-          onTap: () => showPhotoViewer(context, urls: [path]),
+          onTap: () => showPhotoViewer(
+            context,
+            urls: [path],
+            caption: message.text,
+            onMore: widget.onMore,
+          ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: ConstrainedBox(
@@ -225,7 +238,7 @@ class _FileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = mine ? AppColors.onPrimary : AppColors.text;
+    final color = mine ? AppColors.onBubbleMine : AppColors.text;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -379,7 +392,7 @@ class _VideoNotePlayerState extends State<VideoNotePlayer> {
                 child: CircularProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
                   strokeWidth: 3,
-                  color: AppColors.primary,
+                  color: AppColors.champagne,
                 ),
               ),
             if (_ready && (!withSound || !value.isPlaying))
@@ -567,7 +580,7 @@ class VoiceMessagePlayer extends ConsumerWidget {
     final progress = active && total.inMilliseconds > 0
         ? (playback.position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
-    final color = mine ? AppColors.onPrimary : AppColors.primaryTint;
+    final color = mine ? AppColors.onBubbleMine : AppColors.champagne;
     final bars = _bars(attachment.waveform, messageId);
 
     return SizedBox(

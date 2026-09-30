@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/chat_message.dart';
 import 'attachment_views.dart';
+import 'emoji_panel.dart';
 
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
@@ -11,6 +12,7 @@ class MessageBubble extends StatelessWidget {
     required this.message,
     required this.mine,
     this.showSender = false,
+    this.onMediaMore,
   });
 
   final ChatMessage message;
@@ -19,11 +21,22 @@ class MessageBubble extends StatelessWidget {
   /// В группах над чужим сообщением — имя автора.
   final bool showSender;
 
+  /// Меню из полноэкранного просмотра фото.
+  final Future<bool> Function(BuildContext context)? onMediaMore;
+
   @override
   Widget build(BuildContext context) {
     final radius = Radius.circular(AppRadius.card);
-    // Стикер и кружок рисуются без пузыря — как в DDChat и Telegram.
-    final bare = message.kind == MessageKind.sticker ||
+    // Сообщение из 1–3 эмодзи рисуется крупно и без пузыря, как в Telegram.
+    // Старые «стикеры» — это тоже эмодзи, показываются так же.
+    final emojiCount = switch (message.kind) {
+      MessageKind.text => emojiOnlyCount(message.text),
+      MessageKind.sticker => 1,
+      _ => 0,
+    };
+    final bigEmoji = emojiCount > 0;
+    final bare =
+        bigEmoji ||
         (message.kind == MessageKind.videoNote && message.attachment != null);
     final caption = message.text?.trim() ?? '';
     final hasAttachment =
@@ -43,15 +56,25 @@ class MessageBubble extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primaryTint,
+                  color: AppColors.champagne,
                 ),
               ),
             ),
           ),
-        if (message.kind == MessageKind.sticker)
-          Text(caption, style: const TextStyle(fontSize: 64, height: 1.1))
+        if (bigEmoji)
+          Text(
+            caption,
+            style: TextStyle(
+              fontSize: switch (emojiCount) {
+                1 => 56,
+                2 => 44,
+                _ => 36,
+              },
+              height: 1.1,
+            ),
+          )
         else if (hasAttachment)
-          AttachmentView(message: message, mine: mine),
+          AttachmentView(message: message, mine: mine, onMore: onMediaMore),
         if (!bare && (!hasAttachment || caption.isNotEmpty)) ...[
           if (hasAttachment) const SizedBox(height: 6),
           Align(
@@ -61,7 +84,7 @@ class MessageBubble extends StatelessWidget {
               style: TextStyle(
                 fontSize: 15,
                 height: 1.4,
-                color: mine ? AppColors.onPrimary : AppColors.text,
+                color: mine ? AppColors.onBubbleMine : AppColors.text,
               ),
             ),
           ),
@@ -86,7 +109,7 @@ class MessageBubble extends StatelessWidget {
         decoration: bare
             ? null
             : BoxDecoration(
-                color: mine ? AppColors.primary : AppColors.card,
+                color: mine ? AppColors.bubbleMine : AppColors.card,
                 border: mine ? null : Border.all(color: AppColors.hair),
                 borderRadius: BorderRadius.only(
                   topLeft: radius,
@@ -117,7 +140,7 @@ class _Meta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = mine && onBubble
-        ? AppColors.onPrimary.withValues(alpha: 0.7)
+        ? AppColors.onBubbleMine.withValues(alpha: 0.6)
         : AppColors.textFaint;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -132,13 +155,19 @@ class _Meta extends StatelessWidget {
           ),
           const SizedBox(width: 8),
         ],
-        Text(_time(message.sentAt), style: TextStyle(fontSize: 11, color: color)),
+        Text(
+          _time(message.sentAt),
+          style: TextStyle(fontSize: 11, color: color),
+        ),
         if (mine) ...[
           const SizedBox(width: 4),
           Icon(
             message.status == MessageStatus.read ? Icons.done_all : Icons.done,
             size: 13,
-            color: color,
+            // Прочитанное — единственное место с акцентом в пузыре.
+            color: message.status == MessageStatus.read
+                ? AppColors.champagne
+                : color,
           ),
         ],
       ],

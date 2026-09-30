@@ -34,6 +34,8 @@
 		<string>Чтобы снимать фото и закреплять их точками на маршруте.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Чтобы добавить на маршрут уже снятые фотографии.</string>
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>Чтобы сохранять фото и видео из чатов в галерею.</string>
 		<!-- Редирект из моста входа (VK ID/Яндекс ID) — см. lib/core/oauth. -->
 		<key>FlutterDeepLinkingEnabled</key>
 		<false/>

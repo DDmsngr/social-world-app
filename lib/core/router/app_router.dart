@@ -312,8 +312,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const EventsScreen(),
       ),
       StatefulShellRoute.indexedStack(
-        builder: (_, _, navigationShell) =>
-            HomeShell(navigationShell: navigationShell),
+        builder: (_, state, navigationShell) => HomeShell(
+          navigationShell: navigationShell,
+          location: state.uri.path,
+        ),
         branches: [
           StatefulShellBranch(
             routes: [

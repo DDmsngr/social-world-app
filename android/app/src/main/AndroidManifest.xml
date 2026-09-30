@@ -14,6 +14,11 @@
     <!-- Push-уведомления (FCM). На Android 13+ разрешение спрашивается при
          первом запуске после входа. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- «Сохранить в галерею» из чата. С Android 10 запись в общую галерею
+         разрешения не требует, ниже — только так. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <application
         android:label="ChaWo"
         android:name=".MainApplication"

@@ -112,6 +112,38 @@ class LocalChatRepository implements ChatRepository {
   Future<String> attachmentFile(ChatMessage message) async =>
       message.attachment?.path ?? (throw StateError('Нет вложения'));
 
+  @override
+  Future<Set<String>> deleteForEveryone(List<ChatMessage> messages) async {
+    final me = currentUserId();
+    final deleted = <String>{};
+    for (final message in messages) {
+      final conversationId = message.conversationId;
+      final conversation =
+          _conversations.where((c) => c.id == conversationId).firstOrNull;
+      // Те же правила, что у delete_chat_messages (0033): своё — всегда,
+      // чужое — только владельцу группы.
+      final allowed = message.senderId == me ||
+          (conversation != null &&
+              !conversation.isDirect &&
+              conversation.isOwner);
+      if (!allowed) continue;
+      final thread = _messages[conversationId];
+      if (thread == null) continue;
+      final before = thread.length;
+      thread.removeWhere((m) => m.id == message.id);
+      if (thread.length == before) continue;
+      deleted.add(message.id);
+      _controllers[conversationId]?.add(List.unmodifiable(thread));
+      final index = _conversations.indexWhere((c) => c.id == conversationId);
+      if (index != -1) {
+        _conversations[index] = _conversations[index].copyWith(
+          lastMessage: thread.isEmpty ? null : thread.last,
+        );
+      }
+    }
+    return deleted;
+  }
+
   ChatMessage _add(ChatMessage message) {
     final conversationId = message.conversationId;
     final thread = _messages.putIfAbsent(conversationId, () => []);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,8 +14,10 @@ import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/chat_message.dart';
 import 'conversations_screen.dart';
 import 'providers/chat_providers.dart';
+import 'providers/hidden_messages_provider.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/message_bubble.dart';
+import 'widgets/message_menu.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({
@@ -34,6 +37,30 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   late final PushService _push;
+
+  /// Сообщение, по которому открыто меню, — подсвечено, пока меню открыто.
+  String? _selectedId;
+
+  Future<bool> _openMenu(
+    BuildContext context,
+    ChatMessage message,
+    String myId,
+  ) async {
+    setState(() => _selectedId = message.id);
+    try {
+      return await showMessageMenu(
+        context,
+        ref,
+        message: message,
+        myId: myId,
+        conversation: ref
+            .read(conversationProvider(widget.conversationId))
+            .value,
+      );
+    } finally {
+      if (mounted) setState(() => _selectedId = null);
+    }
+  }
 
   @override
   void initState() {
@@ -67,6 +94,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final info = conversation.value;
     final myId = ref.watch(currentUserProvider)?.id ?? 'local-user';
     final isDirect = info?.isDirect ?? true;
+    final hidden = ref.watch(hiddenMessagesProvider);
 
     // Пока экран открыт, входящие сразу считаются прочитанными.
     ref.listen(messagesProvider(widget.conversationId), (previous, next) {
@@ -127,7 +155,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 onRetry: () =>
                     ref.invalidate(messagesProvider(widget.conversationId)),
               ),
-              data: (items) {
+              data: (all) {
+                final items = hidden.isEmpty
+                    ? all
+                    : [
+                        for (final m in all)
+                          if (!hidden.contains(m.id)) m,
+                      ];
                 if (items.isEmpty) {
                   return Center(
                     child: Padding(
@@ -157,10 +191,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   itemBuilder: (context, index) {
                     final message = items[items.length - 1 - index];
                     final mine = message.senderId == myId;
-                    return MessageBubble(
-                      message: message,
-                      mine: mine,
-                      showSender: !isDirect && !mine,
+                    return Semantics(
+                      customSemanticsActions: {
+                        const CustomSemanticsAction(
+                          label: 'Действия с сообщением',
+                        ): () => _openMenu(context, message, myId),
+                      },
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onLongPress: () => _openMenu(context, message, myId),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          decoration: BoxDecoration(
+                            color: _selectedId == message.id
+                                ? AppColors.hair
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.card,
+                            ),
+                          ),
+                          child: MessageBubble(
+                            message: message,
+                            mine: mine,
+                            showSender: !isDirect && !mine,
+                            onMediaMore: (viewerContext) =>
+                                _openMenu(viewerContext, message, myId),
+                          ),
+                        ),
+                      ),
                     );
                   },
                 );
@@ -230,7 +288,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     return SelectableText(
                       snapshot.data!,
                       style: TextStyle(
-                        color: AppColors.primaryTint,
+                        color: AppColors.champagne,
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.4,

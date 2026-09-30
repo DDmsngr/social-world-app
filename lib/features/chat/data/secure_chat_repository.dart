@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/debug/app_log.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/conversation.dart';
 import '../domain/repositories/chat_repository.dart';
@@ -189,7 +190,9 @@ class SecureChatRepository implements ChatRepository {
       yield* rows.asyncMap(
         (batch) => Future.wait([
           for (final row in batch.reversed)
-            _decodeDirect(
+            // Удалённое у всех — «надгробие» без содержимого (0033).
+            if (row['deleted_at'] == null)
+              _decodeDirect(
               row: row,
               conversationId: conversationId,
               peerKeys: keys,
@@ -222,7 +225,8 @@ class SecureChatRepository implements ChatRepository {
       }
       return [
         for (final row in batch.reversed)
-          ChatMessage(
+          if (row['deleted_at'] == null)
+            ChatMessage(
             id: row['id'] as String,
             conversationId: conversationId,
             senderId: row['sender_id'] as String,
@@ -234,6 +238,43 @@ class SecureChatRepository implements ChatRepository {
           ),
       ];
     });
+  }
+
+  @override
+  Future<Set<String>> deleteForEveryone(List<ChatMessage> messages) async {
+    if (messages.isEmpty) return const {};
+    final List<dynamic> rows;
+    try {
+      rows = await _client.rpc(
+            'delete_chat_messages',
+            params: {'in_ids': [for (final m in messages) m.id]},
+          )
+          as List<dynamic>;
+    } on PostgrestException catch (error) {
+      // Функции нет — миграция 0033 ещё не накатана на сервер.
+      if (error.code == 'PGRST202' || error.code == '42883') {
+        throw const ChatDeleteUnavailable();
+      }
+      rethrow;
+    }
+    final deleted = {for (final id in rows) id as String};
+
+    // Файл убираем после строки: наоборот, при сбое осталось бы сообщение
+    // со ссылкой в никуда. Чужой файл (владелец группы удаляет чужое)
+    // хранилище не отдаст — он останется сиротой, это не страшно.
+    final paths = [
+      for (final m in messages)
+        if (deleted.contains(m.id) && m.attachment != null) m.attachment!.path,
+    ];
+    if (paths.isNotEmpty) {
+      await _client.storage.from(_bucket).remove(paths).catchError(
+        (Object error) {
+          AppLog.add('Файлы удалённых сообщений остались: $error');
+          return <FileObject>[];
+        },
+      );
+    }
+    return deleted;
   }
 
   @override

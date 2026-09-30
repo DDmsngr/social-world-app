@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -48,3 +49,8 @@ final chatMembersProvider = FutureProvider.autoDispose
     .family<List<ChatMember>, String>((ref, conversationId) {
       return ref.watch(chatRepositoryProvider).loadMembers(conversationId);
     });
+
+/// Поле ввода переписки занято: открыта клавиатура или панель эмодзи. Пока
+/// так, оболочка прячет нижнюю навигацию — место нужнее переписке.
+/// Не провайдер: поле сбрасывает флаг в dispose, где ref уже недоступен.
+final chatInputActive = ValueNotifier<bool>(false);

@@ -112,7 +112,7 @@ class _ConversationTile extends StatelessWidget {
                 conversation.kind == ConversationKind.quest
                     ? Icons.flag_outlined
                     : Icons.group_outlined,
-                color: AppColors.primaryTint,
+                color: AppColors.champagne,
                 size: 20,
               ),
             ),
@@ -144,7 +144,7 @@ class _ConversationTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.champagne,
                 borderRadius: BorderRadius.circular(AppRadius.chip),
               ),
               child: Text(
@@ -152,7 +152,7 @@ class _ConversationTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.onPrimary,
+                  color: AppColors.ink,
                 ),
               ),
             ),

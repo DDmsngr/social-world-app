@@ -38,6 +38,11 @@ abstract interface class ChatRepository {
     String? caption,
   });
 
+  /// Удалить у всех участников. Возвращает id, которые удалось удалить:
+  /// своё — всегда, чужое — только владельцу группы. Скрыть «только у
+  /// себя» — не сюда, это настройка устройства (hiddenMessagesProvider).
+  Future<Set<String>> deleteForEveryone(List<ChatMessage> messages);
+
   /// Путь к файлу вложения на устройстве: скачивает и расшифровывает при
   /// первом обращении, дальше берёт из кэша.
   Future<String> attachmentFile(ChatMessage message);
@@ -64,4 +69,13 @@ abstract interface class ChatRepository {
   Future<void> removeMember(String conversationId, String memberId);
 
   Future<void> renameGroup(String conversationId, String title);
+}
+
+/// Сервер ещё не умеет удалять сообщения (не накатана миграция 0033).
+class ChatDeleteUnavailable implements Exception {
+  const ChatDeleteUnavailable();
+
+  @override
+  String toString() =>
+      'Удаление у всех пока недоступно на сервере. Сообщение можно скрыть у себя.';
 }

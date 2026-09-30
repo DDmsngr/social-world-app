@@ -11,6 +11,7 @@ Future<void> showPhotoViewer(
   int initialIndex = 0,
   String? caption,
   List<String?>? captions,
+  Future<bool> Function(BuildContext context)? onMore,
 }) {
   if (urls.isEmpty) return Future.value();
   return Navigator.of(context, rootNavigator: true).push<void>(
@@ -24,6 +25,7 @@ Future<void> showPhotoViewer(
         initialIndex: initialIndex.clamp(0, urls.length - 1),
         caption: caption,
         captions: captions,
+        onMore: onMore,
       ),
       transitionsBuilder: (_, animation, _, child) =>
           FadeTransition(opacity: animation, child: child),
@@ -38,6 +40,7 @@ class PhotoViewer extends StatefulWidget {
     this.initialIndex = 0,
     this.caption,
     this.captions,
+    this.onMore,
   });
 
   final List<String> urls;
@@ -46,6 +49,11 @@ class PhotoViewer extends StatefulWidget {
   /// Подпись для всех страниц сразу; [captions] — своя на каждую.
   final String? caption;
   final List<String?>? captions;
+
+  /// Кнопка «⋮» с действиями над фото (чат: сохранить, поделиться,
+  /// удалить). Возвращает true, если фото больше нечего показывать — тогда
+  /// просмотрщик закрывается. Без неё кнопки нет: в ленте меню другое.
+  final Future<bool> Function(BuildContext context)? onMore;
 
   @override
   State<PhotoViewer> createState() => _PhotoViewerState();
@@ -123,6 +131,22 @@ class _PhotoViewerState extends State<PhotoViewer> {
                   ),
                 ),
               ),
+              if (widget.onMore case final onMore?)
+                Positioned(
+                  top: media.padding.top + 8,
+                  right: 64,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      onPressed: () async {
+                        if (await onMore(context) && mounted) _close();
+                      },
+                      tooltip: 'Ещё',
+                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                    ),
+                  ),
+                ),
               Positioned(
                 top: media.padding.top + 8,
                 right: 12,
