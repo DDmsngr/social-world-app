@@ -59,11 +59,12 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Привет');
     await tester.tap(find.byTooltip('Эмодзи'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('😀').first);
+    // 😀 — ещё и иконка вкладки, поэтому жмём соседний в первом ряду.
+    await tester.tap(find.text('😃'));
     await tester.pump();
 
     final field = tester.widget<TextField>(find.byType(TextField));
-    expect(field.controller!.text, 'Привет😀');
+    expect(field.controller!.text, 'Привет😃');
     expect(repository.sent, isEmpty);
 
     // Панель закрывается обратно на клавиатуру той же кнопкой.
@@ -73,9 +74,7 @@ void main() {
   });
 
   testWidgets('отправка текста очищает поле', (tester) async {
-    await tester.pumpWidget(
-      app(const ChatComposer(conversationId: 'conv-1')),
-    );
+    await tester.pumpWidget(app(const ChatComposer(conversationId: 'conv-1')));
     await tester.enterText(find.byType(TextField), 'Ку 👋');
     await tester.pump();
     await tester.tap(find.byTooltip('Отправить'));
@@ -187,13 +186,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Удалить и у Алина'), findsOneWidget);
-      final box = tester.widget<CheckboxListTile>(find.byType(CheckboxListTile));
+      final box = tester.widget<CheckboxListTile>(
+        find.byType(CheckboxListTile),
+      );
       expect(box.value, isTrue);
 
       await tester.tap(find.widgetWithText(TextButton, 'Удалить'));
-      await tester.pumpAndSettle();
-      final thread = await repository.watchMessages('conv-1').first;
-      expect(thread.map((m) => m.id), isNot(contains(mine.id)));
+      // Закрытие диалога и удаление занимают несколько кадров; pumpAndSettle
+      // здесь не дожидался покоя, поэтому кадры отсчитываем явно.
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+      expect(find.byType(AlertDialog), findsNothing);
+      // Поток заглушки живёт на настоящих микрозадачах, а не на фейковом
+      // времени теста.
+      final thread = await tester.runAsync(
+        () => repository.watchMessages('conv-1').first,
+      );
+      expect(thread!.map((m) => m.id), isNot(contains(mine.id)));
       expect(container.read(hiddenMessagesProvider), contains(mine.id));
     });
   });

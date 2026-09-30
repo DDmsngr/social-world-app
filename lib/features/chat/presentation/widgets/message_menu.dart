@@ -210,9 +210,9 @@ Future<bool> _delete(
   }
 
   try {
-    final deleted = await ref
-        .read(chatRepositoryProvider)
-        .deleteForEveryone([message]);
+    final deleted = await ref.read(chatRepositoryProvider).deleteForEveryone([
+      message,
+    ]);
     if (!deleted.contains(message.id)) {
       messenger.showSnackBar(
         const SnackBar(

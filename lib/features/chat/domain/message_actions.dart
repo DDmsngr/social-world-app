@@ -8,7 +8,8 @@ enum MessageAction { copy, saveToGallery, share, delete }
 List<MessageAction> messageActions(ChatMessage message) {
   final text = message.text?.trim() ?? '';
   final attachment = message.attachment;
-  final media = attachment != null &&
+  final media =
+      attachment != null &&
       switch (message.kind) {
         MessageKind.image || MessageKind.video || MessageKind.videoNote => true,
         _ => false,
@@ -30,5 +31,4 @@ bool canDeleteForEveryone(
   required String myId,
   required bool isDirect,
   required bool isGroupOwner,
-}) =>
-    message.senderId == myId || (!isDirect && isGroupOwner);
+}) => message.senderId == myId || (!isDirect && isGroupOwner);

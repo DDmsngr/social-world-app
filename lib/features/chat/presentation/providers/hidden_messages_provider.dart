@@ -61,5 +61,6 @@ class HiddenMessages extends Notifier<Set<String>> {
   }
 }
 
-final hiddenMessagesProvider =
-    NotifierProvider<HiddenMessages, Set<String>>(HiddenMessages.new);
+final hiddenMessagesProvider = NotifierProvider<HiddenMessages, Set<String>>(
+  HiddenMessages.new,
+);
