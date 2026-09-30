@@ -178,7 +178,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 ),
               ),
             )
-          else
+          // Пока нет ключей собеседника, зашифровать нечем: вместо поля, которое
+          // гарантированно выдаст «не удалось отправить», — только объяснение
+          // над ним (_ErrorView).
+          else if (!(messages.hasError &&
+              messages.error.toString().contains('ключи')))
             ChatComposer(conversationId: widget.conversationId),
         ],
       ),
@@ -290,9 +294,10 @@ class _ErrorView extends StatelessWidget {
           children: [
             Text(
               keysMissing
-                  ? 'Собеседник ещё не заходил в приложение с включёнными '
-                        'чатами. Как только он обновится и откроет приложение, '
-                        'здесь можно будет переписываться.'
+                  ? 'Собеседник ещё не заходил в новую версию приложения, '
+                        'поэтому зашифровать для него сообщение пока нечем. '
+                        'Как только он обновится и откроет приложение, здесь '
+                        'можно будет переписываться. Группы работают и без этого.'
                   : 'Не удалось загрузить переписку',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
