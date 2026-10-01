@@ -19,7 +19,7 @@ const db = createClient(
 type Push = {
   title: string;
   body: string;
-  channel: "messages" | "activity";
+  channel: "messages" | "messages_silent" | "activity";
   // Одинаковый tag заменяет прошлое уведомление, а не копит стопку.
   tag: string;
   data: Record<string, string>;
@@ -55,11 +55,20 @@ Deno.serve(async (req) => {
 });
 
 async function forMessage(messageId: string) {
-  const { data: message } = await db
+  let { data: message, error } = await db
     .from("chat_messages")
-    .select("id, conversation_id, sender_id, body, kind")
+    .select("id, conversation_id, sender_id, body, kind, silent")
     .eq("id", messageId)
     .maybeSingle();
+  if (error) {
+    // Колонки silent ещё нет (миграция 0034 не накатана): пуши не должны
+    // из-за этого пропасть, шлём обычные.
+    ({ data: message } = await db
+      .from("chat_messages")
+      .select("id, conversation_id, sender_id, body, kind")
+      .eq("id", messageId)
+      .maybeSingle());
+  }
   if (!message) return null;
 
   const [{ data: conversation }, { data: sender }, { data: members }] = await Promise.all([
@@ -86,14 +95,22 @@ async function forMessage(messageId: string) {
     .filter((id) => !blockedBy.has(id));
 
   const senderName = sender?.display_name ?? "Кто-то";
+  // «Отправить без звука» (0034): тот же пуш, но в тихом канале.
+  const silent = message.silent === true;
+  const channel = silent ? "messages_silent" : "messages";
   let push: Push;
   if (conversation.direct_key) {
     push = {
       title: senderName,
       body: "Новое сообщение",
-      channel: "messages",
+      channel,
       tag: conversation.id,
-      data: { type: "message", conversation_id: conversation.id, title: senderName },
+      data: {
+        type: "message",
+        conversation_id: conversation.id,
+        title: senderName,
+        ...(silent ? { silent: "1" } : {}),
+      },
     };
   } else {
     let title = conversation.title as string | null;
@@ -106,9 +123,14 @@ async function forMessage(messageId: string) {
     push = {
       title,
       body: `${senderName}: ${groupPreview(message.kind, message.body)}`,
-      channel: "messages",
+      channel,
       tag: conversation.id,
-      data: { type: "message", conversation_id: conversation.id, title },
+      data: {
+        type: "message",
+        conversation_id: conversation.id,
+        title,
+        ...(silent ? { silent: "1" } : {}),
+      },
     };
   }
   return { recipients, push };

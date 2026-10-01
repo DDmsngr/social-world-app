@@ -7,12 +7,15 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/errors/friendly_error.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/conversation.dart';
+import '../../domain/forward_service.dart';
 import '../../domain/message_actions.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../providers/chat_providers.dart';
 import '../providers/hidden_messages_provider.dart';
+import 'forward_picker.dart';
 
 /// Меню сообщения: долгий тап в переписке и «⋮» в просмотре фото.
 ///
@@ -24,9 +27,13 @@ Future<bool> showMessageMenu(
   required ChatMessage message,
   required String myId,
   required Conversation? conversation,
+  void Function(ChatMessage message)? onReply,
 }) async {
   HapticFeedback.mediumImpact();
-  final actions = messageActions(message);
+  final actions = messageActions(
+    message,
+    canReply: onReply != null && !(conversation?.closed ?? false),
+  );
   final action = await showModalBottomSheet<MessageAction>(
     context: context,
     useRootNavigator: true,
@@ -66,6 +73,13 @@ Future<bool> showMessageMenu(
   final messenger = ScaffoldMessenger.of(context);
   final repository = ref.read(chatRepositoryProvider);
   switch (action) {
+    case MessageAction.reply:
+      onReply?.call(message);
+      // Из просмотра фото возвращаемся в переписку, где появилась строка ответа.
+      return true;
+    case MessageAction.forward:
+      await _forward(context, ref, message, myId, conversation);
+      return false;
     case MessageAction.copy:
       await Clipboard.setData(ClipboardData(text: message.text!.trim()));
       messenger.showSnackBar(const SnackBar(content: Text('Скопировано')));
@@ -88,6 +102,8 @@ Future<bool> showMessageMenu(
 }
 
 String _label(MessageAction action) => switch (action) {
+  MessageAction.reply => 'Ответить',
+  MessageAction.forward => 'Переслать',
   MessageAction.copy => 'Копировать',
   MessageAction.saveToGallery => 'Сохранить в галерею',
   MessageAction.share => 'Поделиться',
@@ -95,11 +111,34 @@ String _label(MessageAction action) => switch (action) {
 };
 
 IconData _icon(MessageAction action) => switch (action) {
+  MessageAction.reply => Icons.reply_rounded,
+  MessageAction.forward => Icons.shortcut_rounded,
   MessageAction.copy => Icons.copy_rounded,
   MessageAction.saveToGallery => Icons.download_rounded,
   MessageAction.share => Icons.ios_share_rounded,
   MessageAction.delete => Icons.delete_outline_rounded,
 };
+
+Future<void> _forward(
+  BuildContext context,
+  WidgetRef ref,
+  ChatMessage message,
+  String myId,
+  Conversation? source,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final myName = ref.read(currentUserProvider)?.displayName ?? 'Вы';
+  final result = await showForwardPicker(
+    context,
+    messages: [message],
+    excludeConversationId: message.conversationId,
+    authorOf: (m) =>
+        forwardAuthor(m, myId: myId, myName: myName, source: source),
+  );
+  if (result == null) return;
+  final all = ref.read(conversationsProvider).value ?? const <Conversation>[];
+  messenger.showSnackBar(SnackBar(content: Text(forwardSummary(result, all))));
+}
 
 Future<void> _saveToGallery(
   ScaffoldMessengerState messenger,

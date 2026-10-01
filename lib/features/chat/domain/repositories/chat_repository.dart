@@ -1,4 +1,5 @@
 import '../entities/chat_message.dart';
+import '../entities/chat_meta.dart';
 import '../entities/conversation.dart';
 
 /// Шифрование живёт за этим интерфейсом, в data-слое.
@@ -23,6 +24,7 @@ abstract interface class ChatRepository {
     required String conversationId,
     required String text,
     MessageKind kind = MessageKind.text,
+    SendOptions options = SendOptions.none,
   });
 
   /// Фото, видео, кружок, голосовое или файл. Файл с устройства по [filePath]
@@ -36,7 +38,27 @@ abstract interface class ChatRepository {
     int? durationMs,
     List<double>? waveform,
     String? caption,
+    SendOptions options = SendOptions.none,
   });
+
+  /// Отложить текст: уйдёт в [sendAt] либо когда собеседник появится в сети
+  /// ([whenOnline], только личные диалоги). Ровно одно из двух. Текст
+  /// шифруется сразу — сервер хранит и отдаёт готовый шифротекст.
+  Future<ScheduledMessage> scheduleText({
+    required String conversationId,
+    required String text,
+    DateTime? sendAt,
+    bool whenOnline = false,
+    SendOptions options = SendOptions.none,
+  });
+
+  Future<List<ScheduledMessage>> loadScheduled(String conversationId);
+
+  Future<void> cancelScheduled(String id);
+
+  /// Отметка «я в сети» — по ней сервер понимает, что пора отправлять
+  /// сообщения «когда будет в сети». Наружу не отдаётся никому.
+  Future<void> touchPresence();
 
   /// Удалить у всех участников. Возвращает id, которые удалось удалить:
   /// своё — всегда, чужое — только владельцу группы. Скрыть «только у
@@ -78,4 +100,13 @@ class ChatDeleteUnavailable implements Exception {
   @override
   String toString() =>
       'Удаление у всех пока недоступно на сервере. Сообщение можно скрыть у себя.';
+}
+
+/// Нужная миграция ещё не накатана на сервер.
+class ChatFeatureUnavailable implements Exception {
+  const ChatFeatureUnavailable();
+
+  @override
+  String toString() =>
+      'Эта возможность пока недоступна на сервере. Попробуйте позже.';
 }
