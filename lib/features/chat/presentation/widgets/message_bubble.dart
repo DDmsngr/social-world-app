@@ -61,7 +61,7 @@ class MessageBubble extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.champagne,
+                  color: AppColors.primaryTint,
                 ),
               ),
             ),
@@ -175,7 +175,7 @@ class _Meta extends StatelessWidget {
             size: 13,
             // Прочитанное — единственное место с акцентом в пузыре.
             color: message.status == MessageStatus.read
-                ? AppColors.champagne
+                ? AppColors.primaryTint
                 : color,
           ),
         ],
@@ -204,7 +204,7 @@ class _ForwardedLabel extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.shortcut_rounded, size: 14, color: AppColors.champagne),
+            Icon(Icons.shortcut_rounded, size: 14, color: AppColors.primaryTint),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
@@ -214,7 +214,7 @@ class _ForwardedLabel extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontStyle: FontStyle.italic,
-                  color: AppColors.champagne,
+                  color: AppColors.primaryTint,
                 ),
               ),
             ),
@@ -244,7 +244,7 @@ class _QuoteBlock extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.ink.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(8),
-        border: Border(left: BorderSide(color: AppColors.champagne, width: 3)),
+        border: Border(left: BorderSide(color: AppColors.primaryTint, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,7 +257,7 @@ class _QuoteBlock extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.champagne,
+              color: AppColors.primaryTint,
             ),
           ),
           Text(

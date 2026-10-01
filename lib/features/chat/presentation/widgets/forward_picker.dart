@@ -177,7 +177,7 @@ class _ForwardSheetState extends ConsumerState<_ForwardSheet> {
                                         _selected.remove(c.id);
                                       }
                                     }),
-                              activeColor: AppColors.champagne,
+                              activeColor: AppColors.primaryTint,
                               checkColor: AppColors.ink,
                               controlAffinity: ListTileControlAffinity.trailing,
                               contentPadding: const EdgeInsets.symmetric(
@@ -196,7 +196,7 @@ class _ForwardSheetState extends ConsumerState<_ForwardSheet> {
                                         c.kind == ConversationKind.quest
                                             ? Icons.flag_outlined
                                             : Icons.group_outlined,
-                                        color: AppColors.champagne,
+                                        color: AppColors.primaryTint,
                                         size: 20,
                                       ),
                                     ),

@@ -126,7 +126,7 @@ class _MenuPreview extends StatelessWidget {
       decoration: BoxDecoration(
         color: mine ? AppColors.bubbleMine : AppColors.card,
         borderRadius: BorderRadius.circular(14),
-        border: Border(left: BorderSide(color: AppColors.champagne, width: 3)),
+        border: Border(left: BorderSide(color: AppColors.primaryTint, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,7 +137,7 @@ class _MenuPreview extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.champagne,
+              color: AppColors.primaryTint,
             ),
           ),
           const SizedBox(height: 4),
@@ -358,7 +358,7 @@ class _DeleteDialogState extends State<_DeleteDialog> {
         onChanged: (value) => setState(() => _everyone = value ?? false),
         controlAffinity: ListTileControlAffinity.leading,
         contentPadding: EdgeInsets.zero,
-        activeColor: AppColors.champagne,
+        activeColor: AppColors.primaryTint,
         checkColor: AppColors.ink,
         title: Text(widget.everyoneLabel),
       ),

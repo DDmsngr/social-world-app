@@ -164,7 +164,7 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
       leading: CircleAvatar(
         radius: 22,
         backgroundColor: AppColors.ink,
-        child: Icon(Icons.campaign_outlined, color: AppColors.champagne, size: 20),
+        child: Icon(Icons.campaign_outlined, color: AppColors.primaryTint, size: 20),
       ),
       title: Text(channel.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Column(

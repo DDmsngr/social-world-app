@@ -323,7 +323,7 @@ class _EmojiPanelState extends State<EmojiPanel> {
                           Icons.schedule,
                           size: 20,
                           color: _tab == 0
-                              ? AppColors.champagne
+                              ? AppColors.primaryTint
                               : AppColors.textFaint,
                         ),
                       ),
@@ -405,7 +405,7 @@ class _Tab extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: selected ? AppColors.champagne : Colors.transparent,
+              color: selected ? AppColors.primaryTint : Colors.transparent,
               width: 2,
             ),
           ),

@@ -377,7 +377,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     return SelectableText(
                       snapshot.data!,
                       style: TextStyle(
-                        color: AppColors.champagne,
+                        color: AppColors.primaryTint,
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.4,
@@ -510,7 +510,7 @@ class _SlowLoadingState extends State<_SlowLoading> {
             height: 28,
             child: CircularProgressIndicator(
               strokeWidth: 2.5,
-              color: AppColors.champagne,
+              color: AppColors.primaryTint,
             ),
           ),
           if (_slow) ...[
@@ -560,7 +560,7 @@ class _ConnectionBanner extends StatelessWidget {
                 height: 12,
                 child: CircularProgressIndicator(
                   strokeWidth: 1.8,
-                  color: AppColors.champagne,
+                  color: AppColors.primaryTint,
                 ),
               ),
               const SizedBox(width: 10),

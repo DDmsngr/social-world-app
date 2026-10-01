@@ -102,7 +102,7 @@ class ChannelInfoScreen extends ConsumerWidget {
                 child: CircleAvatar(
                   radius: 40,
                   backgroundColor: AppColors.ink,
-                  child: Icon(Icons.campaign_outlined, color: AppColors.champagne, size: 34),
+                  child: Icon(Icons.campaign_outlined, color: AppColors.primaryTint, size: 34),
                 ),
               ),
               const SizedBox(height: 12),

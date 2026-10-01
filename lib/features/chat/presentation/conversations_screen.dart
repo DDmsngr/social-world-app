@@ -72,12 +72,12 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: AppColors.champagne,
+                  color: AppColors.primaryTint,
                   borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: Text(
                   '$n',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.onPrimary),
                 ),
               ),
             ],
@@ -267,7 +267,7 @@ class _ConversationTile extends StatelessWidget {
                   ConversationKind.channel => Icons.campaign_outlined,
                   _ => Icons.group_outlined,
                 },
-                color: AppColors.champagne,
+                color: AppColors.primaryTint,
                 size: 20,
               ),
             ),
@@ -293,7 +293,7 @@ class _ConversationTile extends StatelessWidget {
                             : Icons.done,
                         size: 15,
                         color: last.status == MessageStatus.read
-                            ? AppColors.champagne
+                            ? AppColors.primaryTint
                             : AppColors.textFaint,
                       ),
                       const SizedBox(width: 4),
@@ -331,7 +331,7 @@ class _ConversationTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 // У заглушённого чата счётчик серый: он не должен кричать.
-                color: notify.isMuted ? AppColors.hairStrong : AppColors.champagne,
+                color: notify.isMuted ? AppColors.hairStrong : AppColors.primaryTint,
                 borderRadius: BorderRadius.circular(AppRadius.chip),
               ),
               child: Text(
@@ -339,7 +339,7 @@ class _ConversationTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.ink,
+                  color: notify.isMuted ? AppColors.text : AppColors.onPrimary,
                 ),
               ),
             ),

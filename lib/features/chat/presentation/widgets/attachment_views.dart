@@ -489,7 +489,7 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
                 child: CircularProgressIndicator(
                   value: progress.clamp(0.0, 1.0),
                   strokeWidth: 3,
-                  color: AppColors.champagne,
+                  color: AppColors.primaryTint,
                 ),
               ),
             if (withSound)
@@ -792,7 +792,7 @@ class VoiceMessagePlayer extends ConsumerWidget {
             1.0,
           )
         : 0.0;
-    final color = mine ? AppColors.onBubbleMine : AppColors.champagne;
+    final color = mine ? AppColors.onBubbleMine : AppColors.primaryTint;
     final bars = _bars(attachment.waveform, messageId);
     final speed = ref.watch(playbackSpeedProvider);
 

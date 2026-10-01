@@ -80,7 +80,7 @@ class _SwipeToReplyState extends State<SwipeToReply> {
                     width: 34,
                     height: 34,
                     decoration: BoxDecoration(
-                      color: _armed ? AppColors.champagne : AppColors.hair,
+                      color: _armed ? AppColors.primaryTint : AppColors.hair,
                       shape: BoxShape.circle,
                     ),
                     child: Icon(

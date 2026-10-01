@@ -149,7 +149,7 @@ class _ChatSearchScreenState extends ConsumerState<ChatSearchScreen> {
                     ? UserAvatar(name: c.displayName, url: c.peerAvatarUrl)
                     : CircleAvatar(
                         backgroundColor: AppColors.ink2,
-                        child: Icon(Icons.group_outlined, color: AppColors.champagne),
+                        child: Icon(Icons.group_outlined, color: AppColors.primaryTint),
                       ),
                 title: Text(c.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
               ),

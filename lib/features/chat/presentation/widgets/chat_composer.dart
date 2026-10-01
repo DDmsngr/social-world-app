@@ -604,7 +604,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             _emojiOpen
                 ? Icons.keyboard_alt_outlined
                 : Icons.emoji_emotions_outlined,
-            color: _emojiOpen ? AppColors.champagne : AppColors.textDim,
+            color: _emojiOpen ? AppColors.primaryTint : AppColors.textDim,
           ),
         ),
         IconButton(
@@ -736,7 +736,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                       margin: const EdgeInsets.symmetric(horizontal: 0.8),
                       height: 3 + 25 * v,
                       decoration: BoxDecoration(
-                        color: AppColors.champagne,
+                        color: AppColors.primaryTint,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -779,8 +779,8 @@ class _RoundButton extends StatelessWidget {
       onPressed: onPressed,
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        backgroundColor: accent ? AppColors.champagne : AppColors.bubbleMine,
-        foregroundColor: accent ? AppColors.ink : AppColors.onBubbleMine,
+        backgroundColor: accent ? AppColors.primaryTint : AppColors.bubbleMine,
+        foregroundColor: accent ? AppColors.onPrimary : AppColors.onBubbleMine,
         disabledBackgroundColor: AppColors.card,
         disabledForegroundColor: AppColors.textFaint,
         minimumSize: const Size(48, 48),
@@ -843,7 +843,7 @@ class _ReplyBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: AppColors.champagne, width: 3)),
+        border: Border(left: BorderSide(color: AppColors.primaryTint, width: 3)),
       ),
       child: Row(
         children: [
@@ -858,7 +858,7 @@ class _ReplyBar extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.champagne,
+                    color: AppColors.primaryTint,
                   ),
                 ),
                 Text(

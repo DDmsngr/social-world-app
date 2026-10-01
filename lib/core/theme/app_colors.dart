@@ -80,60 +80,62 @@ class AppPalette {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// Тёмная тема по макетам дизайнера (Figma, 01.10.2026): графитовый фон
-  /// #1C1C1C, карточки #323233, белый текст и один акцент — вишнёво-красный
-  /// #D83D5F, только для действий. Бордово-платиновая палитра отменена.
+  /// Тёмная тема по борду дизайнера (Figma, экраны «Событие · Dark» и
+  /// «Диалог · Dark»): почти чёрный фон, панели и пузыри — ступени графита,
+  /// белый текст и один акцент — красный #EA2249 для действий, прочитанных
+  /// сообщений, цитат и счётчиков. Бордово-платиновая палитра отменена.
   static const designerDark = AppPalette(
     brightness: Brightness.dark,
-    ink: Color(0xFF1C1C1C),
-    ink2: Color(0xFF2A2A2B),
-    card: Color(0xFF323233),
+    ink: Color(0xFF0E0F10),
+    ink2: Color(0xFF191A1C),
+    card: Color(0xFF242526),
     paper: Color(0xFFFFFFFF),
-    primary: Color(0xFFD83D5F),
-    primaryHover: Color(0xFFE5587A),
-    // Акцент для текста и иконок на тёмном: чуть светлее заливки кнопки,
-    // иначе #D83D5F на #1C1C1C читается хуже 4:1.
-    primaryTint: Color(0xFFEC5C7C),
-    onPrimary: Color(0xFF000000),
+    primary: Color(0xFFEA2249),
+    primaryHover: Color(0xFFF03E5F),
+    // Акцент для текста и иконок на тёмном фоне — светлее заливки кнопки:
+    // #EA2249 на почти чёрном мелким текстом читается хуже.
+    primaryTint: Color(0xFFF03E5F),
+    onPrimary: Color(0xFFFFFFFF),
     success: Color(0xFF4CC38A),
     danger: Color(0xFFFF4D4D),
     geo: Color(0xFF4F9DDE),
-    // Выбранное состояние (вкладки, сегменты): белый, не розовый — розовый
-    // у макета только у кнопок действия.
+    // Выбранное состояние (вкладки, сегменты): белый, не красный — красный
+    // у макета означает действие.
     champagne: Color(0xFFFFFFFF),
     text: Color(0xFFFFFFFF),
-    textDim: Color(0xFFB5B5B8),
-    textFaint: Color(0x99B5B5B8),
-    hair: Color(0x33FFFFFF),
-    hairStrong: Color(0xFF48484A),
-    bubbleMine: Color(0xFF3A3A3C),
+    textDim: Color(0xFFA9AAAE),
+    textFaint: Color(0x99A9AAAE),
+    hair: Color(0x1FFFFFFF),
+    hairStrong: Color(0xFF3A3B3D),
+    bubbleMine: Color(0xFF2C2D2F),
     onBubbleMine: Color(0xFFFFFFFF),
   );
 
-  /// Светлая тема по макетам дизайнера: тёплый белый #F8F5F2, карточки
-  /// #EBEBEB, чёрный текст, тот же акцент #D83D5F.
+  /// Светлая тема по тому же борду: белый фон, светло-серые карточки и
+  /// пузыри, чёрный текст, тот же красный акцент.
   static const designerLight = AppPalette(
     brightness: Brightness.light,
-    ink: Color(0xFFF8F5F2),
-    ink2: Color(0xFFFFFFFF),
-    card: Color(0xFFEBEBEB),
+    ink: Color(0xFFFFFFFF),
+    ink2: Color(0xFFF7F7F9),
+    card: Color(0xFFF2F3F5),
     paper: Color(0xFFFFFFFF),
-    primary: Color(0xFFD83D5F),
-    primaryHover: Color(0xFFC8284C),
-    primaryTint: Color(0xFFC9304F),
-    onPrimary: Color(0xFF000000),
+    primary: Color(0xFFEA2249),
+    primaryHover: Color(0xFFD01A3E),
+    primaryTint: Color(0xFFD81E45),
+    onPrimary: Color(0xFFFFFFFF),
     success: Color(0xFF2E8B5E),
     danger: Color(0xFFEC3030),
     geo: Color(0xFF2F7ACB),
-    champagne: Color(0xFF1C1C1C),
-    text: Color(0xFF000000),
-    textDim: Color(0xFF5E5E62),
-    textFaint: Color(0x995E5E62),
-    hair: Color(0x33000000),
-    hairStrong: Color(0xFFD1D1D6),
-    bubbleMine: Color(0xFFE2E2E4),
-    onBubbleMine: Color(0xFF000000),
-  );}
+    champagne: Color(0xFF111111),
+    text: Color(0xFF111111),
+    textDim: Color(0xFF6B6C70),
+    textFaint: Color(0x996B6C70),
+    hair: Color(0x1A000000),
+    hairStrong: Color(0xFFDADBDF),
+    bubbleMine: Color(0xFFE9EAEF),
+    onBubbleMine: Color(0xFF111111),
+  );
+}
 
 /// Цвета текущей темы.
 ///

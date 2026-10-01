@@ -35,7 +35,7 @@ class ScheduledChip extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            Icon(Icons.schedule, size: 16, color: AppColors.champagne),
+            Icon(Icons.schedule, size: 16, color: AppColors.primaryTint),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -129,7 +129,7 @@ class _ScheduledSheet extends ConsumerWidget {
                         m.whenOnline
                             ? Icons.person_pin_circle_outlined
                             : Icons.schedule,
-                        color: AppColors.champagne,
+                        color: AppColors.primaryTint,
                       ),
                       title: Text(
                         m.text,
