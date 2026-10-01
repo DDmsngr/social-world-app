@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../debug/app_log.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/feature_flags.dart';
@@ -162,6 +163,18 @@ final routerProvider = Provider<GoRouter>((ref) {
     auth.value = auth.value;
   });
   ref.onDispose(splashTimer.cancel);
+
+  // Страховка от вечной заставки: если за 25 секунд состояние сессии так и не
+  // стало известно (сервер молчит), считаем, что никто не вошёл, и показываем
+  // вход. Когда ответ всё-таки придёт, подписка выше сама переведёт на нужный
+  // экран, так что вошедшего человека это не выкинет.
+  final resolveTimer = Timer(const Duration(seconds: 25), () {
+    if (auth.isResolving) {
+      AppLog.add('Сессия не определилась за 25 с — показываем вход');
+      auth.value = const AsyncValue.data(null);
+    }
+  });
+  ref.onDispose(resolveTimer.cancel);
 
   return GoRouter(
     initialLocation: Routes.splash,

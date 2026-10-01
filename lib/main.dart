@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,10 +49,18 @@ Future<void> main() async {
 
   await Env.load();
   if (Env.isConfigured) {
-    await Supabase.initialize(
-      url: Env.supabaseUrl,
-      publishableKey: Env.supabaseAnonKey,
-    );
+    // initialize читает сохранённую сессию и подписывается на ссылки; на
+    // странном телефоне это может зависнуть, и тогда приложение не дошло бы до
+    // первого кадра. Клиент создаётся в самом начале initialize, так что после
+    // таймаута им уже можно пользоваться.
+    try {
+      await Supabase.initialize(
+        url: Env.supabaseUrl,
+        publishableKey: Env.supabaseAnonKey,
+      ).timeout(const Duration(seconds: 10));
+    } on TimeoutException {
+      AppLog.add('Supabase.initialize не уложился в 10 с — идём дальше');
+    }
   }
 
   // Ключ карты задаётся до runApp и только в Dart: в официальном плагине

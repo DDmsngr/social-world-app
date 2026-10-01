@@ -45,18 +45,48 @@ class SupabaseAuthRepository implements AuthRepository {
 
     if (user == null) {
       _lastKnown = null;
-      _controller.add(null);
+      _publish(null);
       return;
     }
 
     final resolved = await _withProfile(user, fallbackTo: _lastKnown);
     if (myGeneration != _generation) return; // событие устарело
     _lastKnown = resolved;
-    _controller.add(resolved);
+    _publish(resolved);
   }
 
+  /// Последнее опубликованное значение (в том числе «никто не вошёл»).
+  /// Нужно для [authStateChanges]: GoTrue отдаёт начальное состояние сразу, в
+  /// конструкторе, раньше, чем роутер подпишется, и для человека без сессии
+  /// событие «null» терялось — экран навсегда застревал на заставке.
+  bool _published = false;
+  AppUser? _lastPublished;
+
+  void _publish(AppUser? user) {
+    _published = true;
+    _lastPublished = user;
+    _controller.add(user);
+  }
+
+  /// Каждый новый подписчик сразу получает текущее состояние, если оно уже
+  /// известно, и дальше все изменения.
   @override
-  Stream<AppUser?> authStateChanges() => _controller.stream;
+  Stream<AppUser?> authStateChanges() {
+    late final StreamController<AppUser?> out;
+    StreamSubscription<AppUser?>? inner;
+    out = StreamController<AppUser?>(
+      onListen: () {
+        if (_published) out.add(_lastPublished);
+        inner = _controller.stream.listen(
+          out.add,
+          onError: out.addError,
+          onDone: out.close,
+        );
+      },
+      onCancel: () => inner?.cancel(),
+    );
+    return out.stream;
+  }
 
   @override
   AppUser? get currentUser {
@@ -119,7 +149,7 @@ class SupabaseAuthRepository implements AuthRepository {
     final merged = _merge(user, row);
     if (myGeneration == _generation) {
       _lastKnown = merged;
-      _controller.add(merged);
+      _publish(merged);
     }
     return merged;
   }
@@ -162,7 +192,7 @@ class SupabaseAuthRepository implements AuthRepository {
     final merged = _merge(user, row);
     if (myGeneration == _generation) {
       _lastKnown = merged;
-      _controller.add(merged);
+      _publish(merged);
     }
     return merged;
   }
@@ -183,7 +213,7 @@ class SupabaseAuthRepository implements AuthRepository {
     final merged = _merge(user, row);
     if (myGeneration == _generation) {
       _lastKnown = merged;
-      _controller.add(merged);
+      _publish(merged);
     }
     return merged;
   }
@@ -199,7 +229,7 @@ class SupabaseAuthRepository implements AuthRepository {
         .select()
         .eq('id', user.id)
         .maybeSingle()
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 8));
 
     try {
       final row = await fetch();
