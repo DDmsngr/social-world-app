@@ -3,27 +3,28 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
-/// Inter — весь интерфейс. Playfair Display — заголовки и акценты.
+/// Inter — весь интерфейс, включая заголовки.
 ///
-/// На сайте в заголовках стоит Instrument Serif, но у него нет кириллицы:
-/// русский текст молча уезжает в системный запасной шрифт. Playfair Display
-/// держит тот же высокий контраст и дисплейный характер, но с кириллицей.
+/// Дизайнер рисует в SF Pro, но его лицензия Apple разрешает только
+/// платформы Apple — в Android-сборку его класть нельзя. Inter — открытый
+/// гротеск с кириллицей, по рисунку ближе всего к SF Pro. Заголовки по
+/// макету жирные гротесковые (засечный Playfair Display убран 01.10.2026);
+/// имя [serif] оставлено, чтобы не перетряхивать сотню экранов ради
+/// переименования.
 abstract final class AppTypography {
   static TextStyle serif(
     double size, {
     Color? color,
     FontStyle style = FontStyle.normal,
-    double height = 1.08,
+    double height = 1.15,
   }) =>
-      GoogleFonts.playfairDisplay(
+      GoogleFonts.inter(
         fontSize: size,
         color: color ?? AppColors.text,
         fontStyle: style,
+        fontWeight: FontWeight.w700,
         height: height,
-        letterSpacing: -0.012 * size,
-        // По умолчанию Playfair рисует старостильные цифры: ноль выглядит
-        // как строчная «о». В счётчиках и радиусах это читается как опечатка.
-        fontFeatures: const [FontFeature.liningFigures()],
+        letterSpacing: -0.02 * size,
       );
 
   static TextTheme textTheme(AppPalette p) {

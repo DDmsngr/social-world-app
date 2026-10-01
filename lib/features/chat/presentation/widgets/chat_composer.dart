@@ -334,6 +334,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               ('camera', Icons.photo_camera_outlined, 'Сделать фото'),
               ('video', Icons.video_library_outlined, 'Видео из галереи'),
               ('file', Icons.attach_file, 'Файл'),
+              ('videonote', Icons.radio_button_checked, 'Видеосообщение (кружок)'),
             ])
               ListTile(
                 leading: Icon(icon, color: AppColors.textDim),
@@ -386,6 +387,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               mime: 'video/mp4',
             );
           }
+        case 'videonote':
+          await _recordVideoNote();
         case 'file':
           final file = await FilePicker.pickFile();
           final path = file?.path;
@@ -593,25 +596,18 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     return (height * 0.35 / 24).floor().clamp(4, 12);
   }
 
+  /// По макету «Диалог»: «+» (все вложения, включая кружок) — поле-пилюля с
+  /// эмодзи внутри — красный микрофон, а при наборе текста — отправка.
   Widget _inputRow(bool hasText) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        IconButton(
-          onPressed: _toggleEmoji,
-          tooltip: _emojiOpen ? 'Клавиатура' : 'Эмодзи',
-          icon: Icon(
-            _emojiOpen
-                ? Icons.keyboard_alt_outlined
-                : Icons.emoji_emotions_outlined,
-            color: _emojiOpen ? AppColors.primaryTint : AppColors.textDim,
-          ),
-        ),
-        IconButton(
-          onPressed: _showAttachMenu,
+        _RoundButton(
+          icon: Icons.add,
           tooltip: 'Вложение',
-          icon: Icon(Icons.attach_file, color: AppColors.textDim),
+          onPressed: _showAttachMenu,
         ),
+        const SizedBox(width: 8),
         Expanded(
           child: AnimatedSize(
             duration: const Duration(milliseconds: 120),
@@ -644,16 +640,28 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               decoration: InputDecoration(
                 hintText: 'Сообщение',
                 isDense: true,
+                filled: true,
+                fillColor: AppColors.card,
                 constraints: const BoxConstraints(minHeight: 48),
-                contentPadding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
-                border: _fieldBorder(AppColors.hair),
-                enabledBorder: _fieldBorder(AppColors.hair),
+                contentPadding: const EdgeInsets.fromLTRB(18, 13, 4, 13),
+                border: _fieldBorder(Colors.transparent),
+                enabledBorder: _fieldBorder(Colors.transparent),
                 focusedBorder: _fieldBorder(AppColors.hairStrong),
+                suffixIcon: IconButton(
+                  onPressed: _toggleEmoji,
+                  tooltip: _emojiOpen ? 'Клавиатура' : 'Эмодзи',
+                  icon: Icon(
+                    _emojiOpen
+                        ? Icons.keyboard_alt_outlined
+                        : Icons.emoji_emotions_outlined,
+                    color: _emojiOpen ? AppColors.primaryTint : AppColors.textDim,
+                  ),
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
         if (hasText)
           // Без tooltip: его собственный долгий тап спорил бы с меню отправки.
           Semantics(
@@ -676,18 +684,13 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               ),
             ),
           )
-        else ...[
-          IconButton(
-            onPressed: _recordVideoNote,
-            tooltip: 'Видеосообщение',
-            icon: Icon(Icons.radio_button_checked, color: AppColors.textDim),
-          ),
+        else
           _RoundButton(
             icon: Icons.mic,
             tooltip: 'Голосовое',
+            accent: true,
             onPressed: _startVoice,
           ),
-        ],
       ],
     );
   }
@@ -769,8 +772,8 @@ class _RoundButton extends StatelessWidget {
   final String? tooltip;
   final VoidCallback? onPressed;
 
-  /// Отправка — единственная акцентная кнопка; микрофон и остальное
-  /// нейтральные, чтобы нижняя панель не спорила с перепиской.
+  /// Красная кнопка — главное действие (микрофон или отправка), как в
+  /// макете; «+» нейтральная.
   final bool accent;
 
   @override

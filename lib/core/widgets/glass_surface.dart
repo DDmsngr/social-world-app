@@ -43,10 +43,10 @@ class GlassSurface extends StatelessWidget {
         borderRadius: borderRadius,
         color: fill ??
             (dark
-                ? const Color(0x99303034)
+                ? AppColors.ink2.withValues(alpha: 0.72)
                 : const Color(0x99F5F5F7)),
         border: Border.all(
-          color: dark ? const Color(0x33FFFFFF) : const Color(0x80FFFFFF),
+          color: dark ? const Color(0x24FFFFFF) : const Color(0x80FFFFFF),
         ),
       ),
       child: padding == null ? child : Padding(padding: padding!, child: child),

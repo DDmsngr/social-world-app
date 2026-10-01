@@ -158,7 +158,14 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
   }) {
     final myId = ref.watch(currentUserProvider)?.id;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 12, AppSpacing.gutter, 96),
+      // Снизу — место под кнопку «Группа/Канал» и плавающую панель вкладок
+      // (её высота уже в MediaQuery.padding).
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.gutter,
+        12,
+        AppSpacing.gutter,
+        80 + MediaQuery.paddingOf(context).bottom,
+      ),
       children: [
         if (showEncryptionNotice) ...[
           const _EncryptionNotice(),

@@ -16,6 +16,7 @@ import '../../domain/repositories/chat_repository.dart';
 import '../providers/chat_providers.dart';
 import '../providers/hidden_messages_provider.dart';
 import 'forward_picker.dart';
+import 'reaction_chips.dart';
 
 /// Меню сообщения: долгий тап в переписке и «⋮» в просмотре фото.
 ///
@@ -28,13 +29,17 @@ Future<bool> showMessageMenu(
   required String myId,
   required Conversation? conversation,
   void Function(ChatMessage message)? onReply,
+  // Реакции: текущая моя и что делать при выборе. Без [onReact] полосы нет
+  // (просмотр фото, неотправленное сообщение).
+  String? myReaction,
+  void Function(String emoji)? onReact,
 }) async {
   HapticFeedback.mediumImpact();
   final actions = messageActions(
     message,
     canReply: onReply != null && !(conversation?.closed ?? false),
   );
-  final action = await showModalBottomSheet<MessageAction>(
+  final picked = await showModalBottomSheet<Object>(
     context: context,
     useRootNavigator: true,
     backgroundColor: AppColors.ink2,
@@ -45,6 +50,11 @@ Future<bool> showMessageMenu(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (onReact != null)
+              QuickReactionBar(
+                current: myReaction,
+                onPick: (emoji) => Navigator.of(context).pop(_Reaction(emoji)),
+              ),
             // Шторка с затемнением закрывает переписку, и было непонятно, над
             // каким сообщением открыто меню. Показываем его здесь же.
             _MenuPreview(message: message, mine: message.senderId == myId),
@@ -74,6 +84,11 @@ Future<bool> showMessageMenu(
       ),
     ),
   );
+  if (picked is _Reaction) {
+    onReact?.call(picked.emoji);
+    return false;
+  }
+  final action = picked is MessageAction ? picked : null;
   if (action == null || !context.mounted) return false;
 
   final messenger = ScaffoldMessenger.of(context);
@@ -105,6 +120,12 @@ Future<bool> showMessageMenu(
         conversation: conversation,
       );
   }
+}
+
+/// Выбор реакции из шторки — отдельный тип, чтобы не путать с пунктами меню.
+class _Reaction {
+  const _Reaction(this.emoji);
+  final String emoji;
 }
 
 class _MenuPreview extends StatelessWidget {

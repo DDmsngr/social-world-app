@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,11 +13,13 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
 import 'conversations_screen.dart';
+import 'providers/chat_extras_providers.dart';
 import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
 import 'providers/hidden_messages_provider.dart';
@@ -24,6 +27,7 @@ import 'widgets/chat_composer.dart';
 import 'widgets/chat_notify_sheet.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/message_menu.dart';
+import 'widgets/reaction_chips.dart';
 import 'widgets/swipe_to_reply.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -98,9 +102,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             .read(conversationProvider(widget.conversationId))
             .value,
         onReply: (message) => _startReply(message, myId),
+        // Реакцию можно поставить только на дошедшее сообщение.
+        myReaction: _myReaction(message.id),
+        onReact: message.status == MessageStatus.failed ||
+                message.status == MessageStatus.sending
+            ? null
+            : (emoji) => _react(message.id, emoji),
       );
     } finally {
       if (mounted) setState(() => _selectedId = null);
+    }
+  }
+
+  String? _myReaction(String messageId) {
+    final list = ref.read(chatReactionsProvider(widget.conversationId)).value?[messageId];
+    for (final r in list ?? const <ReactionCount>[]) {
+      if (r.mine) return r.emoji;
+    }
+    return null;
+  }
+
+  Future<void> _react(String messageId, String emoji) async {
+    HapticFeedback.selectionClick();
+    try {
+      await toggleReaction(ref, widget.conversationId, messageId, emoji);
+    } catch (error) {
+      AppLog.add('Реакция не поставилась: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось поставить реакцию')),
+      );
     }
   }
 
@@ -150,27 +181,67 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       }
     });
 
+    final reactions =
+        ref.watch(chatReactionsProvider(widget.conversationId)).value ?? const {};
+    // Шапка по макету «Диалог»: аватар, имя и «в сети / был(а) …».
+    final presence = isDirect
+        ? ref.watch(peerPresenceProvider(widget.conversationId)).value
+        : null;
+    final subtitle = info != null && !isDirect
+        ? membersLabel(info.memberCount)
+        : presence?.label(DateTime.now());
+
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         title: InkWell(
-          onTap: info == null || isDirect
+          onTap: info == null
               ? null
+              : isDirect
+              ? (info.peerId == null ? null : () => openProfile(context, info.peerId!))
               : () => context.push(
                   '${Routes.chats}/${widget.conversationId}/info',
                 ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(
-                info?.displayName ?? widget.peerName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (info != null && !isDirect)
-                Text(
-                  membersLabel(info.memberCount),
-                  style: TextStyle(fontSize: 12, color: AppColors.textDim),
+              if (isDirect)
+                UserAvatar(
+                  name: info?.displayName ?? widget.peerName,
+                  url: info?.peerAvatarUrl,
+                  radius: 19,
+                )
+              else
+                CircleAvatar(
+                  radius: 19,
+                  backgroundColor: AppColors.card,
+                  child: Icon(Icons.group_outlined, size: 18, color: AppColors.primaryTint),
                 ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      info?.displayName ?? widget.peerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: presence?.online ?? false
+                              ? AppColors.primaryTint
+                              : AppColors.textDim,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -286,12 +357,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                               AppRadius.card,
                             ),
                           ),
-                          child: MessageBubble(
-                            message: message,
-                            mine: mine,
-                            showSender: !isDirect && !mine,
-                            onMediaMore: (viewerContext) =>
-                                _openMenu(viewerContext, message, myId),
+                          child: Column(
+                            crossAxisAlignment: mine
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              MessageBubble(
+                                message: message,
+                                mine: mine,
+                                showSender: !isDirect && !mine,
+                                onMediaMore: (viewerContext) =>
+                                    _openMenu(viewerContext, message, myId),
+                              ),
+                              ReactionChips(
+                                reactions: reactions[message.id] ?? const [],
+                                mine: mine,
+                                onTap: (emoji) => _react(message.id, emoji),
+                              ),
+                            ],
                           ),
                         ),
                         ),

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/config/env.dart';
 import '../../../core/errors/friendly_error.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
@@ -76,6 +78,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 10),
+          const _LastSeenSwitch(),
           const SizedBox(height: 26),
           const SectionLabel('Приглашение'),
           const SizedBox(height: 12),
@@ -156,6 +160,60 @@ enum _GeoMode {
 
   /// null — присутствие выключено.
   final int? blurMeters;
+}
+
+/// «В сети / был(а) …» в шапке чата. Как в Telegram: кто скрыл своё время,
+/// тот и чужого не видит. Позже здесь же появится расписание (премиум).
+class _LastSeenSwitch extends StatefulWidget {
+  const _LastSeenSwitch();
+
+  @override
+  State<_LastSeenSwitch> createState() => _LastSeenSwitchState();
+}
+
+class _LastSeenSwitchState extends State<_LastSeenSwitch> {
+  bool? _show;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!Env.isConfigured) return;
+    Supabase.instance.client.rpc('my_show_last_seen').then(
+      (value) {
+        if (mounted) setState(() => _show = value as bool? ?? true);
+      },
+      onError: (Object _) {},
+    );
+  }
+
+  Future<void> _set(bool value) async {
+    final previous = _show;
+    setState(() => _show = value);
+    try {
+      await Supabase.instance.client.rpc('set_show_last_seen', params: {'in_show': value});
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _show = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось сохранить'))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final show = _show;
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 4, 8, 4),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        value: show ?? true,
+        onChanged: show == null ? null : _set,
+        title: const Text('Показывать, когда я в сети'),
+        subtitle: const Text('Если выключить, вы тоже не увидите время других'),
+      ),
+    );
+  }
 }
 
 class _GeoPrivacy extends ConsumerStatefulWidget {
