@@ -52,6 +52,15 @@ class PushService {
     playSound: false,
     enableVibration: false,
   );
+  /// Режим чата «только вибрация».
+  static const _messagesVibrate = AndroidNotificationChannel(
+    'messages_vibrate',
+    'Сообщения — только вибрация',
+    description: 'Чаты с режимом «только вибрация»',
+    importance: Importance.high,
+    playSound: false,
+    enableVibration: true,
+  );
   static const _activity = AndroidNotificationChannel(
     'activity',
     'Активность',
@@ -84,6 +93,7 @@ class PushService {
           >();
       await android?.createNotificationChannel(_messages);
       await android?.createNotificationChannel(_messagesSilent);
+      await android?.createNotificationChannel(_messagesVibrate);
       await android?.createNotificationChannel(_activity);
       _localReady = true;
 
@@ -171,9 +181,11 @@ class PushService {
     if (notification == null || !_localReady) return;
     final channel = !isMessage
         ? _activity
-        : data['silent'] == '1'
-        ? _messagesSilent
-        : _messages;
+        : switch (data['channel']) {
+            'messages_silent' => _messagesSilent,
+            'messages_vibrate' => _messagesVibrate,
+            _ => data['silent'] == '1' ? _messagesSilent : _messages,
+          };
     // id 0 + tag — так же, как пуш, нарисованный системой в фоне: новое
     // уведомление того же чата заменяет прошлое, а не копит стопку.
     _local.show(

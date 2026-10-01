@@ -6,6 +6,7 @@
 // Текст личных сообщений в пуш не попадает никогда: сервер его и не знает
 // (сквозное шифрование), в пуше только «Новое сообщение».
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { decide, type Prefs } from "./decide.ts";
 
 const WEBHOOK_SECRET = Deno.env.get("PUSH_WEBHOOK_SECRET") ?? "";
 const SERVICE_ACCOUNT = JSON.parse(Deno.env.get("FCM_SERVICE_ACCOUNT") ?? "{}");
@@ -19,7 +20,7 @@ const db = createClient(
 type Push = {
   title: string;
   body: string;
-  channel: "messages" | "messages_silent" | "activity";
+  channel: "messages" | "messages_vibrate" | "messages_silent" | "activity";
   // Одинаковый tag заменяет прошлое уведомление, а не копит стопку.
   tag: string;
   data: Record<string, string>;
@@ -35,26 +36,32 @@ Deno.serve(async (req) => {
 
   const payload = await req.json().catch(() => null);
   try {
-    const job = payload?.type === "message"
+    const jobs = payload?.type === "message"
       ? await forMessage(payload.message_id)
       : payload?.type === "notification"
       ? await forNotification(payload.notification_id)
-      : null;
-    if (!job || job.recipients.length === 0) return json({ sent: 0 });
+      : [];
 
-    const tokens = await tokensFor(job.recipients);
     let sent = 0;
-    for (const token of tokens) {
-      if (await send(token, job.push)) sent++;
+    let total = 0;
+    for (const job of jobs) {
+      if (job.recipients.length === 0) continue;
+      const tokens = await tokensFor(job.recipients);
+      total += tokens.length;
+      for (const token of tokens) {
+        if (await send(token, job.push)) sent++;
+      }
     }
-    return json({ sent, tokens: tokens.length });
+    return json({ sent, tokens: total });
   } catch (error) {
     console.error("push-send", error);
     return new Response(String(error), { status: 500 });
   }
 });
 
-async function forMessage(messageId: string) {
+type Job = { recipients: string[]; push: Push };
+
+async function forMessage(messageId: string): Promise<Job[]> {
   let { data: message, error } = await db
     .from("chat_messages")
     .select("id, conversation_id, sender_id, body, kind, silent")
@@ -69,7 +76,7 @@ async function forMessage(messageId: string) {
       .eq("id", messageId)
       .maybeSingle());
   }
-  if (!message) return null;
+  if (!message) return [];
 
   const [{ data: conversation }, { data: sender }, { data: members }] = await Promise.all([
     db.from("chat_conversations")
@@ -82,7 +89,7 @@ async function forMessage(messageId: string) {
       .eq("conversation_id", message.conversation_id)
       .neq("profile_id", message.sender_id),
   ]);
-  if (!conversation) return null;
+  if (!conversation) return [];
 
   // Кто заблокировал или скрыл автора, пуша от него не получает.
   const { data: blocks } = await db
@@ -97,7 +104,7 @@ async function forMessage(messageId: string) {
   const senderName = sender?.display_name ?? "Кто-то";
   // «Отправить без звука» (0034): тот же пуш, но в тихом канале.
   const silent = message.silent === true;
-  const channel = silent ? "messages_silent" : "messages";
+  const channel = "messages";
   let push: Push;
   if (conversation.direct_key) {
     push = {
@@ -109,7 +116,6 @@ async function forMessage(messageId: string) {
         type: "message",
         conversation_id: conversation.id,
         title: senderName,
-        ...(silent ? { silent: "1" } : {}),
       },
     };
   } else {
@@ -129,20 +135,43 @@ async function forMessage(messageId: string) {
         type: "message",
         conversation_id: conversation.id,
         title,
-        ...(silent ? { silent: "1" } : {}),
       },
     };
   }
-  return { recipients, push };
+
+  // Режим чата у каждого получателя свой: разводим по каналам и шлём группами.
+  // Таблицы настроек может ещё не быть (миграция 0038) — тогда у всех «со звуком».
+  const { data: prefRows } = recipients.length === 0
+    ? { data: [] }
+    : await db
+      .from("chat_notification_prefs")
+      .select("profile_id, mode, muted_until")
+      .eq("conversation_id", conversation.id)
+      .in("profile_id", recipients);
+  const prefs = new Map<string, Prefs>(
+    (prefRows ?? []).map((p) => [p.profile_id as string, p as Prefs]),
+  );
+
+  const now = new Date();
+  const byChannel = new Map<Push["channel"], string[]>();
+  for (const id of recipients) {
+    const picked = decide(prefs.get(id), silent, now);
+    if (!picked) continue;
+    byChannel.set(picked, [...(byChannel.get(picked) ?? []), id]);
+  }
+  return [...byChannel].map(([picked, ids]) => ({
+    recipients: ids,
+    push: { ...push, channel: picked, data: { ...push.data, channel: picked } },
+  }));
 }
 
-async function forNotification(notificationId: string) {
+async function forNotification(notificationId: string): Promise<Job[]> {
   const { data: n } = await db
     .from("notifications")
     .select("id, recipient_id, actor_id, kind, target_type, target_id, title")
     .eq("id", notificationId)
     .maybeSingle();
-  if (!n) return null;
+  if (!n) return [];
 
   let actor = "Кто-то";
   if (n.actor_id) {
@@ -150,7 +179,7 @@ async function forNotification(notificationId: string) {
     actor = data?.display_name ?? actor;
   }
 
-  return {
+  return [{
     recipients: [n.recipient_id as string],
     push: {
       title: "ChaWo",
@@ -163,8 +192,8 @@ async function forNotification(notificationId: string) {
         target_type: n.target_type ?? "",
         target_id: n.target_id ?? "",
       },
-    } satisfies Push,
-  };
+    },
+  }];
 }
 
 // Те же подписи, что в списке чатов (MessageKind.preview).

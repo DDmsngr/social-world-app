@@ -17,9 +17,11 @@ import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
 import 'conversations_screen.dart';
+import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
 import 'providers/hidden_messages_provider.dart';
 import 'widgets/chat_composer.dart';
+import 'widgets/chat_notify_sheet.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/message_menu.dart';
 import 'widgets/swipe_to_reply.dart';
@@ -174,6 +176,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
         titleTextStyle: Theme.of(context).textTheme.titleLarge,
         actions: [
+          IconButton(
+            onPressed: () => showChatNotifySheet(
+              context,
+              widget.conversationId,
+              info?.displayName ?? widget.peerName,
+            ),
+            tooltip: 'Уведомления',
+            icon: Icon(switch (chatNotifyOf(ref, widget.conversationId)) {
+              final n when n.isMuted => Icons.notifications_off_outlined,
+              final n when n.mode == NotifyMode.vibrate => Icons.vibration,
+              final n when n.mode == NotifyMode.silent => Icons.notifications_none,
+              _ => Icons.notifications_active_outlined,
+            }),
+          ),
           if (info != null && isDirect)
             IconButton(
               onPressed: _showSecurityCode,

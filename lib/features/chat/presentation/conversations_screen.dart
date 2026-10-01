@@ -11,7 +11,9 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/conversation.dart';
+import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
+import 'widgets/chat_notify_sheet.dart';
 
 class ConversationsScreen extends ConsumerWidget {
   const ConversationsScreen({super.key});
@@ -70,6 +72,12 @@ class ConversationsScreen extends ConsumerWidget {
                   _ConversationTile(
                     conversation: conversation,
                     myId: ref.watch(currentUserProvider)?.id,
+                    notify: chatNotifyOf(ref, conversation.id),
+                    onLongPress: () => showChatNotifySheet(
+                      context,
+                      conversation.id,
+                      conversation.displayName,
+                    ),
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -83,10 +91,17 @@ class ConversationsScreen extends ConsumerWidget {
 }
 
 class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({required this.conversation, required this.myId});
+  const _ConversationTile({
+    required this.conversation,
+    required this.myId,
+    required this.notify,
+    required this.onLongPress,
+  });
 
   final Conversation conversation;
   final String? myId;
+  final ChatNotify notify;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -99,6 +114,7 @@ class _ConversationTile extends StatelessWidget {
 
     return GlassCard(
       padding: const EdgeInsets.all(14),
+      onLongPress: onLongPress,
       onTap: () => context.push(
         '${Routes.chats}/${conversation.id}',
         extra: conversation.displayName,
@@ -165,12 +181,25 @@ class _ConversationTile extends StatelessWidget {
               ],
             ),
           ),
+          if (notify.isCustom) ...[
+            const SizedBox(width: 8),
+            Icon(
+              notify.isMuted
+                  ? Icons.notifications_off_outlined
+                  : notify.mode == NotifyMode.vibrate
+                  ? Icons.vibration
+                  : Icons.notifications_none,
+              size: 16,
+              color: AppColors.textFaint,
+            ),
+          ],
           if (conversation.unreadCount > 0) ...[
             const SizedBox(width: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: AppColors.champagne,
+                // У заглушённого чата счётчик серый: он не должен кричать.
+                color: notify.isMuted ? AppColors.hairStrong : AppColors.champagne,
                 borderRadius: BorderRadius.circular(AppRadius.chip),
               ),
               child: Text(
