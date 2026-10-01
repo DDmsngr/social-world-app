@@ -125,6 +125,7 @@ class SecureChatRepository implements ChatRepository {
                 senderId: senderId,
                 sentAt: sentAt,
                 text: 'Зашифрованное сообщение',
+                status: _status(sentAt, _date(row['peer_last_read_at'])),
               )
             : await _decodeDirect(
                 row: {
@@ -150,6 +151,11 @@ class SecureChatRepository implements ChatRepository {
           kind: lastKind,
           text: row['last_body'] as String?,
           senderName: row['last_sender_name'] as String?,
+          // last_read (0035): кто-то из участников уже прочитал. Без
+          // миграции поля нет — показываем просто «отправлено».
+          status: row['last_read'] == true
+              ? MessageStatus.read
+              : MessageStatus.sent,
         );
       }
     }

@@ -40,31 +40,37 @@ Future<bool> showMessageMenu(
     backgroundColor: AppColors.ink2,
     showDragHandle: true,
     builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final action in actions) ...[
-            // Разрушительное — отдельно и последним, чтобы по нему не
-            // попадали вместо соседнего пункта.
-            if (action == MessageAction.delete && actions.length > 1)
-              Divider(height: 12, color: AppColors.hair),
-            ListTile(
-              leading: Icon(
-                _icon(action),
-                color: action == MessageAction.delete
-                    ? AppColors.danger
-                    : AppColors.textDim,
+      // Превью + до шести пунктов на маленьком экране не помещаются по высоте.
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Шторка с затемнением закрывает переписку, и было непонятно, над
+            // каким сообщением открыто меню. Показываем его здесь же.
+            _MenuPreview(message: message, mine: message.senderId == myId),
+            for (final action in actions) ...[
+              // Разрушительное — отдельно и последним, чтобы по нему не
+              // попадали вместо соседнего пункта.
+              if (action == MessageAction.delete && actions.length > 1)
+                Divider(height: 12, color: AppColors.hair),
+              ListTile(
+                leading: Icon(
+                  _icon(action),
+                  color: action == MessageAction.delete
+                      ? AppColors.danger
+                      : AppColors.textDim,
+                ),
+                title: Text(
+                  _label(action),
+                  style: action == MessageAction.delete
+                      ? TextStyle(color: AppColors.danger)
+                      : null,
+                ),
+                onTap: () => Navigator.of(context).pop(action),
               ),
-              title: Text(
-                _label(action),
-                style: action == MessageAction.delete
-                    ? TextStyle(color: AppColors.danger)
-                    : null,
-              ),
-              onTap: () => Navigator.of(context).pop(action),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     ),
   );
@@ -98,6 +104,55 @@ Future<bool> showMessageMenu(
         myId: myId,
         conversation: conversation,
       );
+  }
+}
+
+class _MenuPreview extends StatelessWidget {
+  const _MenuPreview({required this.message, required this.mine});
+
+  final ChatMessage message;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final who = mine ? 'Вы' : (message.senderName ?? 'Собеседник');
+    final time =
+        '${message.sentAt.hour.toString().padLeft(2, '0')}:'
+        '${message.sentAt.minute.toString().padLeft(2, '0')}';
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: mine ? AppColors.bubbleMine : AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border(left: BorderSide(color: AppColors.champagne, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$who · $time',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.champagne,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message.preview,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              color: mine ? AppColors.onBubbleMine : AppColors.text,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

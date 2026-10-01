@@ -8,6 +8,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
+import '../../auth/presentation/providers/auth_providers.dart';
+import '../domain/entities/chat_message.dart';
 import '../domain/entities/conversation.dart';
 import 'providers/chat_providers.dart';
 
@@ -43,7 +45,8 @@ class ConversationsScreen extends ConsumerWidget {
                   SizedBox(height: 80),
                   StateMessage(
                     title: 'Переписок пока нет',
-                    text: 'Откройте профиль человека и нажмите «Написать» '
+                    text:
+                        'Откройте профиль человека и нажмите «Написать» '
                         'или создайте группу.',
                     icon: Icons.forum_outlined,
                   ),
@@ -64,7 +67,10 @@ class ConversationsScreen extends ConsumerWidget {
                   const SizedBox(height: 14),
                 ],
                 for (final conversation in items) ...[
-                  _ConversationTile(conversation: conversation),
+                  _ConversationTile(
+                    conversation: conversation,
+                    myId: ref.watch(currentUserProvider)?.id,
+                  ),
                   const SizedBox(height: 8),
                 ],
               ],
@@ -77,9 +83,10 @@ class ConversationsScreen extends ConsumerWidget {
 }
 
 class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({required this.conversation});
+  const _ConversationTile({required this.conversation, required this.myId});
 
   final Conversation conversation;
+  final String? myId;
 
   @override
   Widget build(BuildContext context) {
@@ -128,13 +135,32 @@ class _ConversationTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  preview,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontSize: 13),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    // Своё последнее сообщение — с галочками, как в переписке.
+                    if (last != null && last.senderId == myId) ...[
+                      Icon(
+                        last.status == MessageStatus.read
+                            ? Icons.done_all
+                            : Icons.done,
+                        size: 15,
+                        color: last.status == MessageStatus.read
+                            ? AppColors.champagne
+                            : AppColors.textFaint,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(
+                      child: Text(
+                        preview,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(fontSize: 13),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

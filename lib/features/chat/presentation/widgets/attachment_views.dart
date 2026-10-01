@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/debug/app_log.dart';
@@ -100,13 +101,7 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
             caption: message.text,
             onMore: widget.onMore,
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 240, maxHeight: 320),
-              child: Image.file(File(path), fit: BoxFit.cover),
-            ),
-          ),
+          child: ChatPhoto(path: path),
         ),
       ),
       MessageKind.videoNote => _Loaded(
@@ -153,7 +148,9 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
           if (result.type != ResultType.done) {
             messenger.showSnackBar(
               SnackBar(
-                content: Text('Нет приложения, чтобы открыть файл: ${result.message}'),
+                content: Text(
+                  'Нет приложения, чтобы открыть файл: ${result.message}',
+                ),
               ),
             );
           }
@@ -163,9 +160,104 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
   }
 
   String _meta(ChatAttachment a) => [
-    if (a.durationMs != null) formatDuration(Duration(milliseconds: a.durationMs!)),
+    if (a.durationMs != null)
+      formatDuration(Duration(milliseconds: a.durationMs!)),
     formatFileSize(a.size),
   ].join(' · ');
+}
+
+/// Фото в пузыре по своим пропорциям. Раньше `Image.file` стоял в
+/// ConstrainedBox без размеров: до раскодирования картинка не знала своих
+/// пропорций, пузырь раздувался по высоте, а фото рисовалось обрезанной
+/// полосой сверху с пустым низом. Теперь сначала узнаём размер файла, потом
+/// задаём точную рамку: не шире 240 и не выше 320, пропорции сохранены.
+class ChatPhoto extends StatefulWidget {
+  const ChatPhoto({super.key, required this.path});
+
+  final String path;
+
+  static const maxWidth = 240.0;
+  static const maxHeight = 320.0;
+
+  /// Рамка под картинку размера [image] в пределах [maxWidth]×[maxHeight].
+  static Size fit(Size image) {
+    if (image.width <= 0 || image.height <= 0) {
+      return const Size(maxWidth, maxWidth);
+    }
+    final scale = [
+      maxWidth / image.width,
+      maxHeight / image.height,
+    ].reduce((a, b) => a < b ? a : b);
+    // Очень узкие и очень широкие картинки не сжимаем в нитку.
+    return Size(
+      (image.width * scale).clamp(96.0, maxWidth),
+      (image.height * scale).clamp(96.0, maxHeight),
+    );
+  }
+
+  @override
+  State<ChatPhoto> createState() => _ChatPhotoState();
+}
+
+class _ChatPhotoState extends State<ChatPhoto> {
+  Size? _size;
+  ImageStream? _stream;
+  late final ImageStreamListener _listener = ImageStreamListener(
+    (info, _) {
+      if (!mounted) return;
+      setState(() {
+        _size = ChatPhoto.fit(
+          Size(info.image.width.toDouble(), info.image.height.toDouble()),
+        );
+      });
+    },
+    onError: (error, _) {
+      AppLog.add('Фото не раскодировалось: $error');
+      if (mounted) setState(() => _size = ChatPhoto.fit(Size.zero));
+    },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(ChatPhoto old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) {
+      _stream?.removeListener(_listener);
+      _size = null;
+      _resolve();
+    }
+  }
+
+  void _resolve() {
+    _stream = FileImage(File(widget.path)).resolve(ImageConfiguration.empty)
+      ..addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    _stream?.removeListener(_listener);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = _size ?? const Size(ChatPhoto.maxWidth, ChatPhoto.maxWidth);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: size.width,
+        height: size.height,
+        child: _size == null
+            ? ColoredBox(color: AppColors.ink)
+            : Image.file(File(widget.path), fit: BoxFit.cover),
+      ),
+    );
+  }
 }
 
 class _Loaded extends StatelessWidget {
@@ -190,7 +282,8 @@ class _Loaded extends StatelessWidget {
       builder: (context, snapshot) {
         final path = snapshot.data;
         if (path != null && path.isNotEmpty) return builder(path);
-        final failed = snapshot.hasError ||
+        final failed =
+            snapshot.hasError ||
             (snapshot.connectionState == ConnectionState.done);
         return Container(
           width: placeholderSize.width,
@@ -299,16 +392,16 @@ class _FileTile extends StatelessWidget {
 
 /// Кружок: без звука и по кругу, как в Telegram; тап — со звуком с начала,
 /// ещё тап — пауза.
-class VideoNotePlayer extends StatefulWidget {
+class VideoNotePlayer extends ConsumerStatefulWidget {
   const VideoNotePlayer({super.key, required this.filePath});
 
   final String filePath;
 
   @override
-  State<VideoNotePlayer> createState() => _VideoNotePlayerState();
+  ConsumerState<VideoNotePlayer> createState() => _VideoNotePlayerState();
 }
 
-class _VideoNotePlayerState extends State<VideoNotePlayer> {
+class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
   static const _size = 200.0;
   late final VideoPlayerController _controller;
   bool _ready = false;
@@ -318,15 +411,17 @@ class _VideoNotePlayerState extends State<VideoNotePlayer> {
     super.initState();
     _controller = VideoPlayerController.file(File(widget.filePath))
       ..addListener(_onTick)
-      ..initialize().then((_) {
-        _controller
-          ..setLooping(true)
-          ..setVolume(0)
-          ..play();
-        if (mounted) setState(() => _ready = true);
-      }).catchError((Object error) {
-        AppLog.add('Кружок не воспроизводится: $error');
-      });
+      ..initialize()
+          .then((_) {
+            _controller
+              ..setLooping(true)
+              ..setVolume(0)
+              ..play();
+            if (mounted) setState(() => _ready = true);
+          })
+          .catchError((Object error) {
+            AppLog.add('Кружок не воспроизводится: $error');
+          });
   }
 
   void _onTick() {
@@ -344,9 +439,11 @@ class _VideoNotePlayerState extends State<VideoNotePlayer> {
   void _toggle() {
     final value = _controller.value;
     if (value.volume == 0) {
+      // Немой повтор крутится на обычной скорости; выбранная — когда слушают.
       _controller
         ..setVolume(1)
         ..setLooping(false)
+        ..setPlaybackSpeed(ref.read(playbackSpeedProvider))
         ..seekTo(Duration.zero)
         ..play();
     } else if (value.isPlaying) {
@@ -393,6 +490,18 @@ class _VideoNotePlayerState extends State<VideoNotePlayer> {
                   value: progress.clamp(0.0, 1.0),
                   strokeWidth: 3,
                   color: AppColors.champagne,
+                ),
+              ),
+            if (withSound)
+              Positioned(
+                top: 14,
+                child: SpeedChip(
+                  speed: ref.watch(playbackSpeedProvider),
+                  color: Colors.white,
+                  background: Colors.black54,
+                  onTap: () => _controller.setPlaybackSpeed(
+                    ref.read(playbackSpeedProvider.notifier).next(),
+                  ),
                 ),
               ),
             if (_ready && (!withSound || !value.isPlaying))
@@ -492,25 +601,116 @@ class _VideoFullScreenState extends State<VideoFullScreen> {
   }
 }
 
+// ── скорость воспроизведения ────────────────────────────────────────────────
+
+const playbackSpeeds = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5];
+const _speedPrefsKey = 'chat_playback_speed';
+
+/// Скорость голосовых и кружков — одна на всё приложение и запоминается:
+/// кто слушает на 1,5×, хочет так слушать и следующее.
+class PlaybackSpeed extends Notifier<double> {
+  @override
+  double build() {
+    _restore();
+    return 1.0;
+  }
+
+  Future<void> _restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getDouble(_speedPrefsKey);
+      if (saved != null && playbackSpeeds.contains(saved)) state = saved;
+    } catch (_) {}
+  }
+
+  /// Следующая скорость по кругу: 1 → 1,25 → … → 2,5 → 1.
+  double next() {
+    final i = playbackSpeeds.indexOf(state);
+    state = playbackSpeeds[(i + 1) % playbackSpeeds.length];
+    SharedPreferences.getInstance()
+        .then((prefs) => prefs.setDouble(_speedPrefsKey, state))
+        .catchError((_) => false);
+    return state;
+  }
+}
+
+final playbackSpeedProvider = NotifierProvider<PlaybackSpeed, double>(
+  PlaybackSpeed.new,
+);
+
+String speedLabel(double speed) =>
+    '${speed == speed.roundToDouble() ? speed.toInt() : speed.toString().replaceAll('.', ',')}×';
+
+/// Кнопка скорости: «1,5×». Тап — следующая скорость.
+class SpeedChip extends StatelessWidget {
+  const SpeedChip({
+    super.key,
+    required this.speed,
+    required this.onTap,
+    required this.color,
+    this.background,
+  });
+
+  final double speed;
+  final VoidCallback onTap;
+  final Color color;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Скорость ${speedLabel(speed)}',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: background ?? color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            speedLabel(speed),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── голосовые ────────────────────────────────────────────────────────────────
 
 /// Один плеер на всё приложение: новое голосовое останавливает предыдущее.
 class VoicePlayback extends ChangeNotifier {
   VoicePlayback() {
     _subscriptions
-      ..add(_player.onPositionChanged.listen((p) {
-        position = p;
-        notifyListeners();
-      }))
-      ..add(_player.onDurationChanged.listen((d) {
-        duration = d;
-        notifyListeners();
-      }))
-      ..add(_player.onPlayerComplete.listen((_) {
-        playingId = null;
-        position = Duration.zero;
-        notifyListeners();
-      }));
+      ..add(
+        _player.onPositionChanged.listen((p) {
+          position = p;
+          notifyListeners();
+        }),
+      )
+      ..add(
+        _player.onDurationChanged.listen((d) {
+          duration = d;
+          notifyListeners();
+        }),
+      )
+      ..add(
+        _player.onPlayerComplete.listen((_) {
+          playingId = null;
+          position = Duration.zero;
+          notifyListeners();
+        }),
+      );
   }
 
   final _player = AudioPlayer();
@@ -520,7 +720,7 @@ class VoicePlayback extends ChangeNotifier {
   Duration position = Duration.zero;
   Duration duration = Duration.zero;
 
-  Future<void> toggle(String messageId, String path) async {
+  Future<void> toggle(String messageId, String path, {double speed = 1}) async {
     if (playingId == messageId) {
       if (paused) {
         await _player.resume();
@@ -535,11 +735,20 @@ class VoicePlayback extends ChangeNotifier {
       position = Duration.zero;
       duration = Duration.zero;
       await _player.play(DeviceFileSource(path));
+      await setSpeed(speed);
     }
     notifyListeners();
   }
 
   Future<void> seek(Duration to) => _player.seek(to);
+
+  Future<void> setSpeed(double speed) async {
+    try {
+      await _player.setPlaybackRate(speed);
+    } catch (error) {
+      AppLog.add('Скорость голосового: $error');
+    }
+  }
 
   @override
   void dispose() {
@@ -578,17 +787,21 @@ class VoiceMessagePlayer extends ConsumerWidget {
         ? playback.duration
         : Duration(milliseconds: attachment.durationMs ?? 0);
     final progress = active && total.inMilliseconds > 0
-        ? (playback.position.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0)
+        ? (playback.position.inMilliseconds / total.inMilliseconds).clamp(
+            0.0,
+            1.0,
+          )
         : 0.0;
     final color = mine ? AppColors.onBubbleMine : AppColors.champagne;
     final bars = _bars(attachment.waveform, messageId);
+    final speed = ref.watch(playbackSpeedProvider);
 
     return SizedBox(
-      width: 230,
+      width: 240,
       child: Row(
         children: [
           InkResponse(
-            onTap: () => playback.toggle(messageId, filePath),
+            onTap: () => playback.toggle(messageId, filePath, speed: speed),
             child: Container(
               width: 40,
               height: 40,
@@ -645,14 +858,30 @@ class VoiceMessagePlayer extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  active
-                      ? '${formatDuration(playback.position)} / ${formatDuration(total)}'
-                      : formatDuration(total),
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: color.withValues(alpha: 0.75),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        active
+                            ? '${formatDuration(playback.position)} / ${formatDuration(total)}'
+                            : formatDuration(total),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: color.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ),
+                    SpeedChip(
+                      speed: speed,
+                      color: color,
+                      onTap: () {
+                        final next = ref
+                            .read(playbackSpeedProvider.notifier)
+                            .next();
+                        if (active) playback.setSpeed(next);
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -687,7 +916,10 @@ List<double> downsample(List<double> values, int count) {
   return [
     for (var i = 0; i < count; i++)
       values
-          .sublist((i * step).floor(), ((i + 1) * step).floor().clamp(0, values.length))
+          .sublist(
+            (i * step).floor(),
+            ((i + 1) * step).floor().clamp(0, values.length),
+          )
           .fold<double>(0, (a, b) => a > b ? a : b),
   ];
 }
