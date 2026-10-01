@@ -15,7 +15,7 @@ Deno.serve(async () => {
     response_type: "code",
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    scope: "login:email login:info login:avatar",
+    scope: "login:email login:info login:avatar login:default_phone",
     state,
   });
 

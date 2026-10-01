@@ -21,6 +21,8 @@ String? normalizePhone(String raw) {
 String hashPhone(String normalized) =>
     sha256.convert(utf8.encode(normalized)).toString();
 
+enum PhoneStatus { none, self, verified }
+
 /// Контакт записной книжки с уже посчитанными хешами всех его номеров.
 class PhoneContact {
   const PhoneContact({
@@ -67,8 +69,22 @@ class ContactsMatchRepository {
 
   static const _chunk = 1000;
 
-  Future<bool> hasMyPhone() async =>
-      (await _client.rpc('has_my_phone')) as bool? ?? false;
+  /// none — номера нет, self — вписан вручную, verified — пришёл от Яндекса
+  /// или VK при входе.
+  Future<PhoneStatus> phoneStatus() async =>
+      switch (await _client.rpc('my_phone_status')) {
+        'verified' => PhoneStatus.verified,
+        'self' => PhoneStatus.self,
+        _ => PhoneStatus.none,
+      };
+
+  /// Входы, привязанные к аккаунту (`yandex`, `vk`). Подтвердить номер можно
+  /// только тем провайдером, которым человек уже вошёл: чужой вход создал бы
+  /// другой аккаунт.
+  Future<Set<String>> oauthProviders() async {
+    final rows = await _client.rpc('my_oauth_providers');
+    return {for (final p in (rows as List? ?? const [])) p.toString()};
+  }
 
   /// Бросает [FormatException], если номер не похож на номер.
   Future<void> setMyPhone(String raw) async {

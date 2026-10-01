@@ -6,6 +6,8 @@
 // поэтому обмен кодами и профиль делаем сами, а сессию всё равно выпускает
 // настоящий GoTrue через generate_link + verify.
 
+import { phoneHashFrom } from "./phone.ts";
+
 export const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 export const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 export const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -166,6 +168,26 @@ export async function resolveProfile(
   }
 
   return profileId as string;
+}
+
+/**
+ * Подтверждённый номер от провайдера входа (Яндекс login:default_phone, VK
+ * phone). Сбой не должен ломать вход: номер — приятное дополнение, а не
+ * условие, поэтому ошибки только в лог.
+ */
+export async function saveVerifiedPhone(profileId: string, rawPhone: unknown): Promise<void> {
+  try {
+    const hash = await phoneHashFrom(rawPhone);
+    if (!hash) return;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/set_verified_phone`, {
+      method: "POST",
+      headers: restHeaders(),
+      body: JSON.stringify({ p_profile: profileId, p_hash: hash }),
+    });
+    if (!res.ok) console.error("set_verified_phone failed", res.status, await res.text());
+  } catch (e) {
+    console.error("saveVerifiedPhone", e);
+  }
 }
 
 /** Стандартный приём для входа через провайдера, которого GoTrue не знает:

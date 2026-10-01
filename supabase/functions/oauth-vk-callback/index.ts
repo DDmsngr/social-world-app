@@ -9,6 +9,7 @@ import {
   redirectError,
   redirectToApp,
   resolveProfile,
+  saveVerifiedPhone,
 } from "../_shared/oauth.ts";
 
 const CLIENT_ID = Deno.env.get("VK_CLIENT_ID")!;
@@ -80,12 +81,15 @@ Deno.serve(async (req: Request) => {
       .trim() || null;
 
     const externalId = String(userId);
-    await resolveProfile("vk", {
+    const profileId = await resolveProfile("vk", {
       externalId,
       email: emailFromIdToken,
       displayName,
       avatarUrl: (vkUser.avatar as string | undefined) ?? null,
     });
+    // Номер приходит, только если в oauth-vk-start запрошено право `phone` и
+    // оно одобрено в кабинете VK ID. Без права поля нет — вход не страдает.
+    await saveVerifiedPhone(profileId, vkUser.phone);
 
     const session = await mintSession("vk", externalId);
     return redirectToApp({

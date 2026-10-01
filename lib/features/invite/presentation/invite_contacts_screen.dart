@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
+import '../../../core/oauth/oauth_sign_in.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -33,13 +34,15 @@ class InviteContactsScreen extends ConsumerStatefulWidget {
       _InviteContactsScreenState();
 }
 
-class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
+class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
+    with WidgetsBindingObserver {
   final _repo = ContactsMatchRepository(Supabase.instance.client);
   final _search = TextEditingController();
 
   var _phase = _Phase.intro;
   var _permanentlyDenied = false;
-  var _hasMyPhone = true;
+  var _phone = PhoneStatus.verified;
+  var _providers = <String>{};
   ContactsMatch? _result;
   final _followed = <String>{};
   final _following = <String>{};
@@ -47,13 +50,29 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _autoStart();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _search.dispose();
     super.dispose();
+  }
+
+  /// Вернулись из браузера после «Подтвердить через…»: номер мог прийти.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || _phase != _Phase.ready) return;
+    Future<void>.delayed(const Duration(seconds: 2), () async {
+      try {
+        final phone = await _repo.phoneStatus();
+        if (mounted) setState(() => _phone = phone);
+      } catch (error) {
+        AppLog.add('Статус номера: $error');
+      }
+    });
   }
 
   /// Если доступ уже выдан раньше — сразу показываем список, без вступления.
@@ -115,11 +134,13 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
       contacts.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
       final result = await _repo.match(contacts);
-      final hasPhone = await _repo.hasMyPhone();
+      final phone = await _repo.phoneStatus();
+      final providers = await _repo.oauthProviders();
       if (!mounted) return;
       setState(() {
         _result = result;
-        _hasMyPhone = hasPhone;
+        _phone = phone;
+        _providers = providers;
         _phase = _Phase.ready;
       });
     } catch (error) {
@@ -206,7 +227,7 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
     try {
       await _repo.setMyPhone(entered);
       if (!mounted) return;
-      setState(() => _hasMyPhone = true);
+      setState(() => _phone = PhoneStatus.self);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Номер привязан')),
       );
@@ -231,7 +252,7 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
   Future<void> _removeMyPhone() async {
     try {
       await _repo.clearMyPhone();
-      if (mounted) setState(() => _hasMyPhone = false);
+      if (mounted) setState(() => _phone = PhoneStatus.none);
     } catch (error) {
       AppLog.add('Номер не удалился: $error');
     }
@@ -249,7 +270,8 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
           icon: const Icon(Icons.arrow_back),
         ),
         actions: [
-          if (_phase == _Phase.ready && _hasMyPhone)
+          // Подтверждённый номер связан со входом и тут не меняется.
+          if (_phase == _Phase.ready && _phone == PhoneStatus.self)
             PopupMenuButton<String>(
               onSelected: (value) =>
                   value == 'change' ? _editMyPhone() : _removeMyPhone(),
@@ -289,6 +311,57 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
     );
   }
 
+  /// Подтвердить номер можно входом через Яндекс или VK: провайдер сам
+  /// отдаёт номер аккаунта. Кнопка только для того провайдера, которым человек
+  /// уже вошёл, иначе повторный вход создал бы другой аккаунт.
+  Widget _phoneBanner() {
+    final via = [
+      if (_providers.contains('yandex')) (OAuthBridgeProvider.yandex, 'Яндекс'),
+      if (_providers.contains('vk')) (OAuthBridgeProvider.vk, 'VK'),
+    ];
+    final self = _phone == PhoneStatus.self;
+    return GlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.phone_outlined, color: AppColors.primaryTint),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  self
+                      ? 'Номер указан вручную и не подтверждён. Подтвердите '
+                            'его входом — тогда никто не сможет занять ваш номер.'
+                      : 'Добавьте свой номер, чтобы друзья из их записных '
+                            'книжек нашли вас в ChaWo.',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final (provider, name) in via)
+                FilledButton.tonal(
+                  onPressed: () => startOAuthSignIn(provider),
+                  child: Text('Подтвердить через $name'),
+                ),
+              if (!self)
+                OutlinedButton(
+                  onPressed: _editMyPhone,
+                  child: const Text('Ввести вручную'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildList(BuildContext context) {
     final result = _result!;
     final query = _search.text.trim().toLowerCase();
@@ -306,24 +379,8 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen> {
     return ListView(
       padding: AppSpacing.page(context, top: 8),
       children: [
-        if (!_hasMyPhone) ...[
-          GlassCard(
-            padding: const EdgeInsets.all(14),
-            onTap: _editMyPhone,
-            child: Row(
-              children: [
-                Icon(Icons.phone_outlined, color: AppColors.primaryTint),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Text(
-                    'Укажите свой номер, чтобы друзья из их записных книжек '
-                    'нашли вас в ChaWo.',
-                  ),
-                ),
-                Icon(Icons.chevron_right, color: AppColors.textFaint),
-              ],
-            ),
-          ),
+        if (_phone != PhoneStatus.verified) ...[
+          _phoneBanner(),
           const SizedBox(height: 12),
         ],
         TextField(

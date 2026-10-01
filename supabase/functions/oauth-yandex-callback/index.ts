@@ -9,6 +9,7 @@ import {
   redirectError,
   redirectToApp,
   resolveProfile,
+  saveVerifiedPhone,
 } from "../_shared/oauth.ts";
 
 const CLIENT_ID = Deno.env.get("YANDEX_CLIENT_ID")!;
@@ -63,12 +64,15 @@ Deno.serve(async (req: Request) => {
       : `https://avatars.yandex.net/get-yapic/${info.default_avatar_id}/islands-200`;
 
     const externalId = String(info.id);
-    await resolveProfile("yandex", {
+    const profileId = await resolveProfile("yandex", {
       externalId,
       email: info.default_email ?? null,
       displayName: info.display_name ?? info.real_name ?? null,
       avatarUrl,
     });
+    // login:default_phone: {id, number: "+7900…"}; если у человека нет номера
+    // или право не выдано, поля просто нет.
+    await saveVerifiedPhone(profileId, info.default_phone?.number);
 
     const session = await mintSession("yandex", externalId);
     return redirectToApp({

@@ -18,6 +18,8 @@ Deno.serve(async () => {
     response_type: "code",
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
+    // Право `phone` добавить сюда ("email phone"), когда VK одобрит его в
+    // кабинете VK ID: до этого запрос с ним может отклониться.
     scope: "email",
     state,
     code_challenge: challenge,
