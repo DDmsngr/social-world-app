@@ -143,6 +143,7 @@ class SupabaseEventsRepository implements EventsRepository {
           profileId: (raw as Map<String, dynamic>)['profile_id'] as String,
           displayName: (raw['display_name'] as String?) ?? 'Без имени',
           avatarUrl: raw['avatar_url'] as String?,
+          isFriend: raw['is_friend'] as bool? ?? false,
         ),
     ];
   }
@@ -180,6 +181,15 @@ class SupabaseEventsRepository implements EventsRepository {
     createdAt: DateTime.parse(row['created_at'] as String),
     participantCount: (row['participant_count'] as num?)?.toInt() ?? 0,
     joinedByMe: row['joined_by_me'] as bool? ?? false,
+    participantsPreview: [
+      for (final raw in (row['participants_preview'] as List<dynamic>? ?? const []))
+        EventParticipant(
+          profileId: (raw as Map<String, dynamic>)['id'] as String,
+          displayName: (raw['name'] as String?) ?? 'Без имени',
+          avatarUrl: raw['avatar_url'] as String?,
+          isFriend: raw['friend'] as bool? ?? false,
+        ),
+    ],
   );
 
   DateTime? _parseNullable(dynamic raw) =>

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/avatar_stack.dart';
 import '../../domain/entities/event.dart';
 
 class EventCard extends StatelessWidget {
@@ -137,6 +138,14 @@ class EventCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
+                    AvatarStack(
+                      people: [
+                        for (final p in event.participantsPreview)
+                          (name: p.displayName, url: p.avatarUrl),
+                      ],
+                    ),
+                    if (event.participantsPreview.isNotEmpty)
+                      const SizedBox(width: 8),
                     Text(
                       '${event.participantCount} идёт',
                       style: Theme.of(context).textTheme.bodyMedium,

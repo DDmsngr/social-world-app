@@ -19,6 +19,7 @@ class Event {
     this.routePoints = const [],
     this.participantCount = 0,
     this.joinedByMe = false,
+    this.participantsPreview = const [],
   });
 
   final String id;
@@ -49,6 +50,9 @@ class Event {
   final int participantCount;
   final bool joinedByMe;
 
+  /// До четырёх участников для мини-аватарок на карточке: сначала друзья.
+  final List<EventParticipant> participantsPreview;
+
   bool get isPast => (endsAt ?? startsAt).isBefore(DateTime.now());
 
   bool get hasLocation => latitude != null && longitude != null;
@@ -77,6 +81,7 @@ class Event {
     createdAt: createdAt,
     participantCount: participantCount ?? this.participantCount,
     joinedByMe: joinedByMe ?? this.joinedByMe,
+    participantsPreview: participantsPreview,
   );
 }
 
@@ -86,9 +91,13 @@ class EventParticipant {
     required this.profileId,
     required this.displayName,
     this.avatarUrl,
+    this.isFriend = false,
   });
 
   final String profileId;
   final String displayName;
   final String? avatarUrl;
+
+  /// Есть связь по подписке (в любую сторону). Такие идут в списке первыми.
+  final bool isFriend;
 }
