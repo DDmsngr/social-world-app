@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/media/photo_viewer.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -76,16 +77,64 @@ class _RouteBody extends StatelessWidget {
     return ListView(
       padding: EdgeInsets.zero,
       children: [
+        // Карта здесь превью: прокручивая страницу, пальцем её легко сдвинуть
+        // случайно. Поэтому прозрачная плёнка сверху ловит касание и открывает
+        // карту на весь экран, где уже можно двигать, масштабировать и
+        // нажимать на фото.
         SizedBox(
           height: 320,
-          child: RouteMap(
-            path: route.path,
-            markers: [
-              for (final photo in route.photos)
-                RouteMapMarker(
-                  latitude: photo.latitude,
-                  longitude: photo.longitude,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: RouteMap(
+                  path: route.path,
+                  markers: [
+                    for (final photo in route.photos)
+                      RouteMapMarker(
+                        latitude: photo.latitude,
+                        longitude: photo.longitude,
+                        photoUrl: photo.photoUrl,
+                      ),
+                  ],
                 ),
+              ),
+              Positioned.fill(
+                child: Semantics(
+                  button: true,
+                  label: 'Открыть карту на весь экран',
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => context.push('${Routes.routes}/${route.id}/map'),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.ink.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: AppColors.hair),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.open_in_full, size: 14, color: AppColors.primaryTint),
+                          const SizedBox(width: 6),
+                          Text(
+                            'На весь экран',
+                            style: TextStyle(fontSize: 12, color: AppColors.text),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -108,12 +157,20 @@ class _RouteBody extends StatelessWidget {
                 const SizedBox(height: 24),
                 const SectionLabel('Фото на пути'),
                 const SizedBox(height: 12),
-                for (final photo in route.photos) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    child: AspectRatio(
-                      aspectRatio: 4 / 3,
-                      child: _RoutePhotoView(url: photo.photoUrl),
+                for (var i = 0; i < route.photos.length; i++) ...[
+                  GestureDetector(
+                    onTap: () => showPhotoViewer(
+                      context,
+                      urls: [for (final p in route.photos) p.photoUrl],
+                      captions: [for (final p in route.photos) p.caption],
+                      initialIndex: i,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      child: AspectRatio(
+                        aspectRatio: 4 / 3,
+                        child: _RoutePhotoView(url: route.photos[i].photoUrl),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),

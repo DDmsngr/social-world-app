@@ -36,6 +36,7 @@ import '../../features/channels/presentation/channel_post_screen.dart';
 import '../../features/channels/presentation/channel_screen.dart';
 import '../../features/channels/presentation/create_channel_screen.dart';
 import '../../features/invite/presentation/invite_contacts_screen.dart';
+import '../../features/routes/presentation/route_map_screen.dart';
 import '../../features/profile/presentation/blocked_users_screen.dart';
 import '../../features/profile/domain/profile_models.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
@@ -211,6 +212,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '${Routes.routes}/:routeId',
         builder: (_, state) =>
             RouteDetailScreen(routeId: state.pathParameters['routeId']!),
+      ),
+      GoRoute(
+        path: '${Routes.routes}/:routeId/map',
+        builder: (_, state) =>
+            RouteMapScreen(routeId: state.pathParameters['routeId']!),
       ),
       GoRoute(
         path: '${Routes.posts}/:postId',

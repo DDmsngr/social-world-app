@@ -1,14 +1,18 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:yandex_maps_mapkit/image.dart' as ymi;
 import 'package:yandex_maps_mapkit/mapkit.dart' as ymk;
 import 'package:yandex_maps_mapkit/mapkit_factory.dart';
 import 'package:yandex_maps_mapkit/yandex_map.dart';
 
 import '../../../../core/config/mapkit_boot.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../domain/entities/city_route.dart';
 import 'route_map_marker.dart';
+import 'route_photo_icon.dart';
 
 class RouteMap extends StatefulWidget {
   const RouteMap({
@@ -16,10 +20,14 @@ class RouteMap extends StatefulWidget {
     required this.path,
     this.markers = const [],
     this.followLast = false,
+    this.onMarkerTap,
   });
 
   final List<RouteCoordinate> path;
   final List<RouteMapMarker> markers;
+
+  /// Нажатие на метку с фото: индекс в [markers].
+  final void Function(int index)? onMarkerTap;
 
   /// Во время записи камера едет за последней точкой; у готового маршрута
   /// вместо этого один раз подбирается охват всего пути.
@@ -29,6 +37,18 @@ class RouteMap extends StatefulWidget {
   State<RouteMap> createState() => _RouteMapState();
 }
 
+class _MarkerTap extends ymk.MapObjectTapListener {
+  _MarkerTap(this.onTap);
+
+  final VoidCallback onTap;
+
+  @override
+  bool onMapObjectTap(ymk.MapObject mapObject, ymk.Point point) {
+    onTap();
+    return true;
+  }
+}
+
 class _RouteMapState extends State<RouteMap> {
   late final AppLifecycleListener _lifecycle;
   ymk.MapWindow? _window;
@@ -36,6 +56,10 @@ class _RouteMapState extends State<RouteMap> {
   bool _mapkitRunning = false;
   bool _framedOnce = false;
   AppPalette? _appliedPalette;
+
+  // MapKit держит слушателей слабо: без своей ссылки сборщик мусора съест их,
+  // и нажатие на метку молча перестанет работать.
+  final _tapListeners = <_MarkerTap>[];
 
   @override
   void initState() {
@@ -129,7 +153,9 @@ class _RouteMapState extends State<RouteMap> {
       }
     }
 
-    for (final marker in widget.markers) {
+    _tapListeners.clear();
+    for (var i = 0; i < widget.markers.length; i++) {
+      final marker = widget.markers[i];
       final placemark = collection.addPlacemarkWithPoint(
         ymk.Point(latitude: marker.latitude, longitude: marker.longitude),
       );
@@ -137,6 +163,30 @@ class _RouteMapState extends State<RouteMap> {
         placemark
           ..setText(marker.label!)
           ..setTextStyle(_textStyle(AppColors.text));
+      }
+
+      final url = marker.photoUrl;
+      if (url != null) {
+        placemark
+          ..setIcon(
+            ymi.ImageProvider(
+              () => renderPhotoMarkerIcon(imageProviderFor(url)),
+              id: 'route-photo:$url',
+            ),
+          )
+          ..setIconStyle(
+            const ymk.IconStyle(
+              anchor: math.Point(0.5, 0.5),
+              scale: 0.55,
+              zIndex: 10,
+            ),
+          );
+        final onTap = widget.onMarkerTap;
+        if (onTap != null) {
+          final listener = _MarkerTap(() => onTap(i));
+          _tapListeners.add(listener);
+          placemark.addTapListener(listener);
+        }
       }
     }
 

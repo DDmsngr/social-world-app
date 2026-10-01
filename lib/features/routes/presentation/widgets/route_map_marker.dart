@@ -6,9 +6,14 @@ class RouteMapMarker {
     required this.latitude,
     required this.longitude,
     this.label,
+    this.photoUrl,
   });
 
   final double latitude;
   final double longitude;
   final String? label;
+
+  /// Если задан, метка рисуется круглым превью этого фото (ссылка или путь к
+  /// файлу), а не точкой.
+  final String? photoUrl;
 }

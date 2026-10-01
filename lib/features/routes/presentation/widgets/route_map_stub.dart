@@ -15,11 +15,16 @@ class RouteMap extends StatelessWidget {
     required this.path,
     this.markers = const [],
     this.followLast = false,
+    this.onMarkerTap,
   });
 
   final List<RouteCoordinate> path;
   final List<RouteMapMarker> markers;
   final bool followLast;
+
+  /// На вебе метки рисуются эскизом без нажатий; параметр нужен для общего
+  /// интерфейса с мобильной картой.
+  final void Function(int index)? onMarkerTap;
 
   @override
   Widget build(BuildContext context) =>
