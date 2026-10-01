@@ -69,7 +69,7 @@ AppPalette resolvePalette(
     ThemeChoice.light => false,
     ThemeChoice.schedule => _isNight(now),
   };
-  return dark ? AppPalette.burgundyChampagne : AppPalette.warmSand;
+  return dark ? AppPalette.designerDark : AppPalette.designerLight;
 }
 
 /// Ближайший момент, когда режим «по времени суток» переключит тему.

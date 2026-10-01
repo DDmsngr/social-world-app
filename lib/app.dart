@@ -22,8 +22,8 @@ class SocialWorldApp extends ConsumerStatefulWidget {
 
 class _SocialWorldAppState extends ConsumerState<SocialWorldApp>
     with WidgetsBindingObserver {
-  static final _lightTheme = AppTheme.build(AppPalette.warmSand);
-  static final _darkTheme = AppTheme.build(AppPalette.burgundyChampagne);
+  static final _lightTheme = AppTheme.build(AppPalette.designerLight);
+  static final _darkTheme = AppTheme.build(AppPalette.designerDark);
 
   Timer? _scheduleTimer;
 

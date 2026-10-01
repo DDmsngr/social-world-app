@@ -10,6 +10,17 @@ abstract final class AppRadius {
   static const field = 14.0;
 }
 
+/// Кнопка внутри строки списка или группы кнопок. У основной кнопки темы
+/// минимальная ширина «на весь экран» (Size.fromHeight), и в ListTile или Row
+/// она съедает всё место, оставляя названию одну букву в ширину.
+abstract final class AppButtons {
+  static final compact = ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 14)),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  );
+}
+
 abstract final class AppSpacing {
   static const gutter = 20.0;
   static const section = 32.0;

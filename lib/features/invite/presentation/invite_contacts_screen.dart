@@ -347,11 +347,13 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
             children: [
               for (final (provider, name) in via)
                 FilledButton.tonal(
+                  style: AppButtons.compact,
                   onPressed: () => startOAuthSignIn(provider),
                   child: Text('Подтвердить через $name'),
                 ),
               if (!self)
                 OutlinedButton(
+                  style: AppButtons.compact,
                   onPressed: _editMyPhone,
                   child: const Text('Ввести вручную'),
                 ),
@@ -417,6 +419,7 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
             title: Text(contact.name, maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text(contact.phones.first),
             trailing: OutlinedButton(
+              style: AppButtons.compact,
               onPressed: () => _invite(contact),
               child: const Text('Пригласить'),
             ),
@@ -439,6 +442,7 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
       trailing: followed
           ? Text('Вы подписаны', style: Theme.of(context).textTheme.bodySmall)
           : FilledButton.tonal(
+              style: AppButtons.compact,
               onPressed: busy ? null : () => _follow(contact),
               child: const Text('Подписаться'),
             ),

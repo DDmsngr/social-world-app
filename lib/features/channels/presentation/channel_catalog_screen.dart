@@ -178,6 +178,7 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
       trailing: channel.joined
           ? Icon(Icons.check, color: AppColors.textFaint)
           : FilledButton.tonal(
+              style: AppButtons.compact,
               onPressed: _busy.contains(channel.id) ? null : () => _subscribe(channel),
               child: const Text('Подписаться'),
             ),

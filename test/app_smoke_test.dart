@@ -12,7 +12,7 @@ void main() {
     GoogleFonts.config.allowRuntimeFetching = false;
   });
 
-  tearDown(() => AppColors.current = AppPalette.burgundyChampagne);
+  tearDown(() => AppColors.current = AppPalette.designerDark);
 
   Future<void> passSplash(WidgetTester tester) async {
     // Заставка держится 1,7 с осознанно (см. app_router.dart) — без этого
@@ -44,10 +44,10 @@ void main() {
     await passSplash(tester);
 
     expect(find.text('Получить код'), findsOneWidget);
-    expect(AppColors.current, same(AppPalette.warmSand));
+    expect(AppColors.current, same(AppPalette.designerLight));
     expect(
       Theme.of(tester.element(find.text('Получить код'))).scaffoldBackgroundColor,
-      AppPalette.warmSand.ink,
+      AppPalette.designerLight.ink,
     );
   });
 }

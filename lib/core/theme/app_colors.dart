@@ -80,58 +80,60 @@ class AppPalette {
 
   bool get isDark => brightness == Brightness.dark;
 
-  /// «Бургунди и шампань» — зафиксированная фирменная палитра ChaWo
-  /// (решение Алексея 22.09.2026, поверх исходного референса Левона).
-  /// Гео сознательно не розовый и не голубой — золотистый (шампань), чтобы
-  /// не сливаться с брендовым [primary] на карте.
-  static const burgundyChampagne = AppPalette(
+  /// Тёмная тема по макетам дизайнера (Figma, 01.10.2026): графитовый фон
+  /// #1C1C1C, карточки #323233, белый текст и один акцент — вишнёво-красный
+  /// #D83D5F, только для действий. Бордово-платиновая палитра отменена.
+  static const designerDark = AppPalette(
     brightness: Brightness.dark,
-    ink: Color(0xFF21151D),
-    ink2: Color(0xFF3B2731),
-    card: Color(0xFF302029),
-    paper: Color(0xFFFFF8F0),
-    primary: Color(0xFFE89BBA),
-    primaryHover: Color(0xFFF0B0C9),
-    primaryTint: Color(0xFFE89BBA),
-    onPrimary: Color(0xFF21151D),
-    success: Color(0xFF75C9A5),
-    danger: Color(0xFFE87878),
-    geo: Color(0xFFD8B56A),
-    champagne: Color(0xFFE6C98A),
-    text: Color(0xFFFFF8F0),
-    textDim: Color(0xFFBBA9AF),
-    textFaint: Color(0x99BBA9AF),
-    hair: Color(0x80513843),
-    hairStrong: Color(0xFF513843),
-    bubbleMine: Color(0xFF473A41),
-    onBubbleMine: Color(0xFFFFF8F0),
+    ink: Color(0xFF1C1C1C),
+    ink2: Color(0xFF2A2A2B),
+    card: Color(0xFF323233),
+    paper: Color(0xFFFFFFFF),
+    primary: Color(0xFFD83D5F),
+    primaryHover: Color(0xFFE5587A),
+    // Акцент для текста и иконок на тёмном: чуть светлее заливки кнопки,
+    // иначе #D83D5F на #1C1C1C читается хуже 4:1.
+    primaryTint: Color(0xFFEC5C7C),
+    onPrimary: Color(0xFF000000),
+    success: Color(0xFF4CC38A),
+    danger: Color(0xFFFF4D4D),
+    geo: Color(0xFF4F9DDE),
+    // Выбранное состояние (вкладки, сегменты): белый, не розовый — розовый
+    // у макета только у кнопок действия.
+    champagne: Color(0xFFFFFFFF),
+    text: Color(0xFFFFFFFF),
+    textDim: Color(0xFFB5B5B8),
+    textFaint: Color(0x99B5B5B8),
+    hair: Color(0x33FFFFFF),
+    hairStrong: Color(0xFF48484A),
+    bubbleMine: Color(0xFF3A3A3C),
+    onBubbleMine: Color(0xFFFFFFFF),
   );
 
-  /// «Тёплый песок» — светлая тема. Коды сняты со скриншота макета, их
-  /// заменят точные значения, когда придут от Левона.
-  static const warmSand = AppPalette(
+  /// Светлая тема по макетам дизайнера: тёплый белый #F8F5F2, карточки
+  /// #EBEBEB, чёрный текст, тот же акцент #D83D5F.
+  static const designerLight = AppPalette(
     brightness: Brightness.light,
-    ink: Color(0xFFFBF3EA),
+    ink: Color(0xFFF8F5F2),
     ink2: Color(0xFFFFFFFF),
-    card: Color(0xFFFFFFFF),
+    card: Color(0xFFEBEBEB),
     paper: Color(0xFFFFFFFF),
-    primary: Color(0xFFB94E36),
-    primaryHover: Color(0xFFC8573D),
-    primaryTint: Color(0xFFB04A33),
-    onPrimary: Color(0xFFFFFFFF),
+    primary: Color(0xFFD83D5F),
+    primaryHover: Color(0xFFC8284C),
+    primaryTint: Color(0xFFC9304F),
+    onPrimary: Color(0xFF000000),
     success: Color(0xFF2E8B5E),
-    danger: Color(0xFFC2414B),
-    geo: Color(0xFF3C74A8),
-    champagne: Color(0xFFB8863F),
-    text: Color(0xFF3A2A24),
-    textDim: Color(0xFF7A635A),
-    textFaint: Color(0x997A635A),
-    hair: Color(0x80E3D2C3),
-    hairStrong: Color(0xFFDCC6B4),
-    bubbleMine: Color(0xFFF0E4D8),
-    onBubbleMine: Color(0xFF3A2A24),
-  );
-}
+    danger: Color(0xFFEC3030),
+    geo: Color(0xFF2F7ACB),
+    champagne: Color(0xFF1C1C1C),
+    text: Color(0xFF000000),
+    textDim: Color(0xFF5E5E62),
+    textFaint: Color(0x995E5E62),
+    hair: Color(0x33000000),
+    hairStrong: Color(0xFFD1D1D6),
+    bubbleMine: Color(0xFFE2E2E4),
+    onBubbleMine: Color(0xFF000000),
+  );}
 
 /// Цвета текущей темы.
 ///
@@ -139,7 +141,7 @@ class AppPalette {
 /// app.dart подменяет [current] и один раз пересобирает всё дерево
 /// (см. `rebuildWholeTree`), сохраняя стек навигации и состояние экранов.
 abstract final class AppColors {
-  static AppPalette current = AppPalette.burgundyChampagne;
+  static AppPalette current = AppPalette.designerDark;
 
   static Color get ink => current.ink;
   static Color get ink2 => current.ink2;

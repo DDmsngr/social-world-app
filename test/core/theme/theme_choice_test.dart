@@ -35,7 +35,7 @@ Color _swatchColor(WidgetTester tester) => tester
     .color;
 
 void main() {
-  tearDown(() => AppColors.current = AppPalette.burgundyChampagne);
+  tearDown(() => AppColors.current = AppPalette.designerDark);
 
   group('resolvePalette', () {
     final noon = DateTime(2026, 9, 18, 12);
@@ -48,7 +48,7 @@ void main() {
           platformBrightness: Brightness.dark,
           now: noon,
         ),
-        same(AppPalette.burgundyChampagne),
+        same(AppPalette.designerDark),
       );
       expect(
         resolvePalette(
@@ -56,7 +56,7 @@ void main() {
           platformBrightness: Brightness.light,
           now: night,
         ),
-        same(AppPalette.warmSand),
+        same(AppPalette.designerLight),
       );
     });
 
@@ -67,7 +67,7 @@ void main() {
           platformBrightness: Brightness.dark,
           now: night,
         ),
-        same(AppPalette.warmSand),
+        same(AppPalette.designerLight),
       );
       expect(
         resolvePalette(
@@ -75,7 +75,7 @@ void main() {
           platformBrightness: Brightness.light,
           now: noon,
         ),
-        same(AppPalette.burgundyChampagne),
+        same(AppPalette.designerDark),
       );
     });
 
@@ -86,11 +86,11 @@ void main() {
         now: DateTime(2026, 9, 18, hour, minute),
       );
 
-      expect(at(6, 59), same(AppPalette.burgundyChampagne));
-      expect(at(7), same(AppPalette.warmSand));
-      expect(at(19, 59), same(AppPalette.warmSand));
-      expect(at(20), same(AppPalette.burgundyChampagne));
-      expect(at(0), same(AppPalette.burgundyChampagne));
+      expect(at(6, 59), same(AppPalette.designerDark));
+      expect(at(7), same(AppPalette.designerLight));
+      expect(at(19, 59), same(AppPalette.designerLight));
+      expect(at(20), same(AppPalette.designerDark));
+      expect(at(0), same(AppPalette.designerDark));
     });
   });
 
@@ -118,7 +118,7 @@ void main() {
   testWidgets(
     'смена темы перекрашивает даже const-виджеты и не теряет их состояние',
     (tester) async {
-      AppColors.current = AppPalette.burgundyChampagne;
+      AppColors.current = AppPalette.designerDark;
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(body: Column(children: [_Swatch(), _Counter()])),
@@ -127,16 +127,16 @@ void main() {
       await tester.tap(find.byType(TextButton));
       await tester.pump();
       expect(find.text('1'), findsOneWidget);
-      expect(_swatchColor(tester), AppPalette.burgundyChampagne.ink);
+      expect(_swatchColor(tester), AppPalette.designerDark.ink);
 
-      AppColors.current = AppPalette.warmSand;
+      AppColors.current = AppPalette.designerLight;
       rebuildWholeTree(tester.element(find.byType(MaterialApp)));
       await tester.pump();
 
-      expect(_swatchColor(tester), AppPalette.warmSand.ink);
+      expect(_swatchColor(tester), AppPalette.designerLight.ink);
       expect(
         tester.widget<Text>(find.text('1')).style?.color,
-        AppPalette.warmSand.text,
+        AppPalette.designerLight.text,
       );
     },
   );
