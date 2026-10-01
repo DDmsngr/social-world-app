@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/debug/app_log.dart';
+import '../../../core/media/exif_strip.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
@@ -386,7 +387,8 @@ class SecureChatRepository implements ChatRepository {
     SendOptions options = SendOptions.none,
   }) async {
     await _ready;
-    final clear = await File(filePath).readAsBytes();
+    var clear = await File(filePath).readAsBytes();
+    if (kind == MessageKind.image) clear = stripJpegMetadata(clear);
     if (clear.length > maxAttachmentBytes) {
       throw const ChatAttachmentTooLarge();
     }

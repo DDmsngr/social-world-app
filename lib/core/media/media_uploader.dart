@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import 'exif_strip.dart';
+
 /// Загрузка фотографий и видео в Supabase Storage.
 ///
 /// Путь всегда начинается с id пользователя: политика бакета разрешает запись
@@ -23,11 +25,13 @@ class MediaUploader {
     final extension = dot == -1 ? '.jpg' : localPath.substring(dot).toLowerCase();
     final objectPath = '$userId/${_uuid.v4()}$extension';
 
+    // Бакеты публичные: геометки и модель телефона из снимка уходить не должны.
+    final bytes = stripJpegMetadata(await File(localPath).readAsBytes());
     await _client.storage
         .from(bucket)
-        .upload(
+        .uploadBinary(
           objectPath,
-          File(localPath),
+          bytes,
           fileOptions: const FileOptions(cacheControl: '31536000'),
         );
 
