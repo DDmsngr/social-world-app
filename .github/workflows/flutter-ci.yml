@@ -293,8 +293,11 @@ jobs:
           arm64_name="social-world-${VERSION_CODE}-arm64.apk"
           cp build/app/outputs/flutter-apk/app-release.apk "${apk_name}"
           cp "$RUNNER_TEMP/app-arm64.apk" "${arm64_name}"
+          # Постоянное имя для ссылок-приглашений: .../releases/latest/download/chawo.apk
+          # сразу скачивает файл последней сборки, без страницы GitHub.
+          cp "$RUNNER_TEMP/app-arm64.apk" chawo.apk
 
-          gh release create "$TAG" "${apk_name}" "${arm64_name}" \
+          gh release create "$TAG" "${apk_name}" "${arm64_name}" chawo.apk \
             --repo DDmsngr/social-world-releases \
             --title "Social World Android release ${TAG}" \
             --notes "${notes}" \

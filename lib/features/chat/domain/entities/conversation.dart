@@ -1,15 +1,18 @@
 import 'chat_message.dart';
 
 /// direct — личный диалог со сквозным шифрованием; group — группа без E2EE,
-/// созданная людьми; quest — чат квеста, состав ведёт сервер.
+/// созданная людьми; quest — чат квеста, состав ведёт сервер; channel —
+/// канал: пишут владелец и админы, остальные читают и комментируют.
 enum ConversationKind {
   direct,
   group,
-  quest;
+  quest,
+  channel;
 
   static ConversationKind parse(Object? raw) => switch (raw) {
     'group' => ConversationKind.group,
     'quest' => ConversationKind.quest,
+    'channel' => ConversationKind.channel,
     _ => ConversationKind.direct,
   };
 }
@@ -24,6 +27,7 @@ class Conversation {
     this.title,
     this.memberCount = 2,
     this.isOwner = false,
+    this.isAdmin = false,
     this.closed = false,
     this.lastMessage,
     this.unreadCount = 0,
@@ -46,6 +50,9 @@ class Conversation {
   /// Владелец группы может переименовать её и исключать участников.
   final bool isOwner;
 
+  /// Админ канала: пишет посты наравне с владельцем.
+  final bool isAdmin;
+
   /// Закрытый чат (завершённый квест) только читается.
   final bool closed;
   final ChatMessage? lastMessage;
@@ -61,8 +68,18 @@ class Conversation {
   /// Управлять составом можно только в группе, которую создали люди.
   bool get isGroup => kind == ConversationKind.group;
 
+  bool get isChannel => kind == ConversationKind.channel;
+
+  /// Писать можно везде, кроме чужого канала.
+  bool get canPost => !isChannel || isOwner || isAdmin;
+
   String get displayName =>
-      (isDirect ? peerName : title) ?? (isDirect ? 'Пользователь' : 'Группа');
+      (isDirect ? peerName : title) ??
+      switch (kind) {
+        ConversationKind.direct => 'Пользователь',
+        ConversationKind.channel => 'Канал',
+        _ => 'Группа',
+      };
 
   Conversation copyWith({ChatMessage? lastMessage, int? unreadCount}) =>
       Conversation(
@@ -74,6 +91,7 @@ class Conversation {
         title: title,
         memberCount: memberCount,
         isOwner: isOwner,
+        isAdmin: isAdmin,
         closed: closed,
         lastMessage: lastMessage ?? this.lastMessage,
         unreadCount: unreadCount ?? this.unreadCount,

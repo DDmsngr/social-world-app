@@ -16,8 +16,9 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
 import '../data/contacts_match.dart';
 
+/// Прямая ссылка на файл последней сборки: открыл — пошло скачивание.
 const _downloadUrl =
-    'https://github.com/DDmsngr/social-world-releases/releases/latest';
+    'https://github.com/DDmsngr/social-world-releases/releases/latest/download/chawo.apk';
 
 enum _Phase { intro, loading, ready, denied, failed }
 

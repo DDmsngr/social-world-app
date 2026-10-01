@@ -3,6 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/entities/comment.dart';
 import '../domain/repositories/comments_repository.dart';
 
+/// Ключ ветки для поста канала. Обсуждения постов и каналов устроены
+/// одинаково (дерево, лайки, мягкое удаление), различаются только таблицы,
+/// поэтому экран и контроллер общие, а ветку выбирает префикс.
+String channelThreadKey(String messageId) => 'ch:$messageId';
+
+String? channelPostOf(String threadKey) =>
+    threadKey.startsWith('ch:') ? threadKey.substring(3) : null;
+
 class SupabaseCommentsRepository implements CommentsRepository {
   SupabaseCommentsRepository(this._client);
 
@@ -16,10 +24,11 @@ class SupabaseCommentsRepository implements CommentsRepository {
 
   @override
   Future<List<Comment>> loadThread(String postId) async {
-    final rows = await _client.rpc(
-      'post_comments_tree',
-      params: {'in_post': postId},
-    ) as List<dynamic>;
+    final channelPost = channelPostOf(postId);
+    final rows = await (channelPost == null
+            ? _client.rpc('post_comments_tree', params: {'in_post': postId})
+            : _client.rpc('channel_comments_tree', params: {'in_message': channelPost}))
+        as List<dynamic>;
 
     return rows
         .map((row) => _fromRow(postId, row as Map<String, dynamic>))
@@ -33,16 +42,26 @@ class SupabaseCommentsRepository implements CommentsRepository {
     Comment? parent,
   }) async {
     final userId = _userId;
-    final row = await _client
-        .from('post_comments')
-        .insert({
-          'post_id': postId,
-          'parent_id': parent?.id,
-          'author_id': userId,
-          'body': body.trim(),
-        })
-        .select()
-        .single();
+    final channelPost = channelPostOf(postId);
+    final Map<String, dynamic> row;
+    if (channelPost != null) {
+      final rows = await _client.rpc(
+        'channel_comment_add',
+        params: {'in_message': channelPost, 'in_parent': parent?.id, 'in_body': body.trim()},
+      ) as List<dynamic>;
+      row = {...rows.first as Map<String, dynamic>, 'body': body.trim()};
+    } else {
+      row = await _client
+          .from('post_comments')
+          .insert({
+            'post_id': postId,
+            'parent_id': parent?.id,
+            'author_id': userId,
+            'body': body.trim(),
+          })
+          .select()
+          .single();
+    }
 
     // Комментарий уже создан — падение этого чтения не должно превращать
     // успешную отправку в ошибку.
@@ -75,6 +94,16 @@ class SupabaseCommentsRepository implements CommentsRepository {
 
   @override
   Future<Comment> toggleLike(Comment comment) async {
+    if (channelPostOf(comment.postId) != null) {
+      final liked = await _client.rpc(
+        'channel_comment_toggle_like',
+        params: {'in_comment': comment.id},
+      ) as bool;
+      return comment.copyWith(
+        likedByMe: liked,
+        likeCount: comment.likeCount + (liked ? 1 : -1),
+      );
+    }
     if (comment.likedByMe) {
       await _client.from('comment_likes').delete().match({
         'comment_id': comment.id,
@@ -100,7 +129,12 @@ class SupabaseCommentsRepository implements CommentsRepository {
     // стереть body/media_urls по-настоящему, а не только проставить дату —
     // иначе текст «удалённого» комментария остаётся читаемым прямым select
     // к таблице, в обход RPC, которая его маскирует.
-    await _client.rpc('soft_delete_own_comment', params: {'in_comment': comment.id});
+    await _client.rpc(
+      channelPostOf(comment.postId) == null
+          ? 'soft_delete_own_comment'
+          : 'channel_comment_delete',
+      params: {'in_comment': comment.id},
+    );
     return comment.copyWith(deleted: true);
   }
 

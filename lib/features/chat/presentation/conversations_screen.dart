@@ -15,77 +15,201 @@ import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
 import 'widgets/chat_notify_sheet.dart';
 
-class ConversationsScreen extends ConsumerWidget {
+enum _Tab { direct, groups, channels }
+
+/// Чаты разложены по вкладкам «Личные / Группы / Каналы» — как в Telegram,
+/// но без общей «Все»: переписка с человеком не тонет среди постов каналов.
+class ConversationsScreen extends ConsumerStatefulWidget {
   const ConversationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ConversationsScreen> createState() =>
+      _ConversationsScreenState();
+}
+
+class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs = TabController(length: 3, vsync: this)
+    ..addListener(() {
+      if (!_tabs.indexIsChanging) setState(() {});
+    });
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  static _Tab _tabOf(Conversation c) => switch (c.kind) {
+    ConversationKind.direct => _Tab.direct,
+    ConversationKind.channel => _Tab.channels,
+    _ => _Tab.groups,
+  };
+
+  @override
+  Widget build(BuildContext context) {
     final conversations = ref.watch(conversationsProvider);
     final encryptionEnabled = ref
         .watch(chatRepositoryProvider)
         .endToEndEncryptionEnabled;
+    final all = conversations.value ?? const <Conversation>[];
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Чаты')),
-      floatingActionButton: FloatingActionButton.extended(
+    // Непрочитанные по вкладке: заглушённые чаты не считаем, они не должны
+    // звать внимание и через бейдж.
+    int unread(_Tab tab) => all
+        .where((c) => _tabOf(c) == tab && c.unreadCount > 0 && !chatNotifyOf(ref, c.id).isMuted)
+        .length;
+
+    Widget tabLabel(String text, _Tab tab) {
+      final n = unread(tab);
+      return Tab(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(text),
+            if (n > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.champagne,
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                ),
+                child: Text(
+                  '$n',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.ink),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final current = _Tab.values[_tabs.index];
+    final fab = switch (current) {
+      _Tab.direct => null,
+      _Tab.groups => FloatingActionButton.extended(
         onPressed: () => context.push('${Routes.chats}/new-group'),
         icon: const Icon(Icons.group_add_outlined),
         label: const Text('Группа'),
       ),
-      body: RefreshIndicator(
-        onRefresh: () => ref.refresh(conversationsProvider.future),
-        child: conversations.when(
-          loading: () => const LoadingView(),
-          error: (_, _) => StateMessage.error(
-            title: 'Не удалось загрузить чаты',
-            onAction: () => ref.invalidate(conversationsProvider),
-          ),
-          data: (items) {
-            if (items.isEmpty) {
-              return ListView(
-                children: const [
-                  SizedBox(height: 80),
-                  StateMessage(
-                    title: 'Переписок пока нет',
-                    text:
-                        'Откройте профиль человека и нажмите «Написать» '
-                        'или создайте группу.',
-                    icon: Icons.forum_outlined,
-                  ),
-                ],
-              );
-            }
+      _Tab.channels => FloatingActionButton.extended(
+        onPressed: () => context.push(Routes.newChannel),
+        icon: const Icon(Icons.campaign_outlined),
+        label: const Text('Канал'),
+      ),
+    };
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.gutter,
-                12,
-                AppSpacing.gutter,
-                96,
-              ),
-              children: [
-                if (!encryptionEnabled) ...[
-                  const _EncryptionNotice(),
-                  const SizedBox(height: 14),
-                ],
-                for (final conversation in items) ...[
-                  _ConversationTile(
-                    conversation: conversation,
-                    myId: ref.watch(currentUserProvider)?.id,
-                    notify: chatNotifyOf(ref, conversation.id),
-                    onLongPress: () => showChatNotifySheet(
-                      context,
-                      conversation.id,
-                      conversation.displayName,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            );
-          },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Чаты'),
+        actions: [
+          IconButton(
+            onPressed: () => context.push(Routes.channels),
+            tooltip: 'Найти каналы',
+            icon: const Icon(Icons.travel_explore),
+          ),
+        ],
+        bottom: TabBar(
+          controller: _tabs,
+          tabs: [
+            tabLabel('Личные', _Tab.direct),
+            tabLabel('Группы', _Tab.groups),
+            tabLabel('Каналы', _Tab.channels),
+          ],
         ),
       ),
+      floatingActionButton: fab,
+      body: conversations.when(
+        loading: () => const LoadingView(),
+        error: (_, _) => StateMessage.error(
+          title: 'Не удалось загрузить чаты',
+          onAction: () => ref.invalidate(conversationsProvider),
+        ),
+        data: (items) => TabBarView(
+          controller: _tabs,
+          children: [
+            for (final tab in _Tab.values)
+              RefreshIndicator(
+                onRefresh: () => ref.refresh(conversationsProvider.future),
+                child: _list(
+                  context,
+                  [for (final c in items) if (_tabOf(c) == tab) c],
+                  tab,
+                  showEncryptionNotice: tab == _Tab.direct && !encryptionEnabled,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _list(
+    BuildContext context,
+    List<Conversation> items,
+    _Tab tab, {
+    required bool showEncryptionNotice,
+  }) {
+    final myId = ref.watch(currentUserProvider)?.id;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 12, AppSpacing.gutter, 96),
+      children: [
+        if (showEncryptionNotice) ...[
+          const _EncryptionNotice(),
+          const SizedBox(height: 14),
+        ],
+        if (tab == _Tab.channels) ...[
+          GlassCard(
+            padding: const EdgeInsets.all(14),
+            onTap: () => context.push(Routes.channels),
+            child: Row(
+              children: [
+                Icon(Icons.travel_explore, color: AppColors.primaryTint),
+                const SizedBox(width: 14),
+                const Expanded(child: Text('Найти каналы: новости, наука, еда, мемы…')),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 60),
+            child: StateMessage(
+              title: switch (tab) {
+                _Tab.direct => 'Личных переписок пока нет',
+                _Tab.groups => 'Групп пока нет',
+                _Tab.channels => 'Вы ни на что не подписаны',
+              },
+              text: switch (tab) {
+                _Tab.direct => 'Откройте профиль человека и нажмите «Написать».',
+                _Tab.groups => 'Создайте группу кнопкой внизу.',
+                _Tab.channels => 'Загляните в каталог — подписка в одно касание.',
+              },
+              icon: switch (tab) {
+                _Tab.direct => Icons.forum_outlined,
+                _Tab.groups => Icons.group_outlined,
+                _Tab.channels => Icons.campaign_outlined,
+              },
+            ),
+          ),
+        for (final conversation in items) ...[
+          _ConversationTile(
+            conversation: conversation,
+            myId: myId,
+            notify: chatNotifyOf(ref, conversation.id),
+            onLongPress: () => showChatNotifySheet(
+              context,
+              conversation.id,
+              conversation.displayName,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
     );
   }
 }
@@ -107,18 +231,20 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final last = conversation.lastMessage;
     final preview = last == null
-        ? 'Нет сообщений'
-        : conversation.isDirect || last.senderName == null
+        ? (conversation.isChannel ? 'Постов пока нет' : 'Нет сообщений')
+        : conversation.isDirect || conversation.isChannel || last.senderName == null
         ? last.preview
         : '${last.senderName}: ${last.preview}';
 
     return GlassCard(
       padding: const EdgeInsets.all(14),
       onLongPress: onLongPress,
-      onTap: () => context.push(
-        '${Routes.chats}/${conversation.id}',
-        extra: conversation.displayName,
-      ),
+      onTap: () => conversation.isChannel
+          ? context.push(Routes.channel(conversation.id))
+          : context.push(
+              '${Routes.chats}/${conversation.id}',
+              extra: conversation.displayName,
+            ),
       child: Row(
         children: [
           if (conversation.isDirect)
@@ -132,9 +258,11 @@ class _ConversationTile extends StatelessWidget {
               radius: 22,
               backgroundColor: AppColors.ink,
               child: Icon(
-                conversation.kind == ConversationKind.quest
-                    ? Icons.flag_outlined
-                    : Icons.group_outlined,
+                switch (conversation.kind) {
+                  ConversationKind.quest => Icons.flag_outlined,
+                  ConversationKind.channel => Icons.campaign_outlined,
+                  _ => Icons.group_outlined,
+                },
                 color: AppColors.champagne,
                 size: 20,
               ),

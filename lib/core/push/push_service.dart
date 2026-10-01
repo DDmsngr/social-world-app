@@ -224,7 +224,11 @@ class PushService {
       case 'message':
         final id = data['conversation_id'] as String?;
         if (id == null) return;
-        router.push('${Routes.chats}/$id', extra: data['title'] as String?);
+        if (data['channel'] == '1') {
+          router.push(Routes.channel(id));
+        } else {
+          router.push('${Routes.chats}/$id', extra: data['title'] as String?);
+        }
       case 'notification':
         final target = LinkTarget.fromSegment(data['target_type'] as String? ?? '');
         final id = data['target_id'] as String?;

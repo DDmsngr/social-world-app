@@ -10,7 +10,8 @@ enum LinkTarget {
   profile('profile'),
   route('route'),
   quest('quest'),
-  need('need');
+  need('need'),
+  channel('channel');
 
   const LinkTarget(this.segment);
 
@@ -26,7 +27,7 @@ enum LinkTarget {
 }
 
 class DeepLink {
-  const DeepLink(this.target, this.id, {this.arrivalCode});
+  const DeepLink(this.target, this.id, {this.arrivalCode, this.inviteToken});
 
   final LinkTarget target;
   final String id;
@@ -35,19 +36,27 @@ class DeepLink {
   /// предлагает отметиться на месте.
   final String? arrivalCode;
 
+  /// Приглашение в закрытый канал (`?invite=`).
+  final String? inviteToken;
+
   /// Экран приложения, на который ведёт ссылка.
-  String get location =>
-      DeepLinks.locationFor(target, id, arrivalCode: arrivalCode);
+  String get location => DeepLinks.locationFor(
+    target,
+    id,
+    arrivalCode: arrivalCode,
+    inviteToken: inviteToken,
+  );
 
   @override
   bool operator ==(Object other) =>
       other is DeepLink &&
       other.target == target &&
       other.id == id &&
-      other.arrivalCode == arrivalCode;
+      other.arrivalCode == arrivalCode &&
+      other.inviteToken == inviteToken;
 
   @override
-  int get hashCode => Object.hash(target, id, arrivalCode);
+  int get hashCode => Object.hash(target, id, arrivalCode, inviteToken);
 }
 
 abstract final class DeepLinks {
@@ -126,14 +135,24 @@ abstract final class DeepLinks {
     final target = LinkTarget.fromSegment(segment);
     if (target == null) return null;
     final code = uri.queryParameters['arrive'];
+    final invite = uri.queryParameters['invite'];
     return DeepLink(
       target,
       id,
       arrivalCode: target == LinkTarget.quest && code != null && _code.hasMatch(code)
           ? code
           : null,
+      inviteToken: target == LinkTarget.channel && invite != null && _invite.hasMatch(invite)
+          ? invite
+          : null,
     );
   }
+
+  static final _invite = RegExp(r'^[a-f0-9]{32}$');
+
+  /// Приглашение в закрытый канал: `https://…/o/channel/<id>?invite=<токен>`.
+  static Uri channelInviteUri(String channelId, String token) =>
+      Uri.parse('$shareBase/${LinkTarget.channel.segment}/$channelId?invite=$token');
 
   /// Код места из входящей ссылки — если это она, а не ссылка на объект.
   /// `null` для всего остального, включая обычные [LinkTarget]-ссылки.
@@ -157,8 +176,16 @@ abstract final class DeepLinks {
     return code.toUpperCase();
   }
 
-  static String locationFor(LinkTarget target, String id, {String? arrivalCode}) =>
+  static String locationFor(
+    LinkTarget target,
+    String id, {
+    String? arrivalCode,
+    String? inviteToken,
+  }) =>
       switch (target) {
+        LinkTarget.channel => inviteToken == null
+            ? Routes.channel(id)
+            : '${Routes.channel(id)}?invite=$inviteToken',
         LinkTarget.post => '${Routes.posts}/$id',
         LinkTarget.event => '${Routes.eventDetail}/$id',
         LinkTarget.place => '${Routes.places}/$id',

@@ -19,6 +19,16 @@ void main() {
       expect(DeepLinks.parse(Uri.parse('https://evil.example/o/post/abcd')), isNull);
       expect(DeepLinks.parse(Uri.parse('socialworld://post/..%2Fx')), isNull);
     });
+
+    test('приглашение в закрытый канал доходит до экрана канала', () {
+      const token = '0123456789abcdef0123456789abcdef';
+      final link = DeepLinks.parse(DeepLinks.channelInviteUri('chan-1234', token));
+      expect(link, const DeepLink(LinkTarget.channel, 'chan-1234', inviteToken: token));
+      expect(link!.location, '/chats/channel/chan-1234?invite=$token');
+      // Мусор вместо токена отбрасывается, ссылка остаётся просто на канал.
+      final bad = DeepLinks.parse(Uri.parse('socialworld://channel/chan-1234?invite=<x>'));
+      expect(bad!.inviteToken, isNull);
+    });
   });
 
   group('Реферальный код места', () {

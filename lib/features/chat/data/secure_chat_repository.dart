@@ -170,6 +170,7 @@ class SecureChatRepository implements ChatRepository {
       title: row['title'] as String?,
       memberCount: (row['member_count'] as num?)?.toInt() ?? 0,
       isOwner: row['my_role'] == 'owner',
+      isAdmin: row['my_role'] == 'admin',
       closed: row['closed'] as bool? ?? false,
       lastMessage: last,
       unreadCount: (row['unread_count'] as num?)?.toInt() ?? 0,

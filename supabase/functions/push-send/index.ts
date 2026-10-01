@@ -80,7 +80,7 @@ async function forMessage(messageId: string): Promise<Job[]> {
 
   const [{ data: conversation }, { data: sender }, { data: members }] = await Promise.all([
     db.from("chat_conversations")
-      .select("id, direct_key, title, quest_id")
+      .select("id, direct_key, title, quest_id, is_channel")
       .eq("id", message.conversation_id)
       .single(),
     db.from("profiles").select("display_name").eq("id", message.sender_id).maybeSingle(),
@@ -125,16 +125,20 @@ async function forMessage(messageId: string): Promise<Job[]> {
         .from("quests").select("title").eq("id", conversation.quest_id).maybeSingle();
       title = quest?.title ?? null;
     }
-    title ??= "Группа";
+    const isChannel = conversation.is_channel === true;
+    title ??= isChannel ? "Канал" : "Группа";
+    // Пост канала — от имени канала, без имени админа.
+    const preview = groupPreview(message.kind, message.body);
     push = {
       title,
-      body: `${senderName}: ${groupPreview(message.kind, message.body)}`,
+      body: isChannel ? preview : `${senderName}: ${preview}`,
       channel,
       tag: conversation.id,
       data: {
         type: "message",
         conversation_id: conversation.id,
         title,
+        ...(isChannel ? { channel: "1" } : {}),
       },
     };
   }

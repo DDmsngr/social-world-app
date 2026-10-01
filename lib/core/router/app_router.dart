@@ -30,6 +30,11 @@ import '../../features/needs/presentation/create_need_screen.dart';
 import '../../features/needs/presentation/my_needs_screen.dart';
 import '../../features/needs/presentation/need_detail_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
+import '../../features/channels/presentation/channel_catalog_screen.dart';
+import '../../features/channels/presentation/channel_info_screen.dart';
+import '../../features/channels/presentation/channel_post_screen.dart';
+import '../../features/channels/presentation/channel_screen.dart';
+import '../../features/channels/presentation/create_channel_screen.dart';
 import '../../features/invite/presentation/invite_contacts_screen.dart';
 import '../../features/profile/presentation/blocked_users_screen.dart';
 import '../../features/profile/domain/profile_models.dart';
@@ -61,6 +66,9 @@ abstract final class Routes {
   static const events = '/events';
   static const create = '/create';
   static const chats = '/chats';
+  static const channels = '/chats/channels';
+  static const newChannel = '/chats/new-channel';
+  static String channel(String id) => '/chats/channel/$id';
   static const profile = '/profile';
   static const settings = '/profile/settings';
   static const editProfile = '/profile/edit';
@@ -363,6 +371,36 @@ final routerProvider = Provider<GoRouter>((ref) {
                     GoRoute(
                       path: 'new-group',
                       builder: (_, _) => const CreateGroupScreen(),
+                    ),
+                    GoRoute(
+                      path: 'new-channel',
+                      builder: (_, _) => const CreateChannelScreen(),
+                    ),
+                    GoRoute(
+                      path: 'channels',
+                      builder: (_, _) => const ChannelCatalogScreen(),
+                    ),
+                    GoRoute(
+                      path: 'channel/:channelId',
+                      builder: (_, state) => ChannelScreen(
+                        channelId: state.pathParameters['channelId']!,
+                        inviteToken: state.uri.queryParameters['invite'],
+                      ),
+                      routes: [
+                        GoRoute(
+                          path: 'info',
+                          builder: (_, state) => ChannelInfoScreen(
+                            channelId: state.pathParameters['channelId']!,
+                          ),
+                        ),
+                        GoRoute(
+                          path: 'post/:postId',
+                          builder: (_, state) => ChannelPostScreen(
+                            channelId: state.pathParameters['channelId']!,
+                            postId: state.pathParameters['postId']!,
+                          ),
+                        ),
+                      ],
                     ),
                     GoRoute(
                       path: ':conversationId',

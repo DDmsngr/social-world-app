@@ -138,6 +138,7 @@ class _ForwardSheetState extends ConsumerState<_ForwardSheet> {
                   final available = [
                     for (final c in all)
                       if (!c.closed &&
+                          c.canPost &&
                           c.id != widget.excludeConversationId &&
                           (_query.isEmpty ||
                               c.displayName.toLowerCase().contains(
