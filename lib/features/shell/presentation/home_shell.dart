@@ -33,6 +33,14 @@ class HomeShell extends ConsumerStatefulWidget {
       location.startsWith('${Routes.chats}/') &&
       location != '${Routes.chats}/new-group';
 
+  /// Нижняя навигация в переписке: только иконки, а пока открыта клавиатура
+  /// или панель эмодзи — совсем без неё, место нужнее сообщениям.
+  static bool showBottomNav({
+    required bool inChat,
+    required bool keyboard,
+    required bool emojiPanel,
+  }) => !(inChat && (keyboard || emojiPanel));
+
   @override
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
@@ -40,6 +48,20 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell>
     with WidgetsBindingObserver {
   Timer? _poll;
+  Timer? _presence;
+  var _foreground = true;
+
+  /// Раз в минуту, пока приложение открыто: «я в сети». По этой отметке
+  /// сервер отправляет сообщения, отложенные «до появления в сети». Не чаще
+  /// двух минут — иначе окно «в сети» на сервере закроется между отметками.
+  void _touchPresence() {
+    if (!Features.chat || !_foreground) return;
+    try {
+      unawaited(ref.read(chatRepositoryProvider).touchPresence());
+    } catch (error) {
+      AppLog.add('Присутствие: $error');
+    }
+  }
 
   @override
   void initState() {
@@ -65,7 +87,12 @@ class _HomeShellState extends ConsumerState<HomeShell>
         }
       }
       ref.read(pushServiceProvider).start();
+      _touchPresence();
     });
+    _presence = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _touchPresence(),
+    );
     // Опрос остаётся страховкой на случай, если пуши выключены в системе.
     _poll = Timer.periodic(
       const Duration(seconds: 90),
@@ -75,14 +102,17 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.resumed) {
       ref.read(notificationsProvider.notifier).refreshQuietly();
+      _touchPresence();
     }
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _presence?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -119,19 +149,22 @@ class _HomeShellState extends ConsumerState<HomeShell>
     final inChat = HomeShell.isConversation(widget.location);
     final keyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
 
-    return Scaffold(
-      body: widget.navigationShell,
-      // В переписке навигация — только иконки, без подписей, а пока занято
-      // поле ввода (клавиатура или эмодзи) — не видна совсем: место отдаём
-      // сообщениям.
-      bottomNavigationBar: ValueListenableBuilder<bool>(
-        valueListenable: chatInputActive,
-        builder: (context, inputActive, _) {
-          if (inChat && (keyboard || inputActive)) {
-            return const SizedBox.shrink();
-          }
-          return _navigationBar(compact: inChat);
-        },
+    return ValueListenableBuilder<bool>(
+      valueListenable: chatEmojiPanelOpen,
+      builder: (context, emojiPanel, _) => Scaffold(
+        body: widget.navigationShell,
+        // Именно null, а не пустой виджет: Scaffold с любой нижней панелью,
+        // даже нулевой высоты, считает, что системную полосу внизу занимает
+        // она, и убирает отступ из тела — поле ввода уезжало под системные
+        // кнопки Android.
+        bottomNavigationBar:
+            HomeShell.showBottomNav(
+              inChat: inChat,
+              keyboard: keyboard,
+              emojiPanel: emojiPanel,
+            )
+            ? _navigationBar(compact: inChat)
+            : null,
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../domain/entities/chat_message.dart';
+import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
 import '../domain/repositories/chat_repository.dart';
 
@@ -63,6 +64,7 @@ class LocalChatRepository implements ChatRepository {
     required String conversationId,
     required String text,
     MessageKind kind = MessageKind.text,
+    SendOptions options = SendOptions.none,
   }) async => _add(
     ChatMessage(
       id: 'local-msg-${_nextId++}',
@@ -73,6 +75,8 @@ class LocalChatRepository implements ChatRepository {
       text: text.trim(),
       status: MessageStatus.sent,
       signatureValid: true,
+      replyTo: options.replyTo,
+      forwardedFrom: options.forwardedFrom,
     ),
   );
 
@@ -86,6 +90,7 @@ class LocalChatRepository implements ChatRepository {
     int? durationMs,
     List<double>? waveform,
     String? caption,
+    SendOptions options = SendOptions.none,
   }) async => _add(
     ChatMessage(
       id: 'local-msg-${_nextId++}',
@@ -105,8 +110,59 @@ class LocalChatRepository implements ChatRepository {
       ),
       status: MessageStatus.sent,
       signatureValid: true,
+      replyTo: options.replyTo,
+      forwardedFrom: options.forwardedFrom,
     ),
   );
+
+  /// Отложенные живут в памяти; уходят они только руками (см. [releaseScheduled]).
+  final _scheduled = <ScheduledMessage>[];
+
+  @override
+  Future<ScheduledMessage> scheduleText({
+    required String conversationId,
+    required String text,
+    DateTime? sendAt,
+    bool whenOnline = false,
+    SendOptions options = SendOptions.none,
+  }) async {
+    final message = ScheduledMessage(
+      id: 'local-sched-${_nextId++}',
+      conversationId: conversationId,
+      text: text.trim(),
+      createdAt: DateTime.now(),
+      sendAt: sendAt,
+      whenOnline: whenOnline,
+      silent: options.silent,
+    );
+    _scheduled.add(message);
+    return message;
+  }
+
+  @override
+  Future<List<ScheduledMessage>> loadScheduled(String conversationId) async => [
+    for (final m in _scheduled)
+      if (m.conversationId == conversationId) m,
+  ];
+
+  @override
+  Future<void> cancelScheduled(String id) async =>
+      _scheduled.removeWhere((m) => m.id == id);
+
+  /// Для тестов и демо: «сервер» отправляет отложенное прямо сейчас.
+  Future<void> releaseScheduled(String id) async {
+    final index = _scheduled.indexWhere((m) => m.id == id);
+    if (index == -1) return;
+    final scheduled = _scheduled.removeAt(index);
+    await send(
+      conversationId: scheduled.conversationId,
+      text: scheduled.text,
+      options: SendOptions(silent: scheduled.silent),
+    );
+  }
+
+  @override
+  Future<void> touchPresence() async {}
 
   @override
   Future<String> attachmentFile(ChatMessage message) async =>

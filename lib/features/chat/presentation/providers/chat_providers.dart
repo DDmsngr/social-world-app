@@ -7,6 +7,7 @@ import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../data/local_chat_repository.dart';
 import '../../data/secure_chat_repository.dart';
 import '../../domain/entities/chat_message.dart';
+import '../../domain/entities/chat_meta.dart';
 import '../../domain/entities/conversation.dart';
 import '../../domain/repositories/chat_repository.dart';
 
@@ -33,10 +34,15 @@ final conversationsProvider = FutureProvider<List<Conversation>>((ref) {
   return ref.watch(chatRepositoryProvider).loadConversations();
 });
 
+/// Без автоповтора Riverpod: переподключением и опросом занимается сама
+/// лента (liveFeed). Второй слой повторов только плодил бы лишние
+/// подписки на каждую ошибку сети.
 final messagesProvider = StreamProvider.autoDispose
-    .family<List<ChatMessage>, String>((ref, conversationId) {
-      return ref.watch(chatRepositoryProvider).watchMessages(conversationId);
-    });
+    .family<List<ChatMessage>, String>(
+      (ref, conversationId) =>
+          ref.watch(chatRepositoryProvider).watchMessages(conversationId),
+      retry: (_, _) => null,
+    );
 
 /// Карточка одного чата: заголовок, тип, права. Пустой личный диалог в
 /// общем списке не виден, поэтому берётся отдельным запросом.
@@ -50,7 +56,15 @@ final chatMembersProvider = FutureProvider.autoDispose
       return ref.watch(chatRepositoryProvider).loadMembers(conversationId);
     });
 
-/// Поле ввода переписки занято: открыта клавиатура или панель эмодзи. Пока
-/// так, оболочка прячет нижнюю навигацию — место нужнее переписке.
+/// Открыта панель эмодзи (она стоит на месте клавиатуры, и системных
+/// отступов снизу у неё нет). Пока так, оболочка прячет нижнюю навигацию.
 /// Не провайдер: поле сбрасывает флаг в dispose, где ref уже недоступен.
-final chatInputActive = ValueNotifier<bool>(false);
+final chatEmojiPanelOpen = ValueNotifier<bool>(false);
+
+/// Отложенные сообщения чата: что и когда уйдёт.
+final scheduledMessagesProvider = FutureProvider.autoDispose
+    .family<List<ScheduledMessage>, String>(
+      (ref, conversationId) =>
+          ref.watch(chatRepositoryProvider).loadScheduled(conversationId),
+      retry: (_, _) => null,
+    );

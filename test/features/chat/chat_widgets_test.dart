@@ -6,6 +6,7 @@ import 'package:social_world/features/auth/domain/entities/app_user.dart';
 import 'package:social_world/features/auth/presentation/providers/auth_providers.dart';
 import 'package:social_world/features/chat/data/local_chat_repository.dart';
 import 'package:social_world/features/chat/domain/entities/chat_message.dart';
+import 'package:social_world/features/chat/domain/entities/chat_meta.dart';
 import 'package:social_world/features/chat/domain/entities/conversation.dart';
 import 'package:social_world/features/chat/presentation/providers/chat_providers.dart';
 import 'package:social_world/features/chat/presentation/providers/hidden_messages_provider.dart';
@@ -18,15 +19,23 @@ class _SpyRepository extends LocalChatRepository {
   _SpyRepository() : super(currentUserId: () => 'me');
 
   final sent = <String>[];
+  final options = <SendOptions>[];
 
   @override
   Future<ChatMessage> send({
     required String conversationId,
     required String text,
     MessageKind kind = MessageKind.text,
+    SendOptions options = SendOptions.none,
   }) {
     sent.add(text);
-    return super.send(conversationId: conversationId, text: text, kind: kind);
+    this.options.add(options);
+    return super.send(
+      conversationId: conversationId,
+      text: text,
+      kind: kind,
+      options: options,
+    );
   }
 }
 
@@ -77,7 +86,7 @@ void main() {
     await tester.pumpWidget(app(const ChatComposer(conversationId: 'conv-1')));
     await tester.enterText(find.byType(TextField), 'Ку 👋');
     await tester.pump();
-    await tester.tap(find.byTooltip('Отправить'));
+    await tester.tap(find.byIcon(Icons.send));
     await tester.pumpAndSettle();
     expect(repository.sent, ['Ку 👋']);
     expect(
@@ -124,8 +133,9 @@ void main() {
 
     Future<ProviderContainer> openMenu(
       WidgetTester tester,
-      ChatMessage message,
-    ) async {
+      ChatMessage message, {
+      void Function(ChatMessage)? onReply,
+    }) async {
       await tester.pumpWidget(
         app(
           Consumer(
@@ -137,6 +147,7 @@ void main() {
                   message: message,
                   myId: 'me',
                   conversation: direct,
+                  onReply: onReply,
                 ),
                 child: const Text('open'),
               );
@@ -175,6 +186,58 @@ void main() {
       await tester.tap(find.text('Отменить'));
       await tester.pump();
       expect(container.read(hiddenMessagesProvider), isEmpty);
+    });
+
+    testWidgets('«Ответить» вызывает обработчик и закрывает меню', (tester) async {
+      ChatMessage? replied;
+      await openMenu(tester, peerMessage, onReply: (m) => replied = m);
+      await tester.tap(find.text('Ответить'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(replied?.id, peerMessage.id);
+      expect(find.text('Ответить'), findsNothing);
+    });
+
+    testWidgets('без обработчика пункта «Ответить» нет', (tester) async {
+      await openMenu(tester, peerMessage);
+      expect(find.text('Ответить'), findsNothing);
+      expect(find.text('Переслать'), findsOneWidget);
+    });
+
+    testWidgets('переслать: выбор чата, пометка «от кого», итог в снекбаре', (
+      tester,
+    ) async {
+      await openMenu(tester, peerMessage);
+      await tester.tap(find.text('Переслать'));
+      // Список чатов у заглушки приходит с задержкой.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      // Чат, откуда пересылаем, в списке не показывается.
+      expect(find.text('Алина'), findsNothing);
+      expect(find.text('Саша'), findsOneWidget);
+      expect(find.text('Ника'), findsOneWidget);
+      expect(find.text('Выберите чат'), findsOneWidget);
+
+      await tester.tap(find.text('Саша'));
+      await tester.pump();
+      await tester.tap(find.text('Переслать (1)'));
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(repository.sent, ['Привет!']);
+      expect(repository.options.single.forwardedFrom, 'Алина');
+      expect(find.text('Переслано: Саша'), findsOneWidget);
+    });
+
+    testWidgets('переслать: поиск по чатам', (tester) async {
+      await openMenu(tester, peerMessage);
+      await tester.tap(find.text('Переслать'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.enterText(find.byType(TextField), 'ни');
+      await tester.pump();
+      expect(find.text('Ника'), findsOneWidget);
+      expect(find.text('Саша'), findsNothing);
     });
 
     testWidgets('своё — диалог с галочкой «и у собеседника», включённой', (

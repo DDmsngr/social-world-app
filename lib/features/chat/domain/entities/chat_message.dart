@@ -1,3 +1,5 @@
+import 'chat_meta.dart';
+
 /// Тип сообщения. [wire] совпадает с `chat_messages.kind` в базе.
 enum MessageKind {
   text,
@@ -101,6 +103,8 @@ class ChatMessage {
     this.status = MessageStatus.sent,
     this.signatureValid,
     this.senderName,
+    this.replyTo,
+    this.forwardedFrom,
   });
 
   final String id;
@@ -125,6 +129,12 @@ class ChatMessage {
   /// Имя автора — показывается в группах над чужими сообщениями.
   final String? senderName;
 
+  /// Цитата сообщения, на которое это — ответ.
+  final ChatReply? replyTo;
+
+  /// Автор оригинала, если сообщение переслано.
+  final String? forwardedFrom;
+
   /// Строка для списка чатов.
   String get preview {
     final caption = text?.trim();
@@ -148,5 +158,7 @@ class ChatMessage {
         status: status ?? this.status,
         signatureValid: signatureValid ?? this.signatureValid,
         senderName: senderName,
+        replyTo: replyTo,
+        forwardedFrom: forwardedFrom,
       );
 }

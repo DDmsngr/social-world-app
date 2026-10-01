@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,12 +14,15 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/entities/chat_message.dart';
+import '../domain/entities/chat_meta.dart';
+import '../domain/entities/conversation.dart';
 import 'conversations_screen.dart';
 import 'providers/chat_providers.dart';
 import 'providers/hidden_messages_provider.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/message_menu.dart';
+import 'widgets/swipe_to_reply.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({
@@ -35,11 +40,45 @@ class ChatScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen>
+    with WidgetsBindingObserver {
   late final PushService _push;
 
   /// Сообщение, по которому открыто меню, — подсвечено, пока меню открыто.
   String? _selectedId;
+
+  /// Ответ, который сейчас набирается: показан над полем ввода.
+  ChatReply? _replyTo;
+
+  String _nameOf(ChatMessage message, String myId, Conversation? info) {
+    if (message.senderId == myId) {
+      return ref.read(currentUserProvider)?.displayName ?? 'Вы';
+    }
+    return message.senderName ??
+        (info != null && info.isDirect ? info.peerName : null) ??
+        'Пользователь';
+  }
+
+  void _startReply(ChatMessage message, String myId) {
+    final info = ref.read(conversationProvider(widget.conversationId)).value;
+    setState(
+      () => _replyTo = ChatReply.of(
+        message,
+        senderName: _nameOf(message, myId, info),
+      ),
+    );
+  }
+
+  /// После сворачивания приложения сокеты нередко «мёртвые»: переподключаем
+  /// переписку сами, а не ждём, пока человек выйдет и зайдёт снова. Старые
+  /// сообщения при этом остаются на экране.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    ref.invalidate(messagesProvider(widget.conversationId));
+    ref.invalidate(conversationProvider(widget.conversationId));
+    ref.invalidate(scheduledMessagesProvider(widget.conversationId));
+  }
 
   Future<bool> _openMenu(
     BuildContext context,
@@ -56,6 +95,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         conversation: ref
             .read(conversationProvider(widget.conversationId))
             .value,
+        onReply: (message) => _startReply(message, myId),
       );
     } finally {
       if (mounted) setState(() => _selectedId = null);
@@ -65,6 +105,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _push = ref.read(pushServiceProvider)
       ..activeConversationId = widget.conversationId
       ..clearConversation(widget.conversationId);
@@ -81,6 +122,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_push.activeConversationId == widget.conversationId) {
       _push.activeConversationId = null;
     }
@@ -99,7 +141,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Пока экран открыт, входящие сразу считаются прочитанными.
     ref.listen(messagesProvider(widget.conversationId), (previous, next) {
       final before = previous?.value?.length ?? 0;
-      if ((next.value?.length ?? 0) > before && before > 0) _markRead();
+      if ((next.value?.length ?? 0) > before && before > 0) {
+        _markRead();
+        // Отложенное могло как раз уйти — список «запланировано» устарел.
+        ref.invalidate(scheduledMessagesProvider(widget.conversationId));
+      }
     });
 
     return Scaffold(
@@ -149,7 +195,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           if (info != null && !isDirect) const _PlainTextNotice(),
           Expanded(
             child: messages.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              // Уже показанные сообщения не прячем за спиннером при
+              // переподключении и ошибках сети: переписка остаётся на месте,
+              // а о связи говорит тонкая полоска сверху.
+              skipLoadingOnReload: true,
+              skipLoadingOnRefresh: true,
+              skipError: true,
+              loading: () => _SlowLoading(
+                onRetry: () =>
+                    ref.invalidate(messagesProvider(widget.conversationId)),
+              ),
               error: (error, _) => _ErrorView(
                 keysMissing: error.toString().contains('ключи'),
                 onRetry: () =>
@@ -179,7 +234,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 }
                 // reverse: новые снизу, и лента сама держится у последнего
                 // сообщения при входящих.
-                return ListView.builder(
+                final list = ListView.builder(
                   reverse: true,
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.gutter,
@@ -197,7 +252,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           label: 'Действия с сообщением',
                         ): () => _openMenu(context, message, myId),
                       },
-                      child: GestureDetector(
+                      child: SwipeToReply(
+                        enabled: !(info?.closed ?? false) &&
+                            message.signatureValid != false &&
+                            message.status != MessageStatus.failed,
+                        onReply: () => _startReply(message, myId),
+                        child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onLongPress: () => _openMenu(context, message, myId),
                         child: AnimatedContainer(
@@ -218,13 +278,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 _openMenu(viewerContext, message, myId),
                           ),
                         ),
+                        ),
                       ),
                     );
                   },
                 );
+                return list;
               },
             ),
           ),
+          if (messages.hasValue && (messages.isLoading || messages.hasError))
+            _ConnectionBanner(
+              onRetry: () =>
+                  ref.invalidate(messagesProvider(widget.conversationId)),
+            ),
           if (info?.closed ?? false)
             SafeArea(
               top: false,
@@ -241,7 +308,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           // над ним (_ErrorView).
           else if (!(messages.hasError &&
               messages.error.toString().contains('ключи')))
-            ChatComposer(conversationId: widget.conversationId),
+            ChatComposer(
+              conversationId: widget.conversationId,
+              isDirect: isDirect,
+              peerName: info?.peerName,
+              replyTo: _replyTo,
+              onReplyCleared: () => setState(() => _replyTo = null),
+            ),
         ],
       ),
     );
@@ -377,3 +450,114 @@ String messageStatusLabel(MessageStatus status) => switch (status) {
   MessageStatus.read => 'прочитано',
   MessageStatus.failed => 'не ушло',
 };
+
+/// Первая загрузка переписки. Если она тянется дольше нескольких секунд, это
+/// уже не «грузится», а «завис»: вместо вечного кружка — понятная подпись и
+/// кнопка, которая переподключает чат.
+class _SlowLoading extends StatefulWidget {
+  const _SlowLoading({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  State<_SlowLoading> createState() => _SlowLoadingState();
+}
+
+class _SlowLoadingState extends State<_SlowLoading> {
+  static const _patience = Duration(seconds: 10);
+
+  Timer? _timer;
+  var _slow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(_patience, () {
+      if (mounted) setState(() => _slow = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: AppColors.champagne,
+            ),
+          ),
+          if (_slow) ...[
+            const SizedBox(height: 18),
+            Text(
+              'Долго подключаемся к чату',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                setState(() => _slow = false);
+                _timer?.cancel();
+                _timer = Timer(_patience, () {
+                  if (mounted) setState(() => _slow = true);
+                });
+                widget.onRetry();
+              },
+              child: const Text('Переподключить'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Тонкая полоска над полем ввода: связь с чатом потеряна, идёт
+/// переподключение. Сообщения на экране остаются, писать по-прежнему можно.
+class _ConnectionBanner extends StatelessWidget {
+  const _ConnectionBanner({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.card,
+      child: InkWell(
+        onTap: onRetry,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.8,
+                  color: AppColors.champagne,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Подключаемся… Нажмите, чтобы повторить',
+                  style: TextStyle(fontSize: 12, color: AppColors.textDim),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

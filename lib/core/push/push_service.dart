@@ -42,6 +42,16 @@ class PushService {
     description: 'Новые сообщения в чатах',
     importance: Importance.high,
   );
+  /// «Отправить без звука»: уведомление приходит, но молча и без вибрации.
+  /// Звук и вибрация в Android задаются каналом, поэтому нужен отдельный.
+  static const _messagesSilent = AndroidNotificationChannel(
+    'messages_silent',
+    'Сообщения без звука',
+    description: 'Сообщения, отправленные без звука',
+    importance: Importance.defaultImportance,
+    playSound: false,
+    enableVibration: false,
+  );
   static const _activity = AndroidNotificationChannel(
     'activity',
     'Активность',
@@ -73,6 +83,7 @@ class PushService {
             AndroidFlutterLocalNotificationsPlugin
           >();
       await android?.createNotificationChannel(_messages);
+      await android?.createNotificationChannel(_messagesSilent);
       await android?.createNotificationChannel(_activity);
       _localReady = true;
 
@@ -158,7 +169,11 @@ class PushService {
 
     final notification = message.notification;
     if (notification == null || !_localReady) return;
-    final channel = isMessage ? _messages : _activity;
+    final channel = !isMessage
+        ? _activity
+        : data['silent'] == '1'
+        ? _messagesSilent
+        : _messages;
     // id 0 + tag — так же, как пуш, нарисованный системой в фоне: новое
     // уведомление того же чата заменяет прошлое, а не копит стопку.
     _local.show(
@@ -170,8 +185,10 @@ class PushService {
           channel.id,
           channel.name,
           channelDescription: channel.description,
-          importance: Importance.high,
-          priority: Priority.high,
+          importance: channel.importance,
+          priority: channel.playSound ? Priority.high : Priority.defaultPriority,
+          playSound: channel.playSound,
+          enableVibration: channel.enableVibration,
           icon: '@drawable/ic_notification',
           tag: data['conversation_id'] ?? data['notification_id'],
         ),

@@ -1,11 +1,16 @@
 import 'entities/chat_message.dart';
 
 /// Пункты меню сообщения (долгий тап) и «⋮» в просмотре фото из чата.
-enum MessageAction { copy, saveToGallery, share, delete }
+enum MessageAction { reply, copy, saveToGallery, share, forward, delete }
 
 /// Что можно сделать с сообщением. Одно место для правил: его читают меню,
 /// просмотрщик и подсказки для экранного чтеца.
-List<MessageAction> messageActions(ChatMessage message) {
+///
+/// [canReply] — в чат можно писать (в закрытом квест-чате отвечать некуда).
+List<MessageAction> messageActions(
+  ChatMessage message, {
+  bool canReply = true,
+}) {
   final text = message.text?.trim() ?? '';
   final attachment = message.attachment;
   final media =
@@ -14,11 +19,17 @@ List<MessageAction> messageActions(ChatMessage message) {
         MessageKind.image || MessageKind.video || MessageKind.videoNote => true,
         _ => false,
       };
+  // Сообщение, которое не расшифровалось или не прошло проверку подписи,
+  // нельзя ни цитировать, ни пересылать: там нет достоверного содержимого.
+  final trusted =
+      message.signatureValid != false && message.status != MessageStatus.failed;
   return [
+    if (canReply && trusted) MessageAction.reply,
     if (text.isNotEmpty) MessageAction.copy,
     if (media) MessageAction.saveToGallery,
     if (attachment != null && message.kind != MessageKind.sticker)
       MessageAction.share,
+    if (trusted) MessageAction.forward,
     MessageAction.delete,
   ];
 }

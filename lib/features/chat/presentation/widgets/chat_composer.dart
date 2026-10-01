@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -14,17 +16,37 @@ import '../../../../core/network/vpn_check.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/secure_chat_repository.dart';
 import '../../domain/entities/chat_message.dart';
+import '../../domain/entities/chat_meta.dart';
+import '../../domain/repositories/chat_repository.dart';
+import '../../domain/schedule_format.dart';
 import '../providers/chat_providers.dart';
 import 'attachment_views.dart';
 import 'emoji_panel.dart';
+import 'scheduled_sheet.dart';
 import 'video_note_recorder.dart';
 
 /// Поле ввода чата: текст с эмодзи, вложения (фото, камера, видео, файл),
 /// голосовое и кружок. Всё, что умел DDChat, кроме звонков.
 class ChatComposer extends ConsumerStatefulWidget {
-  const ChatComposer({super.key, required this.conversationId});
+  const ChatComposer({
+    super.key,
+    required this.conversationId,
+    this.isDirect = true,
+    this.peerName,
+    this.replyTo,
+    this.onReplyCleared,
+  });
 
   final String conversationId;
+
+  /// «Когда будет в сети» есть только в личных диалогах: в группе непонятно,
+  /// кого ждать.
+  final bool isDirect;
+  final String? peerName;
+
+  /// Ответ, который уйдёт вместе со следующим сообщением.
+  final ChatReply? replyTo;
+  final VoidCallback? onReplyCleared;
 
   @override
   ConsumerState<ChatComposer> createState() => _ChatComposerState();
@@ -67,7 +89,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     _syncActive();
   }
 
-  void _syncActive() => chatInputActive.value = _focus.hasFocus || _emojiOpen;
+  void _syncActive() => chatEmojiPanelOpen.value = _emojiOpen;
 
   void _toggleEmoji() {
     if (_emojiOpen) {
@@ -92,7 +114,13 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   @override
   void dispose() {
-    chatInputActive.value = false;
+    // Сброс после кадра: dispose идёт, пока дерево заблокировано, и
+    // слушатель (оболочка) не может перестроиться прямо сейчас.
+    if (chatEmojiPanelOpen.value) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => chatEmojiPanelOpen.value = false,
+      );
+    }
     _focus.dispose();
     _ticker?.cancel();
     _recorder.dispose();
@@ -102,7 +130,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   // ── текст ─────────────────────────────────────────────────────────────
 
-  Future<void> _sendText() async {
+  Future<void> _sendText({bool silent = false}) async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sendingText) return;
     setState(() {
@@ -112,9 +140,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     try {
       await ref
           .read(chatRepositoryProvider)
-          .send(conversationId: widget.conversationId, text: text)
+          .send(
+            conversationId: widget.conversationId,
+            text: text,
+            options: SendOptions(replyTo: widget.replyTo, silent: silent),
+          )
           .timeout(sendTimeout);
       _controller.clear();
+      widget.onReplyCleared?.call();
       _afterSend();
     } on TimeoutException catch (error) {
       AppLog.add('Отправка не дождалась ответа: $error');
@@ -133,6 +166,122 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     }
   }
 
+  // ── отправка «особым способом» (долгий тап по кнопке) ───────────────────
+
+  Future<void> _showSendOptions() async {
+    if (_controller.text.trim().isEmpty || _sendingText) return;
+    HapticFeedback.mediumImpact();
+    final mode = await showModalBottomSheet<_SendMode>(
+      context: context,
+      backgroundColor: AppColors.ink2,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (mode, icon, label) in [
+              (
+                _SendMode.silent,
+                Icons.notifications_off_outlined,
+                'Отправить без звука',
+              ),
+              (_SendMode.later, Icons.schedule, 'Отправить потом'),
+              if (widget.isDirect)
+                (
+                  _SendMode.whenOnline,
+                  Icons.person_pin_circle_outlined,
+                  'Когда будет в сети',
+                ),
+            ])
+              ListTile(
+                leading: Icon(icon, color: AppColors.textDim),
+                title: Text(label),
+                onTap: () => Navigator.of(context).pop(mode),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (mode == null || !mounted) return;
+    switch (mode) {
+      case _SendMode.silent:
+        await _sendText(silent: true);
+      case _SendMode.later:
+        await _scheduleLater();
+      case _SendMode.whenOnline:
+        await _schedule(whenOnline: true);
+    }
+  }
+
+  Future<void> _scheduleLater() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: now.add(maxScheduleLead),
+      helpText: 'Когда отправить',
+    );
+    if (date == null || !mounted) return;
+    final soon = now.add(const Duration(hours: 1));
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: soon.hour, minute: soon.minute),
+    );
+    if (time == null || !mounted) return;
+    final at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final problem = validateSendAt(at, DateTime.now());
+    if (problem != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
+      return;
+    }
+    await _schedule(sendAt: at);
+  }
+
+  Future<void> _schedule({DateTime? sendAt, bool whenOnline = false}) async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() {
+      _sendingText = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .scheduleText(
+            conversationId: widget.conversationId,
+            text: text,
+            sendAt: sendAt,
+            whenOnline: whenOnline,
+            options: SendOptions(replyTo: widget.replyTo),
+          )
+          .timeout(sendTimeout);
+      _controller.clear();
+      widget.onReplyCleared?.call();
+      ref.invalidate(scheduledMessagesProvider(widget.conversationId));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            whenOnline
+                ? 'Отправим, когда ${widget.peerName ?? 'собеседник'} появится в сети'
+                : 'Отправим ${formatScheduledAt(sendAt!, DateTime.now())}',
+          ),
+        ),
+      );
+    } on ChatFeatureUnavailable catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.toString())));
+    } on TimeoutException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Сервер не ответил. Попробуйте ещё раз')),
+      );
+    } catch (error) {
+      _fail(error, 'Не удалось запланировать сообщение');
+    } finally {
+      if (mounted) setState(() => _sendingText = false);
+    }
+  }
+
   // ── вложения ─────────────────────────────────────────────────────────────
 
   Future<void> _upload({
@@ -144,6 +293,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     List<double>? waveform,
   }) async {
     final label = name ?? kind.preview;
+    final reply = widget.replyTo;
     setState(() {
       _uploads.add(label);
       _error = null;
@@ -159,7 +309,9 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             mime: mime,
             durationMs: durationMs,
             waveform: waveform,
+            options: SendOptions(replyTo: reply),
           );
+      if (reply != null) widget.onReplyCleared?.call();
       _afterSend();
     } catch (error) {
       _fail(error, 'Не удалось отправить: $label');
@@ -408,6 +560,15 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               ),
               const SizedBox(height: 6),
             ],
+            ScheduledChip(
+              conversationId: widget.conversationId,
+              peerName: widget.peerName,
+            ),
+            if (widget.replyTo != null)
+              _ReplyBar(
+                reply: widget.replyTo!,
+                onClose: widget.onReplyCleared ?? () {},
+              ),
             if (_recording) _recordingBar() else _inputRow(hasText),
             if (_emojiOpen && !_recording)
               Padding(
@@ -461,6 +622,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               onChanged: (_) => setState(() {}),
               onTap: () {
                 if (_emojiOpen) setState(() => _emojiOpen = false);
+                _syncActive();
               },
               minLines: 1,
               maxLines: _maxLines(context),
@@ -493,11 +655,26 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
         ),
         const SizedBox(width: 4),
         if (hasText)
-          _RoundButton(
-            icon: Icons.send,
-            tooltip: 'Отправить',
-            accent: true,
-            onPressed: _sendingText ? null : _sendText,
+          // Без tooltip: его собственный долгий тап спорил бы с меню отправки.
+          Semantics(
+            label: 'Отправить',
+            customSemanticsActions: {
+              const CustomSemanticsAction(label: 'Отправить без звука'): () =>
+                  _sendText(silent: true),
+              const CustomSemanticsAction(label: 'Отправить потом'): _scheduleLater,
+              if (widget.isDirect)
+                const CustomSemanticsAction(label: 'Когда будет в сети'): () =>
+                    _schedule(whenOnline: true),
+            },
+            child: GestureDetector(
+              onLongPress: _sendingText ? null : _showSendOptions,
+              child: _RoundButton(
+                icon: Icons.send,
+                tooltip: null,
+                accent: true,
+                onPressed: _sendingText ? null : _sendText,
+              ),
+            ),
           )
         else ...[
           IconButton(
@@ -589,7 +766,7 @@ class _RoundButton extends StatelessWidget {
   });
 
   final IconData icon;
-  final String tooltip;
+  final String? tooltip;
   final VoidCallback? onPressed;
 
   /// Отправка — единственная акцентная кнопка; микрофон и остальное
@@ -647,4 +824,60 @@ String? mimeFromName(String name) {
     'apk' => 'application/vnd.android.package-archive',
     _ => null,
   };
+}
+
+enum _SendMode { silent, later, whenOnline }
+
+/// Над полем ввода: на что отвечаем. Крестик отменяет ответ.
+class _ReplyBar extends StatelessWidget {
+  const _ReplyBar({required this.reply, required this.onClose});
+
+  final ChatReply reply;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+      padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: AppColors.champagne, width: 3)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ответ: ${reply.senderName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.champagne,
+                  ),
+                ),
+                Text(
+                  reply.preview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: AppColors.textDim),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onClose,
+            tooltip: 'Отменить ответ',
+            visualDensity: VisualDensity.compact,
+            icon: Icon(Icons.close, size: 18, color: AppColors.textDim),
+          ),
+        ],
+      ),
+    );
+  }
 }

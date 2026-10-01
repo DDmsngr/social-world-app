@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/chat_message.dart';
+import '../../domain/entities/chat_meta.dart';
 import 'attachment_views.dart';
 import 'emoji_panel.dart';
 
@@ -34,10 +35,14 @@ class MessageBubble extends StatelessWidget {
       MessageKind.sticker => 1,
       _ => 0,
     };
-    final bigEmoji = emojiCount > 0;
+    // С ответом или пересылкой сообщению нужен пузырь: в нём живёт цитата.
+    final hasMeta = message.replyTo != null || message.forwardedFrom != null;
+    final bigEmoji = emojiCount > 0 && !hasMeta;
     final bare =
         bigEmoji ||
-        (message.kind == MessageKind.videoNote && message.attachment != null);
+        (!hasMeta &&
+            message.kind == MessageKind.videoNote &&
+            message.attachment != null);
     final caption = message.text?.trim() ?? '';
     final hasAttachment =
         message.attachment != null && message.kind != MessageKind.sticker;
@@ -61,6 +66,10 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
           ),
+        if (message.forwardedFrom != null)
+          _ForwardedLabel(name: message.forwardedFrom!, mine: mine),
+        if (message.replyTo != null)
+          _QuoteBlock(reply: message.replyTo!, mine: mine),
         if (bigEmoji)
           Text(
             caption,
@@ -177,4 +186,88 @@ class _Meta extends StatelessWidget {
   String _time(DateTime value) =>
       '${value.hour.toString().padLeft(2, '0')}:'
       '${value.minute.toString().padLeft(2, '0')}';
+}
+
+/// «Переслано от …» над содержимым.
+class _ForwardedLabel extends StatelessWidget {
+  const _ForwardedLabel({required this.name, required this.mine});
+
+  final String name;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.shortcut_rounded, size: 14, color: AppColors.champagne),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                'Переслано от $name',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.champagne,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Цитата сообщения, на которое это — ответ.
+class _QuoteBlock extends StatelessWidget {
+  const _QuoteBlock({required this.reply, required this.mine});
+
+  final ChatReply reply;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final dim = mine
+        ? AppColors.onBubbleMine.withValues(alpha: 0.75)
+        : AppColors.textDim;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(10, 4, 8, 4),
+      decoration: BoxDecoration(
+        color: AppColors.ink.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: AppColors.champagne, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            reply.senderName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.champagne,
+            ),
+          ),
+          Text(
+            reply.preview,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 13, color: dim),
+          ),
+        ],
+      ),
+    );
+  }
 }
