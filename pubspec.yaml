@@ -83,6 +83,8 @@ dependencies:
   audioplayers: ^6.8.1
   # Сохранение фото и видео из чата в галерею телефона.
   gal: ^2.3.3
+  flutter_contacts: ^2.5.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

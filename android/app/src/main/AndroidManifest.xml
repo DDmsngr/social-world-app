@@ -19,6 +19,8 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <!-- Приглашение друзей: показать, кто из записной книжки уже в ChaWo. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
     <application
         android:label="ChaWo"
         android:name=".MainApplication"
@@ -95,6 +97,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- «Пригласить» из контактов открывает SMS с готовым текстом. -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="sms"/>
         </intent>
     </queries>
 </manifest>

@@ -30,6 +30,7 @@ import '../../features/needs/presentation/create_need_screen.dart';
 import '../../features/needs/presentation/my_needs_screen.dart';
 import '../../features/needs/presentation/need_detail_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
+import '../../features/invite/presentation/invite_contacts_screen.dart';
 import '../../features/profile/presentation/blocked_users_screen.dart';
 import '../../features/profile/domain/profile_models.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
@@ -64,6 +65,7 @@ abstract final class Routes {
   static const settings = '/profile/settings';
   static const editProfile = '/profile/edit';
   static const blocked = '/profile/blocked';
+  static const inviteContacts = '/profile/invite-contacts';
 
   /// Профиль любого человека: ${Routes.user}/id. Свой открывается тем же
   /// экраном и показывает действия владельца.
@@ -297,6 +299,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.blocked,
         builder: (_, _) => const BlockedUsersScreen(),
+      ),
+      GoRoute(
+        path: Routes.inviteContacts,
+        builder: (_, _) => const InviteContactsScreen(),
       ),
       GoRoute(path: Routes.saved, builder: (_, _) => const SavedScreen()),
       GoRoute(
