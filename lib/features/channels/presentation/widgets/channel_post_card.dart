@@ -29,7 +29,11 @@ class ChannelPostCard extends StatelessWidget {
     final message = post.message;
     final text = message.text?.trim() ?? '';
 
+    // Тап по самому посту открывает его с обсуждением: комментарии живут
+    // внутри поста, а не в ленте канала.
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: full ? null : onComments,
       onLongPress: onLongPress,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),

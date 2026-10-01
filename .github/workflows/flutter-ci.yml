@@ -139,8 +139,12 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           YANDEX_MAPKIT_API_KEY: ${{ secrets.YANDEX_MAPKIT_API_KEY }}
         run: |
+          # Приложение ходит в API через российскую точку (Caddy на ВМ Яндекса
+          # проксирует на Supabase Cloud): supabase.co с телефонов в РФ без VPN
+          # не открывается. Секрет SUPABASE_URL остаётся адресом самого
+          # Cloud — им пользуются шаги CI (публикация релиза и т. п.).
           {
-            echo "SUPABASE_URL=${SUPABASE_URL}"
+            echo "SUPABASE_URL=https://api-socialworld.deepdrift.tech"
             echo "SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}"
             echo "YANDEX_MAPKIT_API_KEY=${YANDEX_MAPKIT_API_KEY}"
           } > .env

@@ -160,6 +160,19 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         ),
         titleTextStyle: Theme.of(context).textTheme.titleLarge,
         actions: [
+          // Подписка всегда на виду: в шапке и внизу экрана.
+          if (info != null && !info.isMember && (info.isPublic || widget.inviteToken != null))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: FilledButton(
+                onPressed: _joining ? null : _join,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                ),
+                child: const Text('Подписаться'),
+              ),
+            ),
           if (info?.isMember ?? false)
             IconButton(
               onPressed: () => showChatNotifySheet(context, widget.channelId, info!.title),
