@@ -31,6 +31,7 @@ import '../../features/needs/presentation/my_needs_screen.dart';
 import '../../features/needs/presentation/need_detail_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/channels/presentation/channel_catalog_screen.dart';
+import '../../features/chat/presentation/chat_search_screen.dart';
 import '../../features/channels/presentation/channel_info_screen.dart';
 import '../../features/channels/presentation/channel_post_screen.dart';
 import '../../features/channels/presentation/channel_screen.dart';
@@ -68,6 +69,7 @@ abstract final class Routes {
   static const create = '/create';
   static const chats = '/chats';
   static const channels = '/chats/channels';
+  static const chatSearch = '/chats/search';
   static const newChannel = '/chats/new-channel';
   static String channel(String id) => '/chats/channel/$id';
   static const profile = '/profile';
@@ -377,6 +379,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                     GoRoute(
                       path: 'new-group',
                       builder: (_, _) => const CreateGroupScreen(),
+                    ),
+                    GoRoute(
+                      path: 'search',
+                      builder: (_, _) => const ChatSearchScreen(),
                     ),
                     GoRoute(
                       path: 'new-channel',

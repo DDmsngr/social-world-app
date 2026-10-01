@@ -105,10 +105,14 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
       appBar: AppBar(
         title: const Text('Чаты'),
         actions: [
+          // Лупа ищет то, что относится к текущей вкладке: людей и чаты на
+          // «Личных» и «Группах», каналы — на «Каналах».
           IconButton(
-            onPressed: () => context.push(Routes.channels),
-            tooltip: 'Найти каналы',
-            icon: const Icon(Icons.travel_explore),
+            onPressed: () => context.push(
+              current == _Tab.channels ? Routes.channels : Routes.chatSearch,
+            ),
+            tooltip: current == _Tab.channels ? 'Найти каналы' : 'Найти человека',
+            icon: Icon(current == _Tab.channels ? Icons.travel_explore : Icons.search),
           ),
         ],
         bottom: TabBar(
