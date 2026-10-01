@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -130,18 +131,34 @@ class _HomeShellState extends ConsumerState<HomeShell>
       router.pop();
       return true;
     }
-    if (router.state.matchedLocation != Routes.home) {
-      router.go(Routes.home);
-      return true;
-    }
     return false;
+  }
+
+  /// Индекс вкладки Pulse в `StatefulShellRoute` (порядок веток в роутере).
+  static const _pulseTab = 1;
+
+  /// Со дна вкладки — на Pulse, с Pulse — выход. Без PopScope Android 14+
+  /// (targetSdk 36, предиктивный «назад») закрывал приложение сам, не
+  /// спрашивая Flutter: на корне нечего «отдавать назад», и система считала
+  /// событие своим. canPop: false сообщает системе, что «назад» обрабатываем мы.
+  void _onBackAtRoot(bool didPop, Object? result) {
+    if (didPop) return;
+    if (widget.navigationShell.currentIndex != _pulseTab) {
+      widget.navigationShell.goBranch(_pulseTab);
+    } else {
+      SystemNavigator.pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return BackButtonListener(
-      onBackButtonPressed: _onSystemBack,
-      child: _buildShell(context),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: _onBackAtRoot,
+      child: BackButtonListener(
+        onBackButtonPressed: _onSystemBack,
+        child: _buildShell(context),
+      ),
     );
   }
 
