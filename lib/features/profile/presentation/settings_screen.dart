@@ -452,11 +452,7 @@ class UpdateSettingsRow extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          // Номер предлагаемой сборки — чтобы было видно, что
-                          // именно встанет, и сравнить с «Версией» выше.
-                          state.info != null && state.hasUpdate
-                              ? '$title · ${state.info!.versionName} (${state.info!.versionCode})'
-                              : title,
+                          title,
                           style: TextStyle(
                             fontWeight: lit ? FontWeight.w600 : null,
                             color: lit ? green : null,
@@ -470,6 +466,16 @@ class UpdateSettingsRow extends ConsumerWidget {
                             color: AppColors.textDim,
                           ),
                         ),
+                        // Номер предлагаемой сборки — чтобы было видно, что
+                        // именно встанет, и сравнить с «Версией» выше.
+                        if (state.info != null && state.hasUpdate)
+                          Text(
+                            'Версия ${state.info!.versionName} (${state.info!.versionCode})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textFaint,
+                            ),
+                          ),
                       ],
                     ),
                   ),
