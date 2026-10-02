@@ -137,7 +137,12 @@ class ChatMessage {
 
   /// Строка для списка чатов.
   String get preview {
-    final caption = text?.trim();
+    // Посты каналов приходят с Markdown — в списке чатов разметка не нужна.
+    final caption = text
+        ?.replaceAllMapped(RegExp(r'\[([^\]]*)\]\([^)]*\)'), (m) => m[1]!)
+        .replaceAll(RegExp(r'[*`~]|^#+\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'\s*\n\s*'), ' ')
+        .trim();
     if (kind == MessageKind.text || kind == MessageKind.sticker) {
       return caption?.isNotEmpty == true ? caption! : kind.preview;
     }

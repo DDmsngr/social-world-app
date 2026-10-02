@@ -31,6 +31,10 @@ class MyQuestsScreen extends StatelessWidget {
             ),
           ],
           bottom: TabBar(
+            // Три подписи в Inter не помещаются в равные трети («Созданные
+            // мной» обрезалось) — вкладки по ширине текста, с прокруткой.
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: [for (final tab in MyQuestsTab.values) Tab(text: tab.label)],
           ),
         ),
