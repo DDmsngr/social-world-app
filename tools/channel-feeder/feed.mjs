@@ -12,18 +12,23 @@ const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, '');
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DRY = process.argv.includes('--dry');
 
-// everyMin — не чаще одного поста в столько минут; perRun — сколько за запуск.
+// everyMin — не чаще одного захода в столько минут; perRun — сколько постов за
+// заход; maxAgeH — насколько старый пост ещё годится (у редких каналов — дольше).
 // credit — подписывать ли источник (у мемов из своего @memepul не нужно).
+//
+// Источники проверены 02.10.2026 по дате последнего поста; мёртвые (naukapro,
+// sochi_news, vcemem и т. п.) не берём. Чем больше источников у канала, тем
+// разнообразнее лента: посты разных источников чередуются.
 const CHANNELS = [
-  { handle: 'chawo_memes', sources: ['memepul'], everyMin: 30, perRun: 1, credit: false },
-  { handle: 'chawo_news', sources: ['tass_agency', 'rbc_news'], everyMin: 30, perRun: 2 },
-  { handle: 'chawo_science', sources: ['nplusone', 'habr_com', 'rozetked'], everyMin: 60, perRun: 1 },
-  { handle: 'chawo_fashion', sources: ['LIVfashionmag', 'trendsetter', 'looktrend', 'goldchihuahua', 'beautyinsider'], everyMin: 90, perRun: 1 },
-  { handle: 'chawo_food', sources: ['thesaltmagazine', 'topretsept', 'kulinarka', 'foodblogger'], everyMin: 90, perRun: 1 },
-  { handle: 'chawo_sochi', sources: ['sochi24tv', 'sochi_online', 'sochi_today', 'sochigid'], everyMin: 45, perRun: 1 },
-  { handle: 'chawo_travel', sources: ['tutu_travel', 'aviasales'], everyMin: 120, perRun: 1 },
-  { handle: 'chawo_kino', sources: ['kinopoisk'], everyMin: 120, perRun: 1 },
-  { handle: 'chawo_sport', sources: ['sportsru', 'championat'], everyMin: 60, perRun: 1 },
+  { handle: 'chawo_memes', sources: ['memepul', 'prikol'], everyMin: 20, perRun: 2, maxAgeH: 24, credit: false },
+  { handle: 'chawo_news', sources: ['tass_agency', 'rbc_news', 'interfaxonline', 'kommersant', 'vedomosti', 'izvestia_ru', 'lentadnya', 'bbbreaking'], everyMin: 10, perRun: 2 },
+  { handle: 'chawo_science', sources: ['nplusone', 'habr_com', 'rozetked', 'postnauka', 'ixbt_official', 'tproger_official'], everyMin: 30, perRun: 2, maxAgeH: 24 },
+  { handle: 'chawo_fashion', sources: ['LIVfashionmag', 'trendsetter', 'looktrend', 'goldchihuahua', 'beautyinsider'], everyMin: 45, perRun: 2, maxAgeH: 72 },
+  { handle: 'chawo_food', sources: ['thesaltmagazine', 'topretsept', 'kulinarka', 'foodblogger'], everyMin: 45, perRun: 2, maxAgeH: 36 },
+  { handle: 'chawo_sochi', sources: ['sochi24tv', 'sochi_online', 'sochi_today', 'sochigid', 'kuban24'], everyMin: 15, perRun: 2, maxAgeH: 24 },
+  { handle: 'chawo_travel', sources: ['tutu_travel', 'aviasales'], everyMin: 60, perRun: 1, maxAgeH: 48 },
+  { handle: 'chawo_kino', sources: ['kinopoisk'], everyMin: 60, perRun: 1, maxAgeH: 72 },
+  { handle: 'chawo_sport', sources: ['sportsru', 'championat', 'sovsport'], everyMin: 20, perRun: 2 },
 ];
 
 const MAX_AGE_HOURS = 12;
@@ -141,7 +146,7 @@ export function htmlToMarkdown(html) {
 // Подвал источника: «✔ Подписывайтесь на ТАСС», «Наш канал | Прислать
 // новость», ссылка на сам канал. Срезаем короткие последние абзацы с такими
 // словами, сколько бы их ни было.
-const FOOTER_RE = /подпи[сш]|прислать\s+новост|предложить\s+новост|наш\s+канал|все\s+(?:наши\s+)?каналы|каналы\s+дня|t\.me\//iu;
+const FOOTER_RE = /подпи[сш]|прислать\s+новост|предложить\s+новост|наш\s+канал|все\s+(?:наши\s+)?каналы|каналы\s+дня|наши\s+соц\.?\s*сети|t\.me\//iu;
 
 export function stripSignature(text) {
   const lines = text.split('\n');
@@ -289,7 +294,7 @@ async function feedChannel(cfg) {
   }
 
   const results = await Promise.allSettled(cfg.sources.map(fetchChannel));
-  const fresh = Date.now() - MAX_AGE_HOURS * 3600_000;
+  const fresh = Date.now() - (cfg.maxAgeH ?? MAX_AGE_HOURS) * 3600_000;
   let candidates = results
     .flatMap((r, i) => {
       if (r.status === 'rejected') console.warn(`[${cfg.handle}] @${cfg.sources[i]}: ${r.reason.message}`);
