@@ -124,7 +124,14 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
           ],
         ),
       ),
-      floatingActionButton: fab,
+      // Scaffold поднимает кнопку только над системной полосой, а плавающая
+      // панель вкладок лежит поверх тела — поднимаем сами.
+      floatingActionButton: fab == null
+          ? null
+          : Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+              child: fab,
+            ),
       body: conversations.when(
         loading: () => const LoadingView(),
         error: (_, _) => StateMessage.error(
