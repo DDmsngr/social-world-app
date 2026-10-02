@@ -43,8 +43,21 @@ class GlassSurface extends StatelessWidget {
         borderRadius: borderRadius,
         color: fill ??
             (dark
-                ? AppColors.ink2.withValues(alpha: 0.72)
+                ? AppColors.ink2.withValues(alpha: 0.5)
                 : const Color(0x99F5F5F7)),
+        // Блик по верхней кромке: без него на спокойном фоне панель
+        // выглядит просто тёмной плашкой, а не стеклом.
+        gradient: fill == null
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(dark ? 0x26FFFFFF : 0x59FFFFFF),
+                  const Color(0x00FFFFFF),
+                ],
+                stops: const [0, 0.6],
+              )
+            : null,
         border: Border.all(
           color: dark ? const Color(0x24FFFFFF) : const Color(0x80FFFFFF),
         ),

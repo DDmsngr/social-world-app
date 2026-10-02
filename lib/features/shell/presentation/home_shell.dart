@@ -264,7 +264,7 @@ class GlassNavBar extends StatelessWidget {
           child: GlassSurface(
             // В чате под панелью только фон — размытие там не нужно, не
             // тратим на него кадры.
-            blur: compact ? 0 : 20,
+            blur: compact ? 0 : 28,
             radius: compact ? 26 : 30,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
