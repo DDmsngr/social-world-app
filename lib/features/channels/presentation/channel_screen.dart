@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -45,8 +47,53 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     });
   }
 
+  final _probes = <_SeenProbeState>{};
+  final _viewKey = GlobalKey();
+  final _centerKey = GlobalKey();
+  Timer? _seenTimer;
+  var _bottomInset = 0.0;
+  var _positioned = false;
+
+  /// Откладывает запись «дочитал досюда»: не на каждый кадр прокрутки.
+  void _scheduleSeen() {
+    _seenTimer?.cancel();
+    _seenTimer = Timer(const Duration(milliseconds: 500), _saveSeen);
+  }
+
+  /// Самый новый из постов, которые сейчас на экране, запоминается как место,
+  /// где остановились: при возвращении лента откроется на нём, даже если
+  /// новых постов набежало сотня.
+  void _saveSeen() {
+    final box = _viewKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return;
+    final top = box.localToGlobal(Offset.zero).dy;
+    final bottom = top + box.size.height - _bottomInset;
+    DateTime? newest;
+    for (final probe in _probes) {
+      final item = probe.context.findRenderObject();
+      if (item is! RenderBox || !item.attached || !item.hasSize) continue;
+      final itemTop = item.localToGlobal(Offset.zero).dy;
+      final itemBottom = itemTop + item.size.height;
+      // Пост считается увиденным, когда на экране его заметная часть.
+      if (itemTop < bottom - 24 && itemBottom > top + 24) {
+        final at = probe.widget.sentAt;
+        if (newest == null || at.isAfter(newest)) newest = at;
+      }
+    }
+    if (newest != null) ChannelSeen.save(widget.channelId, newest);
+  }
+
+  @override
+  void deactivate() {
+    // Уходим с экрана: фиксируем место, пока карточки ещё в дереве.
+    _seenTimer?.cancel();
+    _saveSeen();
+    super.deactivate();
+  }
+
   @override
   void dispose() {
+    _seenTimer?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -229,33 +276,96 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
             icon: Icons.campaign_outlined,
           );
         }
-        return RefreshIndicator(
-          onRefresh: () => ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop(),
-          child: ListView.builder(
-            controller: _scroll,
-            reverse: true,
-            padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 8, AppSpacing.gutter, 8),
-            itemCount: items.length,
-            // Ключ по id поста: новые посты встают сверху, и без ключей
+        // Без поля ввода снизу (читатель-подписчик) лента идёт под
+        // стеклянную панель вкладок — оставляем под неё место.
+        _bottomInset = info.isMember && !info.isAdmin ? MediaQuery.paddingOf(context).bottom : 0;
+        final anchor = ref.read(channelPostsProvider(widget.channelId).notifier).anchor;
+        // items — от новых к старым. Если открываемся на прежнем месте, то
+        // якорь и всё старше него растёт вверх от нижней кромки экрана, а
+        // новые посты лежат ниже и открываются прокруткой вниз.
+        final newer = anchor == null
+            ? const <ChannelPost>[]
+            : [for (final p in items.reversed) if (p.message.sentAt.isAfter(anchor)) p];
+        final older = anchor == null
+            ? items
+            : [for (final p in items) if (!p.message.sentAt.isAfter(anchor)) p];
+
+        SliverList list(List<ChannelPost> posts) => SliverList(
+          delegate: SliverChildBuilderDelegate(
+            childCount: posts.length,
+            // Ключ по id поста: новые посты встают в ленту, и без ключей
             // состояние карточек (загруженное видео, фото) съезжало бы на
             // соседний пост.
             findChildIndexCallback: (key) {
               if (key is! ValueKey<String>) return null;
-              final at = items.indexWhere((p) => p.message.id == key.value);
+              final at = posts.indexWhere((p) => p.message.id == key.value);
               return at < 0 ? null : at;
             },
-            itemBuilder: (context, index) {
-              final post = items[index];
-              return ChannelPostCard(
+            (context, index) {
+              final post = posts[index];
+              return _SeenProbe(
                 key: ValueKey(post.message.id),
-                post: post,
-                onComments: () => context.push(
-                  '${Routes.channel(widget.channelId)}/post/${post.message.id}',
-                  extra: post,
+                registry: _probes,
+                sentAt: post.message.sentAt,
+                child: ChannelPostCard(
+                  post: post,
+                  onComments: () => context.push(
+                    '${Routes.channel(widget.channelId)}/post/${post.message.id}',
+                    extra: post,
+                  ),
+                  onLongPress: info.isAdmin ? () => _deletePost(post) : null,
                 ),
-                onLongPress: info.isAdmin ? () => _deletePost(post) : null,
               );
             },
+          ),
+        );
+
+        // Открылись на прежнем месте: якорь приподнимаем над нижней кромкой
+        // (там стеклянная панель), чтобы снизу виднелись новые посты.
+        if (anchor != null && !_positioned) {
+          _positioned = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!_scroll.hasClients) return;
+            final target = -(120 + _bottomInset);
+            _scroll.jumpTo(target < _scroll.position.minScrollExtent
+                ? _scroll.position.minScrollExtent
+                : target);
+          });
+        }
+
+        _scheduleSeen();
+        return RefreshIndicator(
+          onRefresh: () => ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop(),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (_) {
+              _scheduleSeen();
+              return false;
+            },
+            child: KeyedSubtree(
+              key: _viewKey,
+              child: CustomScrollView(
+                controller: _scroll,
+                reverse: true,
+                center: _centerKey,
+                slivers: [
+                  if (newer.isNotEmpty)
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, 8 + _bottomInset),
+                      sliver: list(newer),
+                    ),
+                  SliverPadding(
+                    key: _centerKey,
+                    padding: EdgeInsets.fromLTRB(
+                      AppSpacing.gutter,
+                      8,
+                      AppSpacing.gutter,
+                      newer.isEmpty ? 8 + _bottomInset : 0,
+                    ),
+                    sliver: list(older),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
       },
@@ -306,6 +416,40 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       ),
     );
   }
+}
+
+/// Метка у карточки поста: экран спрашивает у них, какие сейчас на виду.
+class _SeenProbe extends StatefulWidget {
+  const _SeenProbe({
+    super.key,
+    required this.registry,
+    required this.sentAt,
+    required this.child,
+  });
+
+  final Set<_SeenProbeState> registry;
+  final DateTime sentAt;
+  final Widget child;
+
+  @override
+  State<_SeenProbe> createState() => _SeenProbeState();
+}
+
+class _SeenProbeState extends State<_SeenProbe> {
+  @override
+  void initState() {
+    super.initState();
+    widget.registry.add(this);
+  }
+
+  @override
+  void dispose() {
+    widget.registry.remove(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 String _subscribers(int n) {

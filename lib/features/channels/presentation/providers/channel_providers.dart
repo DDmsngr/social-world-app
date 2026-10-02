@@ -1,7 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/channels_repository.dart';
+
+/// Где человек остановился в канале: время самого нового из показанных ему
+/// постов. Хранится на устройстве и переживает закрытие приложения.
+abstract final class ChannelSeen {
+  static String _key(String channelId) => 'channel_seen_$channelId';
+
+  static Future<DateTime?> load(String channelId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key(channelId));
+      return raw == null ? null : DateTime.tryParse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Запоминает только движение вперёд: прокрутка к старым постам место не
+  /// сбрасывает.
+  static Future<void> save(String channelId, DateTime time) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final old = DateTime.tryParse(prefs.getString(_key(channelId)) ?? '');
+      if (old != null && !time.isAfter(old)) return;
+      await prefs.setString(_key(channelId), time.toUtc().toIso8601String());
+    } catch (_) {}
+  }
+}
 
 final channelsRepositoryProvider = Provider<ChannelsRepository>((ref) {
   ref.keepAlive();
@@ -21,13 +49,31 @@ class ChannelPostsController extends AsyncNotifier<List<ChannelPost>> {
   bool _hasMore = true;
   bool _loadingMore = false;
 
+  /// Время последнего поста, который человек видел при прошлом заходе, если
+  /// после него есть новые. Лента открывается на этом месте, а новые посты
+  /// лежат ниже. null — смотреть сначала нечего: открываем на самом новом.
+  DateTime? anchor;
+
   bool get hasMore => _hasMore;
 
   @override
   Future<List<ChannelPost>> build() async {
-    final page = await ref.watch(channelsRepositoryProvider).posts(channelId);
-    _hasMore = page.length >= 30;
-    return page;
+    final repo = ref.watch(channelsRepositoryProvider);
+    final seen = await ChannelSeen.load(channelId);
+    var items = await repo.posts(channelId);
+    _hasMore = items.length >= 30;
+    anchor = null;
+    if (seen != null && items.isNotEmpty && items.first.message.sentAt.isAfter(seen)) {
+      // Есть непрочитанное: докручиваем историю до места, где остановились
+      // (с запасом по числу страниц, чтобы не качать весь канал).
+      while (_hasMore && items.last.message.sentAt.isAfter(seen) && items.length < 400) {
+        final page = await repo.posts(channelId, before: items.last.message.sentAt);
+        _hasMore = page.length >= 30;
+        items = [...items, ...page];
+      }
+      if (!items.last.message.sentAt.isAfter(seen)) anchor = seen;
+    }
+    return items;
   }
 
   /// Подтянуть свежие посты, не теряя уже догруженную историю.

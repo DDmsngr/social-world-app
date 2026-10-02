@@ -268,8 +268,11 @@ class _PeoplePickerState extends ConsumerState<PeoplePicker> {
                 );
               }
               return ListView.builder(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.gutter,
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.gutter,
+                  0,
+                  AppSpacing.gutter,
+                  MediaQuery.paddingOf(context).bottom,
                 ),
                 itemCount: items.length,
                 itemBuilder: (context, index) {

@@ -35,15 +35,6 @@ class HomeShell extends ConsumerStatefulWidget {
       location.startsWith('${Routes.chats}/') &&
       location != '${Routes.chats}/new-group';
 
-  /// Корень одной из пяти вкладок, а не экран внутри неё.
-  static bool isTabRoot(String location) => const {
-    Routes.feed,
-    Routes.discover,
-    Routes.create,
-    Routes.chats,
-    Routes.profile,
-  }.contains(location);
-
   /// Нижняя навигация в переписке: только иконки, а пока открыта клавиатура
   /// или панель эмодзи — совсем без неё, место нужнее сообщениям.
   static bool showBottomNav({
@@ -179,11 +170,10 @@ class _HomeShellState extends ConsumerState<HomeShell>
     return ValueListenableBuilder<bool>(
       valueListenable: chatEmojiPanelOpen,
       builder: (context, emojiPanel, _) => Scaffold(
-        // Корневые вкладки идут под стеклянную панель (она размывает
-        // контент) — их отступы и кнопки считают высоту панели из
-        // MediaQuery.padding. Экраны внутри вкладок (чат, канал, поиск) под
-        // панель не уходят: у них внизу поле ввода и свои отступы.
-        extendBody: HomeShell.isTabRoot(widget.location),
+        // Все экраны идут под стеклянную панель (она размывает контент) —
+        // их отступы, кнопки и поля ввода (SafeArea) считают высоту панели из
+        // MediaQuery.padding.
+        extendBody: true,
         body: widget.navigationShell,
         // Именно null, а не пустой виджет: Scaffold с любой нижней панелью,
         // даже нулевой высоты, считает, что системную полосу внизу занимает
@@ -262,9 +252,7 @@ class GlassNavBar extends StatelessWidget {
           width: targetWidth,
           height: compact ? 52 : 64,
           child: GlassSurface(
-            // В чате под панелью только фон — размытие там не нужно, не
-            // тратим на него кадры.
-            blur: compact ? 0 : 28,
+            blur: 28,
             radius: compact ? 26 : 30,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
