@@ -8,6 +8,7 @@ import '../config/env.dart';
 import '../media/photo_viewer.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'inline_video.dart';
 
 /// Схемы, по которым ссылка из чужого текста вообще может открыться.
 /// Всё остальное (javascript:, intent:, file: и т. д.) тихо игнорируется.
@@ -121,6 +122,8 @@ class _MarkdownImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = uri.toString();
     final remote = uri.scheme == 'https' || uri.scheme == 'http';
+    // Видео вставляется тем же синтаксисом, что и фото: `![видео](….mp4)`.
+    if (remote && isVideoUrl(url)) return InlineVideo(url: url);
     // Локальные пути бывают только в режиме заглушек, где нет хранилища.
     final local = !Env.isConfigured && (uri.scheme == 'blob' || uri.scheme.isEmpty);
     if (!remote && !local) return const SizedBox.shrink();

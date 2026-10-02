@@ -19,6 +19,8 @@ class PostBodyEditor extends StatefulWidget {
     this.minLines = 4,
     this.maxLines = 8,
     this.onInsertImage,
+    this.onInsertVideo,
+    this.maxMedia = 10,
     this.onChanged,
   });
 
@@ -36,6 +38,12 @@ class PostBodyEditor extends StatefulWidget {
   /// Загружает фото и возвращает ссылку для вставки в текст. Не задан — кнопки
   /// «фото» нет.
   final Future<String?> Function()? onInsertImage;
+
+  /// То же для видео. Не задан — кнопки «видео» нет.
+  final Future<String?> Function()? onInsertVideo;
+
+  /// Сколько фото и видео суммарно можно вставить в текст.
+  final int maxMedia;
   final VoidCallback? onChanged;
 
   @override
@@ -87,15 +95,46 @@ class _PostBodyEditorState extends State<PostBodyEditor> {
     _notify();
   }
 
-  Future<void> _image() async {
-    final pick = widget.onInsertImage;
-    if (pick == null || _insertingImage) return;
+  static final _mediaToken = RegExp(r'!\[[^\]]*\]\([^)\s]+\)');
+
+  int get _mediaCount => _mediaToken.allMatches(_c.text).length;
+
+  /// Вставляет фото или видео отдельным блоком в место курсора: с пустыми
+  /// строками вокруг, чтобы медиа встало между абзацами, а не посреди слова.
+  void _insertBlock(String block) {
+    final value = _c.value;
+    final text = value.text;
+    final at = value.selection.isValid ? value.selection.end : text.length;
+    final before = text.substring(0, at);
+    final after = text.substring(at);
+    final lead = before.isEmpty || before.endsWith('\n\n')
+        ? ''
+        : (before.endsWith('\n') ? '\n' : '\n\n');
+    final trail = after.startsWith('\n\n')
+        ? ''
+        : (after.startsWith('\n') ? '\n' : '\n\n');
+    final inserted = '$lead$block$trail';
+    _c.value = TextEditingValue(
+      text: before + inserted + after,
+      selection: TextSelection.collapsed(offset: before.length + inserted.length),
+    );
+    _notify();
+  }
+
+  Future<void> _media(Future<String?> Function() pick, String alt) async {
+    if (_insertingImage) return;
+    if (_mediaCount >= widget.maxMedia) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('В текст можно вставить не больше ${widget.maxMedia} фото и видео'),
+        ),
+      );
+      return;
+    }
     setState(() => _insertingImage = true);
     try {
       final url = await pick();
-      if (url != null && mounted) {
-        _wrap('![', ']($url)', placeholder: 'фото');
-      }
+      if (url != null && mounted) _insertBlock('![$alt]($url)');
     } finally {
       if (mounted) setState(() => _insertingImage = false);
     }
@@ -145,17 +184,29 @@ class _PostBodyEditorState extends State<PostBodyEditor> {
                         'Ссылка',
                         () => _wrap('[', '](https://)', placeholder: 'текст ссылки'),
                       ),
-                      if (widget.onInsertImage != null)
-                        _insertingImage
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              )
-                            : _Tool(Icons.image_outlined, 'Фото в текст', _image),
+                      if (_insertingImage)
+                        const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else ...[
+                        if (widget.onInsertImage != null)
+                          _Tool(
+                            Icons.image_outlined,
+                            'Фото в текст',
+                            () => _media(widget.onInsertImage!, 'фото'),
+                          ),
+                        if (widget.onInsertVideo != null)
+                          _Tool(
+                            Icons.videocam_outlined,
+                            'Видео в текст',
+                            () => _media(widget.onInsertVideo!, 'видео'),
+                          ),
+                      ],
                     ],
                   ),
                 ),
@@ -186,18 +237,31 @@ class _PostBodyEditorState extends State<PostBodyEditor> {
                 : MarkdownView(data: _c.text),
           )
         else
-          TextField(
-            controller: _c,
-            minLines: widget.minLines,
-            maxLines: widget.maxLines,
-            maxLength: widget.maxLength,
-            keyboardType: TextInputType.multiline,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              hintText: widget.hint,
-              alignLabelWithHint: true,
+          // Высота поля ограничена видимой частью экрана над клавиатурой:
+          // длинный текст прокручивается внутри поля. Иначе при «выделить
+          // всё» поле было выше экрана, ручки выделения и «Копировать»
+          // уезжали за край.
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight:
+                  ((MediaQuery.sizeOf(context).height -
+                              MediaQuery.viewInsetsOf(context).bottom) *
+                          0.5)
+                      .clamp(220.0, 600.0),
             ),
-            onChanged: (_) => _notify(),
+            child: TextField(
+              controller: _c,
+              minLines: widget.minLines,
+              maxLines: null,
+              maxLength: widget.maxLength,
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                alignLabelWithHint: true,
+              ),
+              onChanged: (_) => _notify(),
+            ),
           ),
       ],
     );

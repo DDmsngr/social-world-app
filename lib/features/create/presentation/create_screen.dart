@@ -236,6 +236,29 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     }
   }
 
+  /// Видео в тексте статьи: до минуты (как вложение), заливается заранее.
+  /// Тот же загрузчик, что и для фото: он просто кладёт файл в `post-media`.
+  Future<String?> _insertInlineVideo() async {
+    final file = await _picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 1),
+    );
+    if (file == null) return null;
+    try {
+      return await ref.read(feedRepositoryProvider).uploadInlineImage(file.path);
+    } catch (error) {
+      AppLog.add('Видео в текст не загрузилось: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(friendlyError(error, fallback: 'Видео не загрузилось')),
+          ),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> _pickStartsAt() async {
     final now = DateTime.now();
     final date = await showDatePicker(
@@ -378,6 +401,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               maxLines: 24,
               hint: 'Текст статьи',
               onInsertImage: _insertInlineImage,
+              onInsertVideo: _insertInlineVideo,
               onChanged: () => setState(() {}),
             ),
           ],

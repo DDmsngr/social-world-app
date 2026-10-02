@@ -132,6 +132,25 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
     }
   }
 
+  Future<String?> _insertVideo() async {
+    final file = await _picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 1),
+    );
+    if (file == null) return null;
+    try {
+      return await ref.read(feedRepositoryProvider).uploadInlineImage(file.path);
+    } catch (error) {
+      AppLog.add('Видео в текст не загрузилось: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(error, fallback: 'Видео не загрузилось'))),
+        );
+      }
+      return null;
+    }
+  }
+
   Future<void> _save() async {
     final post = _post;
     if (post == null) return;
@@ -214,6 +233,7 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
             maxLines: _isArticle ? 24 : 8,
             hint: _isArticle ? 'Текст статьи' : 'Текст',
             onInsertImage: _isArticle ? _insertImage : null,
+            onInsertVideo: _isArticle ? _insertVideo : null,
             onChanged: () => setState(() {}),
           ),
           const SizedBox(height: 12),
