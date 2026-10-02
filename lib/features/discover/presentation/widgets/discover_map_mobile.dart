@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:yandex_maps_mapkit/image.dart' as ymi;
 import 'package:yandex_maps_mapkit/mapkit.dart' as ymk;
 import 'package:yandex_maps_mapkit/mapkit_factory.dart';
 import 'package:yandex_maps_mapkit/yandex_map.dart';
@@ -10,6 +12,7 @@ import '../../../../core/config/mapkit_boot.dart';
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/location/device_position.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/widgets/sw_widgets.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../events/domain/entities/event.dart';
@@ -23,6 +26,7 @@ import '../providers/discover_providers.dart';
 import 'activity_palette.dart';
 import 'location_dot.dart';
 import 'map_types.dart';
+import 'quest_marker_icon.dart';
 
 class DiscoverMap extends StatefulWidget {
   const DiscoverMap({
@@ -461,18 +465,32 @@ class _DiscoverMapState extends State<DiscoverMap> {
       collection.addPlacemarkWithPoint(
           ymk.Point(latitude: quest.latitude!, longitude: quest.longitude!),
         )
-        ..setText(
-          quest.isTrail
-              ? _short(quest.title, 30)
-              : '${_short(quest.title, 30)} · ${quest.occupancy}',
+        // Круглая метка с фото квеста и пилюлей «0/8»; название — под ней.
+        ..setIcon(
+          ymi.ImageProvider(
+            () => renderQuestMarker(
+              photo: quest.photoUrl == null ? null : imageProviderFor(quest.photoUrl!),
+              badge: quest.occupancy,
+              trail: quest.isTrail,
+            ),
+            id: 'quest:${quest.id}:${quest.photoUrl}:${quest.occupancy}:${quest.isTrail}',
+          ),
         )
+        ..setIconStyle(
+          const ymk.IconStyle(
+            anchor: math.Point(0.5, 0.38),
+            scale: 0.5,
+            zIndex: 7,
+          ),
+        )
+        ..setText(_short(quest.title, 26))
         ..setTextStyle(
           ymk.TextStyle(
-            size: quest.isTrail ? 11 : 13,
-            color: quest.isTrail ? AppColors.textDim : AppColors.primaryTint,
+            size: quest.isTrail ? 11 : 12.5,
+            color: quest.isTrail ? AppColors.textDim : AppColors.text,
             outlineColor: AppColors.ink,
-            placement: ymk.TextStylePlacement.Top,
-            offset: 8,
+            placement: ymk.TextStylePlacement.Bottom,
+            offset: 2,
           ),
         )
         ..zIndex = 7

@@ -71,6 +71,9 @@ Future<ui.Image> renderPhotoMarkerIcon(ImageProvider source, {int size = 132}) a
   }
 }
 
+/// Декодированная картинка провайдера — для рисования своих меток на карте.
+Future<ui.Image> resolveUiImage(ImageProvider provider) => _resolve(provider);
+
 Future<ui.Image> _resolve(ImageProvider provider) {
   final completer = Completer<ui.Image>();
   final stream = provider.resolve(ImageConfiguration.empty);
