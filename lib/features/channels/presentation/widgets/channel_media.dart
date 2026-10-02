@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,10 +11,10 @@ import '../../../chat/domain/entities/chat_message.dart';
 import '../../../chat/presentation/providers/chat_providers.dart';
 import '../../../chat/presentation/widgets/attachment_views.dart';
 
-/// Вложение поста канала. В ленте у фото и видео фиксированная рамка (фото —
-/// 4:3, видео — 16:9, обрезка «cover»): размеры файла заранее неизвестны, и
-/// если подгонять рамку под них после загрузки, каждый пост в прокрутке
-/// «прыгал» бы по высоте, а список дёргался. Полный кадр — в просмотрщике.
+/// Вложение поста канала. Фото показывается целиком, в своих пропорциях
+/// (в разумных пределах 0.6–2.4); пока файл не пришёл, рамка 4:3. Пропорции
+/// запоминаются, поэтому пост, который уже показывали, при прокрутке не
+/// меняет высоту. Видео — рамка 16:9.
 class ChannelMedia extends StatelessWidget {
   const ChannelMedia({super.key, required this.message});
 
@@ -45,10 +46,33 @@ class _ChannelPhoto extends ConsumerStatefulWidget {
 }
 
 class _ChannelPhotoState extends ConsumerState<_ChannelPhoto> {
-  late Future<String> _file = _fetch();
+  /// Пропорции уже показанных фото: при возврате к посту в прокрутке рамка
+  /// сразу нужной высоты, и список не прыгает.
+  static final _ratios = <String, double>{};
 
-  Future<String> _fetch() =>
-      ref.read(chatRepositoryProvider).attachmentFile(widget.message);
+  late Future<({String path, double ratio})> _file = _fetch();
+
+  Future<({String path, double ratio})> _fetch() async {
+    final path = await ref.read(chatRepositoryProvider).attachmentFile(widget.message);
+    var ratio = _ratios[widget.message.id];
+    if (ratio == null) {
+      try {
+        final bytes = await File(path).readAsBytes();
+        final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+        final descriptor = await ui.ImageDescriptor.encoded(buffer);
+        ratio = descriptor.width / descriptor.height;
+        descriptor.dispose();
+        buffer.dispose();
+      } catch (_) {
+        ratio = 4 / 3;
+      }
+      // Совсем узкие и совсем широкие кадры чуть обрезаются: иначе один
+      // скриншот на всю высоту экрана съел бы ленту. Полный кадр — по тапу.
+      ratio = ratio.clamp(0.6, 2.4);
+      _ratios[widget.message.id] = ratio;
+    }
+    return (path: path, ratio: ratio);
+  }
 
   @override
   void didUpdateWidget(_ChannelPhoto old) {
@@ -58,37 +82,41 @@ class _ChannelPhotoState extends ConsumerState<_ChannelPhoto> {
 
   @override
   Widget build(BuildContext context) {
-    return AspectRatio(
-      aspectRatio: 4 / 3,
-      child: FutureBuilder<String>(
-        future: _file,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            AppLog.add('Фото канала не скачалось: ${snapshot.error}');
-            return InkWell(
-              onTap: () => setState(() => _file = _fetch()),
-              child: ColoredBox(
-                color: AppColors.card,
-                child: Center(
-                  child: Icon(Icons.refresh, color: AppColors.textFaint),
-                ),
-              ),
-            );
-          }
-          final path = snapshot.data;
-          if (path == null) return ColoredBox(color: AppColors.card);
-          return GestureDetector(
-            onTap: () => showPhotoViewer(context, urls: [path]),
-            child: Image.file(
-              File(path),
-              fit: BoxFit.cover,
-              // Лента не должна декодировать полноразмерный кадр ради
-              // превью в 400 px шириной.
-              cacheWidth: 900,
-              gaplessPlayback: true,
-            ),
-          );
-        },
+    return FutureBuilder<({String path, double ratio})>(
+      future: _file,
+      builder: (context, snapshot) {
+        final loaded = snapshot.data;
+        return AspectRatio(
+          // Пока файл не пришёл — 4:3; пришёл — фото целиком, в своих
+          // пропорциях.
+          aspectRatio: loaded?.ratio ?? _ratios[widget.message.id] ?? 4 / 3,
+          child: _body(snapshot),
+        );
+      },
+    );
+  }
+
+  Widget _body(AsyncSnapshot<({String path, double ratio})> snapshot) {
+    if (snapshot.hasError) {
+      AppLog.add('Фото канала не скачалось: ${snapshot.error}');
+      return InkWell(
+        onTap: () => setState(() => _file = _fetch()),
+        child: ColoredBox(
+          color: AppColors.card,
+          child: Center(child: Icon(Icons.refresh, color: AppColors.textFaint)),
+        ),
+      );
+    }
+    final loaded = snapshot.data;
+    if (loaded == null) return ColoredBox(color: AppColors.card);
+    return GestureDetector(
+      onTap: () => showPhotoViewer(context, urls: [loaded.path]),
+      child: Image.file(
+        File(loaded.path),
+        fit: BoxFit.cover,
+        // Лента не должна декодировать полноразмерный кадр ради превью.
+        cacheWidth: 900,
+        gaplessPlayback: true,
       ),
     );
   }

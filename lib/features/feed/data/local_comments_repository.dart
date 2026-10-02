@@ -46,14 +46,8 @@ class LocalCommentsRepository implements CommentsRepository {
   }
 
   @override
-  Future<Comment> toggleLike(Comment comment) async {
-    final liked = !comment.likedByMe;
-    final updated = comment.copyWith(
-      likedByMe: liked,
-      likeCount: comment.likeCount + (liked ? 1 : -1),
-    );
-    _replace(updated);
-    return updated;
+  Future<void> setVote(Comment comment, int vote) async {
+    _replace(comment.withVote(vote));
   }
 
   @override

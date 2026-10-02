@@ -93,33 +93,12 @@ class SupabaseCommentsRepository implements CommentsRepository {
   }
 
   @override
-  Future<Comment> toggleLike(Comment comment) async {
-    if (channelPostOf(comment.postId) != null) {
-      final liked = await _client.rpc(
-        'channel_comment_toggle_like',
-        params: {'in_comment': comment.id},
-      ) as bool;
-      return comment.copyWith(
-        likedByMe: liked,
-        likeCount: comment.likeCount + (liked ? 1 : -1),
-      );
-    }
-    if (comment.likedByMe) {
-      await _client.from('comment_likes').delete().match({
-        'comment_id': comment.id,
-        'profile_id': _userId,
-      });
-    } else {
-      await _client.from('comment_likes').insert({
-        'comment_id': comment.id,
-        'profile_id': _userId,
-      });
-    }
-
-    final liked = !comment.likedByMe;
-    return comment.copyWith(
-      likedByMe: liked,
-      likeCount: comment.likeCount + (liked ? 1 : -1),
+  Future<void> setVote(Comment comment, int vote) async {
+    await _client.rpc(
+      channelPostOf(comment.postId) == null
+          ? 'comment_set_vote'
+          : 'channel_comment_set_vote',
+      params: {'in_comment': comment.id, 'in_vote': vote},
     );
   }
 
@@ -155,6 +134,8 @@ class SupabaseCommentsRepository implements CommentsRepository {
     depth: (row['depth'] as num?)?.toInt() ?? 0,
     likeCount: (row['like_count'] as num?)?.toInt() ?? 0,
     likedByMe: row['liked_by_me'] as bool? ?? false,
+    dislikeCount: (row['dislike_count'] as num?)?.toInt() ?? 0,
+    dislikedByMe: row['disliked_by_me'] as bool? ?? false,
     deleted: row['deleted'] as bool? ?? false,
   );
 }

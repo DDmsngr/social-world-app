@@ -13,7 +13,9 @@ abstract interface class CommentsRepository {
     Comment? parent,
   });
 
-  Future<Comment> toggleLike(Comment comment);
+  /// Голос за комментарий: 1 — нравится, -1 — не нравится, 0 — снять голос.
+  /// Один голос на человека: новый заменяет прежний.
+  Future<void> setVote(Comment comment, int vote);
 
   /// Удаление мягкое: узел остаётся в дереве, чтобы ответы не пропали вместе
   /// с ним.

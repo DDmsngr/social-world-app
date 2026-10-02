@@ -212,6 +212,9 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                         onLike: () => ref
                             .read(commentsProvider(widget.postId).notifier)
                             .toggleLike(row.comment),
+                        onDislike: () => ref
+                            .read(commentsProvider(widget.postId).notifier)
+                            .toggleDislike(row.comment),
                         onReply: () => _reply(row.comment),
                         onToggleCollapse: () => setState(() {
                           if (!_collapsed.remove(row.comment.id)) {

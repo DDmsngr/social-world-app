@@ -8,6 +8,7 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/sheet_parts.dart';
 import '../../../../core/widgets/sw_widgets.dart';
 import '../../domain/entities/quest.dart';
 import '../providers/quests_providers.dart';
@@ -27,26 +28,6 @@ Future<void> showQuestSheet(BuildContext context, Quest quest) =>
         child: SheetCard(child: _QuestSheet(fallback: quest)),
       ),
     );
-
-class _Fact extends StatelessWidget {
-  const _Fact({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: AppColors.textDim),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
-      ],
-    ),
-  );
-}
 
 class _QuestSheet extends ConsumerWidget {
   const _QuestSheet({required this.fallback});
@@ -79,34 +60,7 @@ class _QuestSheet extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
           ],
-          // Сразу видно, что это квест, и когда он.
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'КВЕСТ',
-                  style: TextStyle(
-                    color: AppColors.onPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  formatQuestWhen(quest),
-                  style: TextStyle(color: AppColors.textDim, fontSize: 13),
-                ),
-              ),
-            ],
-          ),
+          SheetKindHeader(kind: 'Квест', detail: formatQuestWhen(quest)),
           const SizedBox(height: 10),
           Text(quest.title, style: AppTypography.serif(26)),
           const SizedBox(height: 6),
@@ -141,21 +95,17 @@ class _QuestSheet extends ConsumerWidget {
           ],
           const SizedBox(height: 10),
           if (quest.placeTitle != null)
-            _Fact(icon: Icons.place_outlined, text: quest.placeTitle!),
-          _Fact(icon: Icons.group_outlined, text: formatOccupancy(quest)),
+            SheetFact(icon: Icons.place_outlined, text: quest.placeTitle!),
+          SheetFact(icon: Icons.group_outlined, text: formatOccupancy(quest)),
           if (quest.extraInfo != null && quest.extraInfo!.trim().isNotEmpty)
-            _Fact(icon: Icons.info_outline, text: quest.extraInfo!.trim()),
+            SheetFact(icon: Icons.info_outline, text: quest.extraInfo!.trim()),
           // «Подробнее» сразу под описанием, а не в самом низу за кнопками.
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36)),
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.push('${Routes.questDetail}/${quest.id}', extra: quest);
-              },
-              child: const Text('Подробнее о квесте →'),
-            ),
+          SheetMoreLink(
+            label: 'Подробнее о квесте →',
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.push('${Routes.questDetail}/${quest.id}', extra: quest);
+            },
           ),
           const SizedBox(height: 8),
           QuestActionPanel(quest: quest, compact: true),

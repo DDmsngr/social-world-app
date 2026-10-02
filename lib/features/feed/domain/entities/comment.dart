@@ -16,6 +16,8 @@ class Comment {
     this.mediaUrls = const [],
     this.likeCount = 0,
     this.likedByMe = false,
+    this.dislikeCount = 0,
+    this.dislikedByMe = false,
     this.deleted = false,
   });
 
@@ -38,13 +40,29 @@ class Comment {
   final int depth;
   final int likeCount;
   final bool likedByMe;
+  final int dislikeCount;
+  final bool dislikedByMe;
   final bool deleted;
 
   bool get hasMedia => mediaUrls.isNotEmpty;
 
+  /// Голос человека: 1 — нравится, -1 — не нравится, 0 — без голоса.
+  int get myVote => likedByMe ? 1 : (dislikedByMe ? -1 : 0);
+
+  /// Комментарий после голоса [vote] (1, -1 или 0): счётчики пересчитываются
+  /// сразу, не дожидаясь ответа сервера.
+  Comment withVote(int vote) => copyWith(
+    likedByMe: vote == 1,
+    dislikedByMe: vote == -1,
+    likeCount: likeCount - (likedByMe ? 1 : 0) + (vote == 1 ? 1 : 0),
+    dislikeCount: dislikeCount - (dislikedByMe ? 1 : 0) + (vote == -1 ? 1 : 0),
+  );
+
   Comment copyWith({
     int? likeCount,
     bool? likedByMe,
+    int? dislikeCount,
+    bool? dislikedByMe,
     bool? deleted,
     String? body,
   }) {
@@ -61,6 +79,8 @@ class Comment {
       depth: depth,
       likeCount: likeCount ?? this.likeCount,
       likedByMe: likedByMe ?? this.likedByMe,
+      dislikeCount: dislikeCount ?? this.dislikeCount,
+      dislikedByMe: dislikedByMe ?? this.dislikedByMe,
       deleted: deleted ?? this.deleted,
     );
   }

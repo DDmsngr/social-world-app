@@ -12,7 +12,9 @@ void main() {
 
   setUp(() {
     me = 'nika';
-    now = DateTime(2026, 9, 25, 12);
+    // Текущее время: `isVisible` сверяется с настоящими часами, а с зашитой
+    // датой срок «неделя» однажды истекал и тест краснел сам по себе.
+    now = DateTime.now();
     repo = LocalNeedsRepository(
       currentUserId: () => me,
       currentUserName: () => me,

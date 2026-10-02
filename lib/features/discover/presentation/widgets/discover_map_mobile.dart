@@ -21,6 +21,7 @@ import '../../domain/entities/nearby_person.dart';
 import '../../domain/entities/place.dart';
 import '../providers/discover_providers.dart';
 import 'activity_palette.dart';
+import 'location_dot.dart';
 import 'map_types.dart';
 
 class DiscoverMap extends StatefulWidget {
@@ -91,6 +92,9 @@ class _DiscoverMapState extends State<DiscoverMap> {
   ymk.MapObjectCollection? _objects;
   ymk.MapWindow? _window;
   ymk.UserLocationLayer? _userLocationLayer;
+
+  /// Слой геопозиции держит слушателя слабой ссылкой — храним тут.
+  final _locationDot = LocationDotListener();
 
   // Слушатели тапов живут ровно столько же, сколько метки: MapKit держит
   // на них слабую ссылку, и без своего списка они собираются сборщиком,
@@ -213,6 +217,7 @@ class _DiscoverMapState extends State<DiscoverMap> {
     if (!await hasLocationPermission()) return;
     if (!mounted || _window != window) return;
     _userLocationLayer = mapkit.createUserLocationLayer(window)
+      ..setObjectListener(_locationDot)
       ..setVisible(true)
       ..setDefaultSource();
   }

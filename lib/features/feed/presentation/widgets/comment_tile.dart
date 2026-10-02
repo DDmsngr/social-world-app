@@ -16,6 +16,7 @@ class CommentTile extends StatelessWidget {
     required this.collapsed,
     required this.isMine,
     required this.onLike,
+    required this.onDislike,
     required this.onReply,
     required this.onToggleCollapse,
     required this.onDelete,
@@ -30,6 +31,7 @@ class CommentTile extends StatelessWidget {
   final bool collapsed;
   final bool isMine;
   final VoidCallback onLike;
+  final VoidCallback onDislike;
   final VoidCallback onReply;
   final VoidCallback onToggleCollapse;
   final VoidCallback onDelete;
@@ -146,6 +148,16 @@ class CommentTile extends StatelessWidget {
                     onTap: comment.deleted ? null : onLike,
                   ),
                   _Action(
+                    icon: comment.dislikedByMe
+                        ? Icons.thumb_down
+                        : Icons.thumb_down_outlined,
+                    label: '${comment.dislikeCount}',
+                    color: comment.dislikedByMe
+                        ? AppColors.textDim
+                        : AppColors.textFaint,
+                    onTap: comment.deleted ? null : onDislike,
+                  ),
+                  _Action(
                     icon: Icons.reply,
                     label: 'Ответить',
                     color: AppColors.textFaint,
@@ -158,9 +170,36 @@ class CommentTile extends StatelessWidget {
                       color: AppColors.textFaint,
                       onTap: onDelete,
                     ),
+                  const Spacer(),
+                  // Свернуть ветку явной кнопкой: раньше это было только
+                  // тапом по шапке, и про него никто не знал.
+                  _Action(
+                    icon: Icons.unfold_less,
+                    label: 'Свернуть',
+                    color: AppColors.textFaint,
+                    onTap: onToggleCollapse,
+                  ),
                 ],
               ),
-            ],
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: TextButton.icon(
+                  onPressed: onToggleCollapse,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.unfold_more, size: 16),
+                  label: Text(
+                    hiddenReplies > 0
+                        ? 'Развернуть · ещё $hiddenReplies'
+                        : 'Развернуть',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

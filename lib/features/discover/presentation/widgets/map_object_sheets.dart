@@ -10,6 +10,7 @@ import '../../../../core/share/share_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/sheet_parts.dart';
 import '../../../../core/widgets/sw_widgets.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
@@ -94,19 +95,10 @@ class _EventSheet extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
         ],
-        SectionLabel(_when(event.startsAt)),
+        SheetKindHeader(kind: 'Событие', detail: _when(event.startsAt)),
         const SizedBox(height: 10),
         Text(event.title, style: AppTypography.serif(26)),
-        const SizedBox(height: 8),
-        Text(
-          [
-            if (event.placeTitle != null) event.placeTitle!,
-            ?distance,
-            '${event.participantCount} идёт',
-          ].join(' · '),
-          style: theme.textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         InkWell(
           onTap: () {
             Navigator.of(context).pop();
@@ -127,16 +119,33 @@ class _EventSheet extends ConsumerWidget {
             ),
           ),
         ),
-        if (event.description != null && event.description!.isNotEmpty) ...[
+        if (event.description != null && event.description!.trim().isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
-            event.description!,
+            event.description!.trim(),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodyMedium,
           ),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
+        if (event.placeTitle != null)
+          SheetFact(
+            icon: Icons.place_outlined,
+            text: [event.placeTitle!, ?distance].join(' · '),
+          ),
+        SheetFact(
+          icon: Icons.group_outlined,
+          text: 'Участники: ${event.participantCount}',
+        ),
+        SheetMoreLink(
+          label: 'Подробнее о событии →',
+          onPressed: () {
+            Navigator.of(context).pop();
+            context.push('${Routes.eventDetail}/${event.id}', extra: event);
+          },
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -185,16 +194,6 @@ class _EventSheet extends ConsumerWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Center(
-          child: TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.push('${Routes.eventDetail}/${event.id}', extra: event);
-            },
-            child: const Text('Подробнее'),
-          ),
-        ),
       ],
     );
   }
@@ -221,12 +220,17 @@ class _PlaceSheet extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionLabel(place.category ?? 'Место'),
-        const SizedBox(height: 12),
+        SheetKindHeader(kind: 'Место', detail: place.category),
+        const SizedBox(height: 10),
         Text(place.title, style: AppTypography.serif(28)),
         if (place.description != null) ...[
-          const SizedBox(height: 10),
-          Text(place.description!, style: theme.textTheme.bodyMedium),
+          const SizedBox(height: 8),
+          Text(
+            place.description!,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium,
+          ),
         ],
         const SizedBox(height: 12),
         Text(

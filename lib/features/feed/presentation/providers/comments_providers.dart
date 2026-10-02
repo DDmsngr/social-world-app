@@ -57,8 +57,20 @@ class CommentsController extends AsyncNotifier<List<Comment>> {
     );
   }
 
-  Future<void> toggleLike(Comment comment) async {
-    _replace(await ref.read(commentsRepositoryProvider).toggleLike(comment));
+  Future<void> toggleLike(Comment comment) =>
+      _vote(comment, comment.likedByMe ? 0 : 1);
+
+  Future<void> toggleDislike(Comment comment) =>
+      _vote(comment, comment.dislikedByMe ? 0 : -1);
+
+  /// Счётчики меняются сразу; если сервер не принял голос — возвращаем как было.
+  Future<void> _vote(Comment comment, int vote) async {
+    _replace(comment.withVote(vote));
+    try {
+      await ref.read(commentsRepositoryProvider).setVote(comment, vote);
+    } catch (_) {
+      _replace(comment);
+    }
   }
 
   Future<void> delete(Comment comment) async {

@@ -117,6 +117,7 @@ class _ChannelPostScreenState extends ConsumerState<ChannelPostScreen> {
                         collapsed: row.collapsed,
                         isMine: row.comment.authorId == myId,
                         onLike: () => ref.read(commentsProvider(_key).notifier).toggleLike(row.comment),
+                        onDislike: () => ref.read(commentsProvider(_key).notifier).toggleDislike(row.comment),
                         onReply: () {
                           setState(() => _replyTo = row.comment);
                           _focusNode.requestFocus();
