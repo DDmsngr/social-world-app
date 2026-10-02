@@ -385,7 +385,7 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
   }.toList()..sort();
 
   return showModalBottomSheet<void>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
@@ -543,7 +543,7 @@ Future<void> showNearbySheet(
   required void Function(MapSearchResult result) onSelect,
 }) {
   return showModalBottomSheet<void>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

@@ -16,7 +16,7 @@ import '../providers/quests_providers.dart';
 /// Под QR — тот же код текстом для ручного ввода.
 Future<void> showQuestQrSheet(BuildContext context, Quest quest) {
   return showModalBottomSheet<void>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

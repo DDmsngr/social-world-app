@@ -40,7 +40,7 @@ String formatResponses(int n) {
 /// Просьба поверх Pulse: текст, автор, где примерно, кнопка «Могу помочь».
 Future<void> showNeedSheet(BuildContext context, NeedRequest need) =>
     showModalBottomSheet<void>(
-      context: context,
+      context: context, useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -178,7 +178,7 @@ class _NeedRespondButtonState extends ConsumerState<NeedRespondButton> {
 /// продукте пока нет. Возвращает текст (может быть пустым) или `null`.
 Future<String?> showNeedResponseSheet(BuildContext context) {
   return showModalBottomSheet<String>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

@@ -13,7 +13,7 @@ Future<void> showChatNotifySheet(
   String title,
 ) {
   return showModalBottomSheet<void>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: AppColors.ink2,

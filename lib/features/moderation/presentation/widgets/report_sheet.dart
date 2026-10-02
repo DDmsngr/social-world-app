@@ -18,7 +18,7 @@ Future<bool> showReportSheet(
   String? authorId,
 }) async {
   final sent = await showModalBottomSheet<bool>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

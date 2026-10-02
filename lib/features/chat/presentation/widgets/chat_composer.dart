@@ -172,7 +172,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     if (_controller.text.trim().isEmpty || _sendingText) return;
     HapticFeedback.mediumImpact();
     final mode = await showModalBottomSheet<_SendMode>(
-      context: context,
+      context: context, useRootNavigator: true,
       backgroundColor: AppColors.ink2,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -322,7 +322,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   Future<void> _showAttachMenu() async {
     final choice = await showModalBottomSheet<String>(
-      context: context,
+      context: context, useRootNavigator: true,
       backgroundColor: AppColors.ink2,
       showDragHandle: true,
       builder: (context) => SafeArea(

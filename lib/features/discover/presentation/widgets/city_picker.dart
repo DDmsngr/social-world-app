@@ -12,7 +12,7 @@ import '../providers/city_provider.dart';
 /// где включён телефон (ТЗ, п. 10).
 Future<void> showCityPicker(BuildContext context) {
   return showModalBottomSheet<void>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

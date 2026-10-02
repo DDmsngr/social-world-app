@@ -64,7 +64,7 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
     }
 
     final title = await showModalBottomSheet<String>(
-      context: context,
+      context: context, useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,

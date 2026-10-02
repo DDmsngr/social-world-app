@@ -14,7 +14,7 @@ import '../providers/referrals_providers.dart';
 /// (старый телефон, приложение поставили позже, код переслали текстом).
 Future<void> showReferralCodeSheet(BuildContext context) {
   return showModalBottomSheet<void>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

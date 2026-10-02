@@ -424,7 +424,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         .read(chatRepositoryProvider)
         .securityCode(widget.conversationId);
     await showModalBottomSheet<void>(
-      context: context,
+      context: context, useRootNavigator: true,
       backgroundColor: AppColors.ink2,
       showDragHandle: true,
       builder: (context) => SafeArea(

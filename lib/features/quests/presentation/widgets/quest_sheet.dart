@@ -17,7 +17,7 @@ import 'quest_format.dart';
 /// главная кнопка по состоянию и «Подробнее».
 Future<void> showQuestSheet(BuildContext context, Quest quest) =>
     showModalBottomSheet<void>(
-      context: context,
+      context: context, useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

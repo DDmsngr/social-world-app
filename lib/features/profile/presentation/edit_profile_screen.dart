@@ -65,7 +65,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   void _chooseAvatarSource() {
     showModalBottomSheet<void>(
-      context: context,
+      context: context, useRootNavigator: true,
       useSafeArea: true,
       backgroundColor: AppColors.ink2,
       builder: (sheet) => SafeArea(

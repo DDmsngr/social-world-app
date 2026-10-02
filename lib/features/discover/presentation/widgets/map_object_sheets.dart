@@ -27,7 +27,7 @@ import '../providers/discover_providers.dart';
 /// карта → объект → действие → карта не рвётся.
 Future<void> _show(BuildContext context, Widget child) =>
     showModalBottomSheet<void>(
-      context: context,
+      context: context, useRootNavigator: true,
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

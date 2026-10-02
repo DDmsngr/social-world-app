@@ -11,7 +11,7 @@ import '../../domain/entities/quest.dart';
 /// QR у организатора. Возвращает введённый код или `null`.
 Future<String?> showArrivalCodeSheet(BuildContext context) {
   return showModalBottomSheet<String>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

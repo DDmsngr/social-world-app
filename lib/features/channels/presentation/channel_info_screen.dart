@@ -178,7 +178,7 @@ class ChannelInfoScreen extends ConsumerWidget {
     var topic = info.topic;
 
     final save = await showModalBottomSheet<bool>(
-      context: context,
+      context: context, useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.ink2,

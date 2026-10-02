@@ -116,7 +116,7 @@ Future<void> changePostSettings(
   }
 
   final chosen = await showModalBottomSheet<PublishSettings>(
-    context: context,
+    context: context, useRootNavigator: true,
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
