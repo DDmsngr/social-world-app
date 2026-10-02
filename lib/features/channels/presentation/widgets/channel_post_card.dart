@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/markdown_view.dart';
-import '../../../chat/presentation/widgets/attachment_views.dart';
 import '../../data/channels_repository.dart';
+import 'channel_media.dart';
 
 /// Пост канала. Текст — Markdown (ссылки из источника открываются после
 /// подтверждения), вложение — тот же виджет, что в чатах.
@@ -46,14 +46,7 @@ class ChannelPostCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (message.attachment != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: AttachmentView(message: message, mine: false),
-                ),
-              ),
+            if (message.attachment != null) ChannelMedia(message: message),
             if (text.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

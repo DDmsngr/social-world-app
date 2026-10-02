@@ -170,11 +170,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
     return ValueListenableBuilder<bool>(
       valueListenable: chatEmojiPanelOpen,
       builder: (context, emojiPanel, _) => Scaffold(
-        // Панель плавает над контентом (макет «Liquid Glass»): тело уходит под
-        // неё, а Scaffold сам добавляет её высоту в нижний отступ
-        // MediaQuery — экраны с SafeArea и AppSpacing.page не прячут
-        // последние строки и поле ввода под стекло.
-        extendBody: true,
+        // Тело НЕ уходит под панель (extendBody выключен): первая версия со
+        // стеклом поверх контента спрятала кнопки Pulse за меню, а размытие
+        // живого списка под панелью тормозило прокрутку каналов.
         body: widget.navigationShell,
         // Именно null, а не пустой виджет: Scaffold с любой нижней панелью,
         // даже нулевой высоты, считает, что системную полосу внизу занимает
@@ -253,6 +251,9 @@ class GlassNavBar extends StatelessWidget {
           width: targetWidth,
           height: compact ? 52 : 64,
           child: GlassSurface(
+            // Без BackdropFilter: под панелью пустой фон, размывать нечего, а
+            // фильтр на каждом кадре — лишняя нагрузка на слабых телефонах.
+            blur: 0,
             radius: compact ? 26 : 30,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(

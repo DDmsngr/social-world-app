@@ -236,9 +236,18 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
             reverse: true,
             padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 8, AppSpacing.gutter, 8),
             itemCount: items.length,
+            // Ключ по id поста: новые посты встают сверху, и без ключей
+            // состояние карточек (загруженное видео, фото) съезжало бы на
+            // соседний пост.
+            findChildIndexCallback: (key) {
+              if (key is! ValueKey<String>) return null;
+              final at = items.indexWhere((p) => p.message.id == key.value);
+              return at < 0 ? null : at;
+            },
             itemBuilder: (context, index) {
               final post = items[index];
               return ChannelPostCard(
+                key: ValueKey(post.message.id),
                 post: post,
                 onComments: () => context.push(
                   '${Routes.channel(widget.channelId)}/post/${post.message.id}',

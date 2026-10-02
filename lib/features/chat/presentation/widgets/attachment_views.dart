@@ -122,19 +122,10 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
           mine: widget.mine,
         ),
       ),
-      MessageKind.video => _FileTile(
-        icon: Icons.play_circle_outline,
-        title: attachment.name ?? 'Видео',
-        subtitle: _meta(attachment),
-        mine: widget.mine,
-        loading: _file,
-        onTap: () => _openWith(
-          (path) => Navigator.of(context, rootNavigator: true).push(
-            MaterialPageRoute<void>(
-              builder: (_) => VideoFullScreen(filePath: path),
-            ),
-          ),
-        ),
+      // Видео — превью с кнопкой «play», а не строка файла.
+      MessageKind.video => SizedBox(
+        width: 260,
+        child: VideoPreview(message: message),
       ),
       _ => _FileTile(
         icon: iconForMime(attachment.mime),
@@ -159,11 +150,6 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
     };
   }
 
-  String _meta(ChatAttachment a) => [
-    if (a.durationMs != null)
-      formatDuration(Duration(milliseconds: a.durationMs!)),
-    formatFileSize(a.size),
-  ].join(' · ');
 }
 
 /// Фото в пузыре по своим пропорциям. Раньше `Image.file` стоял в
@@ -521,6 +507,177 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Видео в ленте как видео: рамка фиксированных пропорций (чтобы список не
+/// «прыгал», пока ролик загружается), первый кадр, кнопка «play» и длительность
+/// или размер. Небольшие ролики подгружаются сами (с задержкой — при быстрой
+/// прокрутке не стартуем десяток декодеров), тяжёлые — по тапу. Тап открывает
+/// ролик на весь экран.
+class VideoPreview extends ConsumerStatefulWidget {
+  const VideoPreview({
+    super.key,
+    required this.message,
+    this.aspectRatio = 16 / 9,
+    this.autoLoadMaxBytes = 8 * 1024 * 1024,
+  });
+
+  final ChatMessage message;
+  final double aspectRatio;
+  final int autoLoadMaxBytes;
+
+  @override
+  ConsumerState<VideoPreview> createState() => _VideoPreviewState();
+}
+
+class _VideoPreviewState extends ConsumerState<VideoPreview> {
+  Timer? _delay;
+  VideoPlayerController? _controller;
+  String? _path;
+  var _loading = false;
+  var _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final size = widget.message.attachment?.size ?? 0;
+    if (size > 0 && size <= widget.autoLoadMaxBytes) {
+      _delay = Timer(const Duration(milliseconds: 400), _load);
+    }
+  }
+
+  @override
+  void dispose() {
+    _delay?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<String?> _load() async {
+    if (_path != null) return _path;
+    if (_loading) return null;
+    setState(() {
+      _loading = true;
+      _failed = false;
+    });
+    try {
+      final path = await ref
+          .read(chatRepositoryProvider)
+          .attachmentFile(widget.message);
+      if (!mounted) return null;
+      _path = path;
+      final controller = VideoPlayerController.file(File(path));
+      await controller.initialize();
+      await controller.setVolume(0);
+      if (!mounted) {
+        await controller.dispose();
+        return path;
+      }
+      setState(() {
+        _controller = controller;
+        _loading = false;
+      });
+      return path;
+    } catch (error) {
+      AppLog.add('Видео не загрузилось: $error');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _failed = true;
+        });
+      }
+      return null;
+    }
+  }
+
+  Future<void> _open() async {
+    final path = _path ?? await _load();
+    if (path == null || !mounted) return;
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute<void>(builder: (_) => VideoFullScreen(filePath: path)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final attachment = widget.message.attachment!;
+    final controller = _controller;
+    final label = [
+      if (attachment.durationMs != null)
+        formatDuration(Duration(milliseconds: attachment.durationMs!))
+      else if (controller != null && controller.value.isInitialized)
+        formatDuration(controller.value.duration),
+      formatFileSize(attachment.size),
+    ].join(' · ');
+
+    return Semantics(
+      button: true,
+      label: 'Видео, $label',
+      child: GestureDetector(
+        onTap: _open,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: AspectRatio(
+            aspectRatio: widget.aspectRatio,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ColoredBox(color: AppColors.card),
+                if (controller != null && controller.value.isInitialized)
+                  FittedBox(
+                    fit: BoxFit.cover,
+                    clipBehavior: Clip.hardEdge,
+                    child: SizedBox(
+                      width: controller.value.size.width,
+                      height: controller.value.size.height,
+                      child: VideoPlayer(controller),
+                    ),
+                  ),
+                Center(
+                  child: _loading
+                      ? const SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        )
+                      : Container(
+                          width: 56,
+                          height: 56,
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _failed ? Icons.refresh : Icons.play_arrow_rounded,
+                            size: 34,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+                Positioned(
+                  left: 10,
+                  bottom: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      child: Text(
+                        _failed ? 'Не загрузилось — нажмите ещё раз' : label,
+                        style: const TextStyle(fontSize: 11, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
