@@ -99,6 +99,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     final view = ref.watch(mapViewProvider);
     final picking = ref.watch(pickingAnchorProvider);
     final anchor = ref.watch(nearbyAnchorProvider);
+    // Карта идёт под стеклянную панель вкладок, поэтому кнопки отсчитываем
+    // от верха панели, а не от низа экрана.
+    final nav = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
       appBar: AppBar(
@@ -179,11 +182,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               ),
             ),
             if (view.isEmpty && view.isFiltered)
-              const Positioned(
+              Positioned(
                 left: AppSpacing.gutter,
                 right: AppSpacing.gutter,
-                bottom: 148,
-                child: MapEmptyBanner(),
+                bottom: 148 + nav,
+                child: const MapEmptyBanner(),
               ),
             // Кнопка переехала сюда из DiscoverMap: внутри виджета карты не
             // должно быть ничего, кроме самого платформенного слоя, — так же
@@ -193,7 +196,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             // чтобы не налезть на него.
             Positioned(
               right: AppSpacing.gutter,
-              bottom: view.isEmpty && view.isFiltered ? 212 : 148,
+              bottom: (view.isEmpty && view.isFiltered ? 212 : 148) + nav,
               child: _MyLocationButton(
                 onLocated: (lat, lng) => _focus(lat, lng, zoom: 15.5),
               ),
@@ -206,7 +209,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             Positioned(
               left: AppSpacing.gutter,
               right: AppSpacing.gutter,
-              bottom: 92,
+              bottom: 92 + nav,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -230,7 +233,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             Positioned(
               left: AppSpacing.gutter,
               right: AppSpacing.gutter,
-              bottom: 16,
+              bottom: 16 + nav,
               child: _CityPulseCard(
                 data: snapshot,
                 view: view,

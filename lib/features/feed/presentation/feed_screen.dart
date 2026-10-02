@@ -103,7 +103,10 @@ class FeedScreen extends ConsumerWidget {
             backgroundColor: AppColors.ink2,
             onRefresh: () => ref.read(feedProvider.notifier).refresh(),
             child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 24),
+              padding: EdgeInsets.only(
+                top: 8,
+                bottom: 24 + MediaQuery.paddingOf(context).bottom,
+              ),
               // +1 — полоса историй первым элементом.
               itemCount: posts.length + 1,
               itemBuilder: (context, index) {

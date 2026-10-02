@@ -35,6 +35,15 @@ class HomeShell extends ConsumerStatefulWidget {
       location.startsWith('${Routes.chats}/') &&
       location != '${Routes.chats}/new-group';
 
+  /// Корень одной из пяти вкладок, а не экран внутри неё.
+  static bool isTabRoot(String location) => const {
+    Routes.feed,
+    Routes.discover,
+    Routes.create,
+    Routes.chats,
+    Routes.profile,
+  }.contains(location);
+
   /// Нижняя навигация в переписке: только иконки, а пока открыта клавиатура
   /// или панель эмодзи — совсем без неё, место нужнее сообщениям.
   static bool showBottomNav({
@@ -170,9 +179,11 @@ class _HomeShellState extends ConsumerState<HomeShell>
     return ValueListenableBuilder<bool>(
       valueListenable: chatEmojiPanelOpen,
       builder: (context, emojiPanel, _) => Scaffold(
-        // Тело НЕ уходит под панель (extendBody выключен): первая версия со
-        // стеклом поверх контента спрятала кнопки Pulse за меню, а размытие
-        // живого списка под панелью тормозило прокрутку каналов.
+        // Корневые вкладки идут под стеклянную панель (она размывает
+        // контент) — их отступы и кнопки считают высоту панели из
+        // MediaQuery.padding. Экраны внутри вкладок (чат, канал, поиск) под
+        // панель не уходят: у них внизу поле ввода и свои отступы.
+        extendBody: HomeShell.isTabRoot(widget.location),
         body: widget.navigationShell,
         // Именно null, а не пустой виджет: Scaffold с любой нижней панелью,
         // даже нулевой высоты, считает, что системную полосу внизу занимает
@@ -251,9 +262,9 @@ class GlassNavBar extends StatelessWidget {
           width: targetWidth,
           height: compact ? 52 : 64,
           child: GlassSurface(
-            // Без BackdropFilter: под панелью пустой фон, размывать нечего, а
-            // фильтр на каждом кадре — лишняя нагрузка на слабых телефонах.
-            blur: 0,
+            // В чате под панелью только фон — размытие там не нужно, не
+            // тратим на него кадры.
+            blur: compact ? 0 : 20,
             radius: compact ? 26 : 30,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(

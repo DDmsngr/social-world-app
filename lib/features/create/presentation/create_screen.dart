@@ -282,7 +282,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Создать')),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.gutter),
+        padding: AppSpacing.page(context, top: AppSpacing.gutter),
         children: [
           const SectionLabel('Что публикуем'),
           const SizedBox(height: 14),
