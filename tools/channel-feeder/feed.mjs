@@ -27,7 +27,7 @@ const CHANNELS = [
   { handle: 'chawo_food', sources: ['thesaltmagazine', 'topretsept', 'kulinarka', 'foodblogger'], everyMin: 45, perRun: 2, maxAgeH: 36 },
   { handle: 'chawo_sochi', sources: ['sochi24tv', 'sochi_online', 'sochi_today', 'sochigid', 'kuban24'], everyMin: 15, perRun: 2, maxAgeH: 24 },
   { handle: 'chawo_travel', sources: ['tutu_travel', 'aviasales'], everyMin: 60, perRun: 1, maxAgeH: 48 },
-  { handle: 'chawo_kino', sources: ['kinopoisk'], everyMin: 60, perRun: 1, maxAgeH: 72 },
+  { handle: 'chawo_kino', sources: ['kinopoisk', 'kineman'], everyMin: 60, perRun: 1, maxAgeH: 96 },
   { handle: 'chawo_sport', sources: ['sportsru', 'championat', 'sovsport'], everyMin: 20, perRun: 2 },
 ];
 
