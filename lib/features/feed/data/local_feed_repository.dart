@@ -1,4 +1,5 @@
 import '../../../core/permissions/content_permissions.dart';
+import '../../../core/text/hashtags.dart';
 import '../../discover/domain/entities/city.dart';
 import '../domain/entities/post.dart';
 import '../domain/entities/publish_settings.dart';
@@ -24,15 +25,38 @@ class LocalFeedRepository implements FeedRepository {
       post.authorId == currentUserId();
 
   @override
-  Future<List<Post>> loadFeed({String? authorId, int limit = 50, String? city}) async {
+  Future<List<Post>> loadFeed({
+    String? authorId,
+    int limit = 50,
+    String? city,
+    String? tag,
+    bool forYou = false,
+  }) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     // У заглушки все авторы — из пилотного города: в режиме «Город» с другим
     // городом лента честно пустая.
     if (city != null && city != Cities.fallback.name) return const [];
+    final wanted = tag == null ? null : normalizeHashtag(tag);
     final visible = _posts.where(
-      (post) => _visible(post) && (authorId == null || post.authorId == authorId),
+      (post) =>
+          _visible(post) &&
+          (authorId == null || post.authorId == authorId) &&
+          (wanted == null ||
+              extractHashtags('${post.title ?? ''} ${post.body ?? ''}').contains(wanted)),
     );
     return visible.take(limit).toList(growable: false);
+  }
+
+  @override
+  Future<List<({String tag, int posts})>> trendingHashtags({int limit = 15}) async {
+    final counts = <String, int>{};
+    for (final post in _posts.where(_visible)) {
+      for (final tag in extractHashtags('${post.title ?? ''} ${post.body ?? ''}')) {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      }
+    }
+    final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return [for (final e in sorted.take(limit)) (tag: e.key, posts: e.value)];
   }
 
   @override

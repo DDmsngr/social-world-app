@@ -18,17 +18,56 @@ class SupabaseFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<List<Post>> loadFeed({String? authorId, int limit = 50, String? city}) async {
+  Future<List<Post>> loadFeed({
+    String? authorId,
+    int limit = 50,
+    String? city,
+    String? tag,
+    bool forYou = false,
+  }) async {
+    if (forYou && authorId == null && city == null && tag == null) {
+      try {
+        final rows = await _client.rpc('for_you_feed', params: {'in_limit': limit}) as List<dynamic>;
+        return rows
+            .map((row) => _fromRow(row as Map<String, dynamic>))
+            .toList(growable: false);
+      } on PostgrestException catch (error) {
+        // До миграции 0048 функции нет — показываем обычную ленту.
+        if (error.code != 'PGRST202') rethrow;
+      }
+    }
     final rows = await _client.rpc(
       'city_feed',
-      // in_city — только когда выбран «Город»: до миграции 0024 у функции
-      // нет этого параметра, и «Страна» должна работать и на старой базе.
-      params: {'in_author': authorId, 'in_limit': limit, 'in_city': ?city},
+      // in_city и in_tag — только когда заданы: на старой базе у функции нет
+      // этих параметров, и обычная лента должна работать и там.
+      params: {
+        'in_author': authorId,
+        'in_limit': limit,
+        'in_city': ?city,
+        'in_tag': ?tag,
+      },
     ) as List<dynamic>;
 
     return rows
         .map((row) => _fromRow(row as Map<String, dynamic>))
         .toList(growable: false);
+  }
+
+  @override
+  Future<List<({String tag, int posts})>> trendingHashtags({int limit = 15}) async {
+    try {
+      final rows = await _client.rpc(
+        'trending_hashtags',
+        params: {'in_limit': limit},
+      ) as List<dynamic>;
+      return [
+        for (final row in rows.cast<Map<String, dynamic>>())
+          (tag: row['tag'] as String, posts: (row['posts'] as num).toInt()),
+      ];
+    } on PostgrestException catch (error) {
+      if (error.code == 'PGRST202') return const [];
+      rethrow;
+    }
   }
 
   @override

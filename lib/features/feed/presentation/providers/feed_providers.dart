@@ -26,9 +26,10 @@ final feedRepositoryProvider = Provider<FeedRepository>((ref) {
   return SupabaseFeedRepository(Supabase.instance.client);
 });
 
-/// Охват ленты «Моменты» (п. 47 ТЗ). По умолчанию — страна; выбор живёт до
-/// перезапуска, как и просит ТЗ («по умолчанию — страна»).
+/// Охват ленты: «Для вас» (по интересам), страна или город (п. 47 ТЗ). По
+/// умолчанию — «Для вас»; выбор живёт до перезапуска.
 enum FeedScope {
+  forYou('Для вас'),
   country('Страна'),
   city('Город');
 
@@ -41,7 +42,7 @@ class FeedScopeController extends Notifier<FeedScope> {
   @override
   FeedScope build() {
     ref.keepAlive();
-    return FeedScope.country;
+    return FeedScope.forYou;
   }
 
   void set(FeedScope scope) => state = scope;
@@ -53,9 +54,25 @@ final feedScopeProvider = NotifierProvider<FeedScopeController, FeedScope>(
 
 /// Город для запроса ленты: выбранный на Pulse в режиме «Город», иначе null.
 final feedCityFilterProvider = Provider<String?>((ref) {
-  if (ref.watch(feedScopeProvider) == FeedScope.country) return null;
+  if (ref.watch(feedScopeProvider) != FeedScope.city) return null;
   return ref.watch(cityProvider).name;
 });
+
+/// Популярные хэштеги для полосы над лентой.
+final trendingHashtagsProvider =
+    FutureProvider.autoDispose<List<({String tag, int posts})>>((ref) async {
+      try {
+        return await ref.watch(feedRepositoryProvider).trendingHashtags();
+      } catch (error) {
+        AppLog.add('Популярные теги не загрузились: $error');
+        return const [];
+      }
+    });
+
+/// Лента одного хэштега.
+final hashtagFeedProvider = FutureProvider.autoDispose.family<List<Post>, String>(
+  (ref, tag) => ref.watch(feedRepositoryProvider).loadFeed(tag: tag),
+);
 
 class FeedController extends AsyncNotifier<List<Post>> {
   @override
@@ -65,20 +82,23 @@ class FeedController extends AsyncNotifier<List<Post>> {
     // стрелять запросом без сессии — city_feed доступна только authenticated,
     // без охраны это была бы гарантированная ошибка ровно в момент логаута.
     if (ref.watch(currentUserProvider) == null) return const [];
-    final posts = await ref
-        .watch(feedRepositoryProvider)
-        .loadFeed(city: ref.watch(feedCityFilterProvider));
+    final posts = await ref.watch(feedRepositoryProvider).loadFeed(
+      city: ref.watch(feedCityFilterProvider),
+      forYou: ref.watch(feedScopeProvider) == FeedScope.forYou,
+    );
     return _withoutHidden(posts);
   }
 
   Future<void> refresh() async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      final posts = await ref
-          .read(feedRepositoryProvider)
-          .loadFeed(city: ref.read(feedCityFilterProvider));
+      final posts = await ref.read(feedRepositoryProvider).loadFeed(
+        city: ref.read(feedCityFilterProvider),
+        forYou: ref.read(feedScopeProvider) == FeedScope.forYou,
+      );
       return _withoutHidden(posts);
     });
+    ref.invalidate(trendingHashtagsProvider);
   }
 
   /// Лайк применяется на месте: перезагружать ленту ради одного счётчика
@@ -175,6 +195,11 @@ final feedProvider = AsyncNotifierProvider<FeedController, List<Post>>(
 );
 
 /// Публикации текущего пользователя — этим живёт вкладка профиля.
+/// Один пост по id — для оригинала внутри репоста.
+final postByIdProvider = FutureProvider.autoDispose.family<Post?, String>(
+  (ref, id) => ref.watch(feedRepositoryProvider).loadPost(id),
+);
+
 final myPostsProvider = FutureProvider<List<Post>>((ref) async {
   final userId = ref.watch(currentUserProvider)?.id;
   if (userId == null) return const [];

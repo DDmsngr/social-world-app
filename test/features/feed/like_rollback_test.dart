@@ -22,9 +22,17 @@ class _FailingFeedRepository implements FeedRepository {
   var likeCalls = 0;
 
   @override
-  Future<List<Post>> loadFeed({String? authorId, int limit = 50, String? city}) async => [
-    _post,
-  ];
+  Future<List<Post>> loadFeed({
+    String? authorId,
+    int limit = 50,
+    String? city,
+    String? tag,
+    bool forYou = false,
+  }) async => [_post];
+
+  @override
+  Future<List<({String tag, int posts})>> trendingHashtags({int limit = 15}) async =>
+      const [];
 
   @override
   Future<Post> toggleLike(Post post) async {

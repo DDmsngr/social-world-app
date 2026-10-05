@@ -8,7 +8,18 @@ abstract interface class FeedRepository {
   ///
   /// [city] — режим «Город» (п. 47 ТЗ): только авторы, у которых в профиле
   /// этот город. `null` — «Страна», вся лента.
-  Future<List<Post>> loadFeed({String? authorId, int limit = 50, String? city});
+  /// [tag] — только посты с этим хэштегом. [forYou] — лента «Для вас»:
+  /// подобрана по интересам, а не по времени.
+  Future<List<Post>> loadFeed({
+    String? authorId,
+    int limit = 50,
+    String? city,
+    String? tag,
+    bool forYou = false,
+  });
+
+  /// Популярные хэштеги за неделю: тег и сколько постов.
+  Future<List<({String tag, int posts})>> trendingHashtags({int limit = 15});
 
   /// Один пост по id: для ссылок, уведомлений и «Сохранённого», когда поста
   /// нет в уже загруженной ленте. `null` — не существует или недоступен.

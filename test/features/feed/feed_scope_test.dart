@@ -9,8 +9,8 @@ import 'package:social_world/features/discover/presentation/providers/city_provi
 import 'package:social_world/features/feed/presentation/feed_screen.dart';
 import 'package:social_world/features/feed/presentation/providers/feed_providers.dart';
 
-// «Моменты: Страна | Город» (п. 47 ТЗ): по умолчанию страна, город — тот же,
-// что выбран на Pulse.
+// «Для вас | Страна | Город»: по умолчанию «Для вас», город — тот же, что
+// выбран на Pulse (п. 47 ТЗ).
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -32,10 +32,11 @@ void main() {
     return container;
   }
 
-  testWidgets('по умолчанию — страна', (tester) async {
+  testWidgets('по умолчанию — «Для вас»', (tester) async {
     final container = await pump(tester, Cities.fallback);
-    expect(container.read(feedScopeProvider), FeedScope.country);
+    expect(container.read(feedScopeProvider), FeedScope.forYou);
     expect(container.read(feedCityFilterProvider), isNull);
+    expect(find.text('Для вас'), findsOne);
     expect(find.text('Страна'), findsOne);
     expect(find.text(Cities.fallback.name), findsOne);
   });

@@ -20,6 +20,7 @@ Future<ForwardResult?> showForwardPicker(
   required String Function(ChatMessage message) authorOf,
   String? excludeConversationId,
   bool withAuthor = true,
+  String? title,
 }) => showModalBottomSheet<ForwardResult>(
   context: context,
   useRootNavigator: true,
@@ -31,6 +32,7 @@ Future<ForwardResult?> showForwardPicker(
     authorOf: authorOf,
     excludeConversationId: excludeConversationId,
     withAuthor: withAuthor,
+    title: title,
   ),
 );
 
@@ -55,12 +57,14 @@ class _ForwardSheet extends ConsumerStatefulWidget {
     required this.authorOf,
     this.excludeConversationId,
     this.withAuthor = true,
+    this.title,
   });
 
   final List<ChatMessage> messages;
   final String Function(ChatMessage message) authorOf;
   final String? excludeConversationId;
   final bool withAuthor;
+  final String? title;
 
   @override
   ConsumerState<_ForwardSheet> createState() => _ForwardSheetState();
@@ -115,7 +119,8 @@ class _ForwardSheetState extends ConsumerState<_ForwardSheet> {
                 10,
               ),
               child: Text(
-                widget.withAuthor ? 'Переслать' : 'Изменить и переслать',
+                widget.title ??
+                    (widget.withAuthor ? 'Переслать' : 'Изменить и переслать'),
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),

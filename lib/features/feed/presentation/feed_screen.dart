@@ -12,6 +12,32 @@ import 'providers/feed_providers.dart';
 import 'widgets/post_card.dart';
 import 'widgets/story_strip.dart';
 
+/// Популярные хэштеги недели полосой над лентой. Пусто — полосы нет.
+class _TrendingTags extends ConsumerWidget {
+  const _TrendingTags();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tags = ref.watch(trendingHashtagsProvider).value ?? const [];
+    if (tags.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 6, AppSpacing.gutter, 0),
+        itemCount: tags.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) => ActionChip(
+          label: Text('#${tags[i].tag}'),
+          onPressed: () => context.push(
+            '${Routes.hashtag}/${Uri.encodeComponent(tags[i].tag)}',
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class FeedScreen extends ConsumerWidget {
   const FeedScreen({super.key});
 
@@ -87,10 +113,13 @@ class FeedScreen extends ConsumerWidget {
               text: scope == FeedScope.city
                   ? 'В городе «$cityName» пока никто ничего не опубликовал. '
                         'Посмотрите всю страну или начните первым.'
+                  : scope == FeedScope.forYou
+                  ? 'Подборка появится, когда в ленте будут свежие публикации. '
+                        'Загляните во «Всю страну».'
                   : 'Здесь ещё никто ничего не опубликовал. '
                         'Начните первым — вкладка «Создать».',
-              actionLabel: scope == FeedScope.city ? 'Вся страна' : null,
-              onAction: scope == FeedScope.city
+              actionLabel: scope != FeedScope.country ? 'Вся страна' : null,
+              onAction: scope != FeedScope.country
                   ? () => ref.read(feedScopeProvider.notifier).set(FeedScope.country)
                   : null,
             );
@@ -113,7 +142,13 @@ class FeedScreen extends ConsumerWidget {
                 if (index == 0) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: StoryStrip(stories: stories),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        StoryStrip(stories: stories),
+                        const _TrendingTags(),
+                      ],
+                    ),
                   );
                 }
                 return Padding(

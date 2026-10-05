@@ -7,6 +7,7 @@ import '../../../../core/text/markdown_preview.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/hashtag_text.dart';
 import '../../../../core/widgets/markdown_view.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../profile/domain/profile_models.dart';
@@ -16,12 +17,12 @@ import '../../domain/entities/post.dart';
 import '../post_actions.dart';
 import '../providers/feed_providers.dart';
 import 'post_media.dart';
+import 'post_share_sheet.dart';
 
 enum _PostMenu {
   edit,
   settings,
   save,
-  share,
   delete,
   report,
   hideAuthor,
@@ -66,8 +67,6 @@ class PostCard extends ConsumerWidget {
         return changePostSettings(context, ref, post);
       case _PostMenu.save:
         return toggleSavePost(context, ref, post);
-      case _PostMenu.share:
-        return sharePost(context, post);
       case _PostMenu.delete:
         return deleteOwnPost(context, ref, post);
       case _PostMenu.report:
@@ -175,10 +174,6 @@ class PostCard extends ConsumerWidget {
                       value: _PostMenu.save,
                       child: Text(isSaved ? 'Убрать из сохранённого' : 'Сохранить'),
                     ),
-                    const PopupMenuItem(
-                      value: _PostMenu.share,
-                      child: Text('Поделиться'),
-                    ),
                     if (permissions.canDelete)
                       const PopupMenuItem(
                         value: _PostMenu.delete,
@@ -252,7 +247,7 @@ class PostCard extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => sharePost(context, post),
+                  onPressed: () => showPostShare(context, ref, post),
                   tooltip: 'Поделиться',
                   icon: Icon(Icons.ios_share, size: 19, color: AppColors.textFaint),
                 ),
@@ -319,11 +314,111 @@ class _Body extends StatelessWidget {
 
     if (body.isEmpty) return const SizedBox.shrink();
 
+    final original = repostOf(post);
+    if (original != null) return _RepostEmbed(postId: original);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: post.bodyFormat == BodyFormat.markdown
           ? MarkdownView(data: body)
-          : Text(body, style: theme.textTheme.bodyLarge),
+          : HashtagText(body, style: theme.textTheme.bodyLarge),
+    );
+  }
+}
+
+/// Оригинал внутри репоста: автор, фото и подпись. Нажатие открывает его.
+class _RepostEmbed extends ConsumerWidget {
+  const _RepostEmbed({required this.postId});
+
+  final String postId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final original = ref.watch(postByIdProvider(postId));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.repeat, size: 16, color: AppColors.textFaint),
+              const SizedBox(width: 6),
+              Text('Репост', style: TextStyle(fontSize: 12, color: AppColors.textFaint)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.hair),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: original.when(
+              loading: () => const SizedBox(
+                height: 80,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+              error: (_, _) => const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text('Публикация не открылась'),
+              ),
+              data: (p) => p == null
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        'Публикация удалена или скрыта',
+                        style: TextStyle(color: AppColors.textDim),
+                      ),
+                    )
+                  : InkWell(
+                      onTap: () => context.push('${Routes.posts}/${p.id}', extra: p),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                            child: Row(
+                              children: [
+                                UserAvatar(
+                                  name: p.authorName,
+                                  url: p.authorAvatarUrl,
+                                  userId: p.authorId,
+                                  radius: 14,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    p.authorName,
+                                    style: theme.textTheme.titleSmall,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (p.hasMedia) PostMedia(urls: p.mediaUrls),
+                          if ((p.title ?? p.body ?? '').trim().isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                              child: Text(
+                                p.isArticle
+                                    ? (p.title ?? markdownPreview(p.body ?? ''))
+                                    : markdownPreview(p.body ?? ''),
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

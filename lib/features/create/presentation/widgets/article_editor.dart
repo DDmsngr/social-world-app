@@ -383,31 +383,7 @@ class _ArticleEditorState extends State<ArticleEditor> {
             ),
           ],
         ),
-        if (_busy)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _fraction > 0 && _fraction < 1
-                      ? '$_label · ${(_fraction * 100).round()}%'
-                      : _label,
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    minHeight: 6,
-                    value: _fraction > 0 ? _fraction : null,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          const SizedBox(height: 4),
+        const SizedBox(height: 4),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -451,6 +427,32 @@ class _ArticleEditorState extends State<ArticleEditor> {
                   ],
                 ),
         ),
+        // Полоса загрузки — сразу под полем, рядом с кнопками фото и видео.
+        if (_busy)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _fraction > 0 && _fraction < 1
+                      ? '$_label · ${(_fraction * 100).round()}%'
+                      : _label,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    minHeight: 6,
+                    value: _fraction > 0 ? _fraction : null,
+                    color: AppColors.primary,
+                    backgroundColor: AppColors.hair,
+                  ),
+                ),
+              ],
+            ),
+          ),
         const SizedBox(height: 6),
         Align(
           alignment: Alignment.centerRight,
