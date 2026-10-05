@@ -263,7 +263,11 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
           children: [
             Text('Переносим: ${_done + _failed} из $total', style: theme.textTheme.titleLarge),
             const SizedBox(height: 16),
-            LinearProgressIndicator(value: total == 0 ? null : (_done + _failed) / total),
+            LinearProgressIndicator(
+              value: total == 0 ? null : (_done + _failed) / total,
+              color: AppColors.primary,
+              backgroundColor: AppColors.hair,
+            ),
             const SizedBox(height: 12),
             Text(
               'Не закрывайте приложение, пока идёт перенос.',

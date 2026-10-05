@@ -46,6 +46,7 @@ import '../../features/profile/presentation/follow_list_screen.dart';
 import '../../features/profile/presentation/user_profile_screen.dart';
 import '../../features/assistant/assistant_screen.dart';
 import '../../features/migration/import_screen.dart';
+import '../../features/profile/presentation/profile_menu_screen.dart';
 import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/presentation/settings_screen.dart';
@@ -87,6 +88,7 @@ abstract final class Routes {
   static const saved = '/saved';
   static const assistant = '/assistant';
   static const importData = '/profile/import';
+  static const profileMenu = '/profile/menu';
   static const notifications = '/notifications';
   static const places = '/places';
 
@@ -340,6 +342,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.saved, builder: (_, _) => const SavedScreen()),
       GoRoute(path: Routes.assistant, builder: (_, _) => const AssistantScreen()),
       GoRoute(path: Routes.importData, builder: (_, _) => const ImportScreen()),
+      GoRoute(path: Routes.profileMenu, builder: (_, _) => const ProfileMenuScreen()),
       GoRoute(
         path: Routes.notifications,
         builder: (_, _) => const NotificationsScreen(),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../media/playback_focus.dart';
 import '../theme/app_colors.dart';
 
 /// Расширения, по которым ссылка в `![](…)` считается видео, а не картинкой.
@@ -29,16 +30,26 @@ class _InlineVideoState extends State<InlineVideo> {
 
   @override
   void dispose() {
-    _controller?.dispose();
+    final controller = _controller;
+    if (controller != null) {
+      PlaybackFocus.release(controller);
+      controller.dispose();
+    }
     super.dispose();
   }
 
+  void _onChange() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _start() async {
-    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+      ..addListener(_onChange);
     setState(() => _controller = controller);
     try {
       await controller.initialize();
       await controller.setLooping(true);
+      PlaybackFocus.claim(controller);
       await controller.play();
       if (mounted) setState(() {});
     } catch (_) {
@@ -68,9 +79,12 @@ class _InlineVideoState extends State<InlineVideo> {
               } else if (controller == null) {
                 _start();
               } else if (ready) {
-                setState(() {
-                  controller.value.isPlaying ? controller.pause() : controller.play();
-                });
+                if (controller.value.isPlaying) {
+                  controller.pause();
+                } else {
+                  PlaybackFocus.claim(controller);
+                  controller.play();
+                }
               }
             },
             child: Stack(

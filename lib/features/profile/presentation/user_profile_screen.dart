@@ -18,16 +18,16 @@ import '../../../core/update/update_dot.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
-import '../../assistant/assistant.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../feed/presentation/post_actions.dart';
-import '../../feed/presentation/widgets/post_card.dart';
 import '../../moderation/domain/entities/report_reason.dart';
 import '../../moderation/presentation/widgets/report_sheet.dart';
 import '../../notifications/notifications.dart';
 import '../domain/profile_models.dart';
+import '../../feed/domain/entities/post.dart';
 import 'providers/profile_providers.dart';
+import 'widgets/profile_post_grid.dart';
 
 /// Профиль человека — свой и чужой одним экраном на общей модели
 /// [UserProfile]. Что можно делать, решает [ContentPermissions]: у своего
@@ -100,13 +100,33 @@ class UserProfileScreen extends ConsumerWidget {
               ),
         automaticallyImplyLeading: false,
         actions: [
-          if (isMe)
+          if (isMe) ...[
+            Consumer(
+              builder: (context, ref, _) {
+                final unread = ref.watch(unreadNotificationsProvider);
+                return IconButton(
+                  onPressed: () => context.push(Routes.notifications),
+                  tooltip: 'Уведомления',
+                  icon: Badge(
+                    isLabelVisible: unread > 0,
+                    label: Text(unread > 99 ? '99+' : '$unread'),
+                    backgroundColor: AppColors.primary,
+                    child: const Icon(Icons.notifications_none),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              onPressed: () => context.push(Routes.profileMenu),
+              tooltip: 'Мои разделы',
+              icon: const Icon(Icons.menu),
+            ),
             IconButton(
               onPressed: () => context.push(Routes.settings),
               tooltip: 'Настройки',
               icon: const UpdateDot(child: Icon(Icons.settings_outlined)),
-            )
-          else if (profile != null) ...[
+            ),
+          ] else if (profile != null) ...[
             Builder(
               builder: (context) => IconButton(
                 onPressed: () => ShareService.share(
@@ -254,9 +274,11 @@ class _Body extends ConsumerWidget {
     final theme = Theme.of(context);
     final blockKind = profile.blockKind;
 
-    return ListView(
-      padding: AppSpacing.page(context, top: 16),
-      children: [
+    final posts = blockKind == null ? ref.watch(userPostsProvider(profile.id)) : null;
+    final postCount = posts?.value?.length;
+    final bottom = 24 + MediaQuery.paddingOf(context).bottom;
+
+    final header = <Widget>[
         Row(
           children: [
             GestureDetector(
@@ -280,99 +302,45 @@ class _Body extends ConsumerWidget {
                       radius: 38,
                     ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(profile.displayName, style: AppTypography.serif(28)),
-                  if (profile.city != null) ...[
-                    const SizedBox(height: 2),
-                    Text(profile.city!, style: theme.textTheme.bodyMedium),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-        if (profile.bio != null && profile.bio!.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text(profile.bio!, style: theme.textTheme.bodyLarge),
-        ],
-        const SizedBox(height: 18),
-        Row(
-          children: [
+            const SizedBox(width: 12),
+            _Stat(value: postCount ?? 0, label: 'публикации'),
             _Stat(
               value: profile.followerCount,
-              label: 'подписчиков',
+              label: 'подписчики',
               onTap: () => context.push(
                 '${Routes.user}/${profile.id}/followers',
               ),
             ),
             _Stat(
               value: profile.followingCount,
-              label: 'подписок',
+              label: 'подписки',
               onTap: () => context.push(
                 '${Routes.user}/${profile.id}/following',
               ),
             ),
-            _Stat(value: profile.socialScore, label: 'Social Score'),
           ],
         ),
-        const SizedBox(height: 18),
-        if (isMe) ...[
+        const SizedBox(height: 12),
+        Text(profile.displayName, style: theme.textTheme.titleLarge),
+        if (profile.city != null)
+          Text(profile.city!, style: theme.textTheme.bodyMedium),
+        if (profile.bio != null && profile.bio!.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(profile.bio!, style: theme.textTheme.bodyLarge),
+        ],
+        const SizedBox(height: 4),
+        Text(
+          'Social Score: ${profile.socialScore}',
+          style: TextStyle(fontSize: 12, color: AppColors.textDim),
+        ),
+        const SizedBox(height: 14),
+        if (isMe)
           OutlinedButton.icon(
             onPressed: () => context.push(Routes.editProfile),
             icon: const Icon(Icons.edit_outlined),
             label: const Text('Редактировать профиль'),
-          ),
-          const SizedBox(height: 14),
-          // Квесты — только в своём профиле: чужие активные квесты не
-          // показываются никому (п. 43, 44).
-          _MenuTile(
-            icon: Icons.flag_outlined,
-            title: '🎯 Квесты',
-            onTap: () => context.push(Routes.myQuests),
-          ),
-          _MenuTile(
-            icon: Icons.volunteer_activism_outlined,
-            title: 'Мне надо',
-            onTap: () => context.push(Routes.myNeeds),
-          ),
-          _MenuTile(
-            icon: Icons.bookmark_border,
-            title: 'Сохранённое',
-            onTap: () => context.push(Routes.saved),
-          ),
-          _MenuTile(
-            icon: Icons.move_to_inbox_outlined,
-            title: 'Импорт из запрещённограмма',
-            onTap: () => context.push(Routes.importData),
-          ),
-          Consumer(
-            builder: (context, ref, _) {
-              if (ref.watch(isAssistantOwnerProvider).value != true) {
-                return const SizedBox.shrink();
-              }
-              return _MenuTile(
-                icon: Icons.support_agent,
-                title: 'Помощник',
-                onTap: () => context.push(Routes.assistant),
-              );
-            },
-          ),
-          Consumer(
-            builder: (context, ref, _) {
-              final unread = ref.watch(unreadNotificationsProvider);
-              return _MenuTile(
-                icon: Icons.notifications_none,
-                title: 'Уведомления',
-                trailing: unread == 0 ? null : '$unread новых',
-                onTap: () => context.push(Routes.notifications),
-              );
-            },
-          ),
-        ] else if (blockKind != null)
+          )
+        else if (blockKind != null)
           GlassCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -426,54 +394,67 @@ class _Body extends ConsumerWidget {
               ],
             ],
           ),
-        const SizedBox(height: 26),
-        if (blockKind == null) _Posts(userId: profile.id, isMe: isMe),
-      ],
+        const SizedBox(height: 18),
+    ];
+
+    Widget message(Widget child) => SliverPadding(
+      padding: EdgeInsets.fromLTRB(AppSpacing.gutter, 12, AppSpacing.gutter, bottom),
+      sliver: SliverToBoxAdapter(child: child),
     );
-  }
-}
 
-class _Posts extends ConsumerWidget {
-  const _Posts({required this.userId, required this.isMe});
-
-  final String userId;
-  final bool isMe;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final posts = ref.watch(userPostsProvider(userId));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionLabel('Публикации'),
-        const SizedBox(height: 12),
-        posts.when(
-          loading: () => const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CircularProgressIndicator()),
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(userProfileProvider(profile.id));
+        if (blockKind == null) {
+          await ref.refresh(userPostsProvider(profile.id).future).catchError((_) => <Post>[]);
+        }
+      },
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 16, AppSpacing.gutter, 0),
+            sliver: SliverList(delegate: SliverChildListDelegate(header)),
           ),
-          error: (_, _) => Row(
-            children: [
-              const Expanded(child: Text('Не удалось загрузить публикации')),
-              TextButton(
-                onPressed: () => ref.invalidate(userPostsProvider(userId)),
-                child: const Text('Повторить'),
-              ),
-            ],
-          ),
-          data: (items) => items.isEmpty
-              ? Text(
-                  isMe
-                      ? 'Вы ещё ничего не опубликовали. Начните со вкладки «Создать».'
-                      : 'Публикаций пока нет.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                )
-              : Column(
-                  children: [for (final post in items) PostCard(post: post)],
+          if (posts != null) ...[
+            SliverToBoxAdapter(child: Divider(height: 1, color: AppColors.hair)),
+            const SliverToBoxAdapter(child: SizedBox(height: 2)),
+            ...posts.when(
+              loading: () => [
+                message(const Center(child: CircularProgressIndicator())),
+              ],
+              error: (_, _) => [
+                message(
+                  Row(
+                    children: [
+                      const Expanded(child: Text('Не удалось загрузить публикации')),
+                      TextButton(
+                        onPressed: () => ref.invalidate(userPostsProvider(profile.id)),
+                        child: const Text('Повторить'),
+                      ),
+                    ],
+                  ),
                 ),
-        ),
-      ],
+              ],
+              data: (items) => items.isEmpty
+                  ? [
+                      message(
+                        Text(
+                          isMe
+                              ? 'Вы ещё ничего не опубликовали. Начните со вкладки «Создать».'
+                              : 'Публикаций пока нет.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    ]
+                  : [
+                      ProfilePostGrid(posts: items),
+                      SliverToBoxAdapter(child: SizedBox(height: bottom)),
+                    ],
+            ),
+          ] else
+            SliverToBoxAdapter(child: SizedBox(height: bottom)),
+        ],
+      ),
     );
   }
 }
@@ -509,40 +490,3 @@ class _Stat extends StatelessWidget {
   }
 }
 
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    this.trailing,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? trailing;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GlassCard(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        onTap: onTap,
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.primaryTint),
-            const SizedBox(width: 14),
-            Expanded(child: Text(title)),
-            if (trailing != null)
-              Text(
-                trailing!,
-                style: TextStyle(color: AppColors.primaryTint, fontSize: 13),
-              ),
-            Icon(Icons.chevron_right, color: AppColors.textFaint),
-          ],
-        ),
-      ),
-    );
-  }
-}

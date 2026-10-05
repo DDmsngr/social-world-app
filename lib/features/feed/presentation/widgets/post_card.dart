@@ -204,9 +204,16 @@ class PostCard extends ConsumerWidget {
               ],
             ),
           ),
-          _Body(post: post, full: full, onOpen: () => _openDetail(context)),
+          // Подпись — под фото, как в привычных фотосетях; у статьи заголовок
+          // и текст остаются сверху.
+          if (post.isArticle)
+            _Body(post: post, full: full, onOpen: () => _openDetail(context)),
           if (post.isRoute) RoutePostPreview(routeId: post.routeId!),
           if (post.hasMedia) PostMedia(urls: post.mediaUrls),
+          if (!post.isArticle) ...[
+            if (post.hasMedia || post.isRoute) const SizedBox(height: 12),
+            _Body(post: post, full: full, onOpen: () => _openDetail(context)),
+          ],
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
             child: Row(
