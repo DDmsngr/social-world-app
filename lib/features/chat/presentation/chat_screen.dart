@@ -20,13 +20,16 @@ import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
 import 'conversations_screen.dart';
 import 'providers/chat_extras_providers.dart';
+import 'providers/chat_pins_providers.dart';
 import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
 import 'providers/hidden_messages_provider.dart';
+import 'widgets/bookmarks_sheet.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/chat_notify_sheet.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/message_menu.dart';
+import 'widgets/pinned_bar.dart';
 import 'widgets/reaction_chips.dart';
 import 'widgets/swipe_to_reply.dart';
 
@@ -35,9 +38,13 @@ class ChatScreen extends ConsumerStatefulWidget {
     super.key,
     required this.conversationId,
     required this.peerName,
+    this.jumpToMessageId,
   });
 
   final String conversationId;
+
+  /// Открыть чат сразу на этом сообщении (из закладок и закрепов).
+  final String? jumpToMessageId;
 
   /// Имя из списка — показывается, пока карточка чата не загрузилась.
   final String peerName;
@@ -55,6 +62,75 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   /// Ответ, который сейчас набирается: показан над полем ввода.
   ChatReply? _replyTo;
+
+  final _scroll = ScrollController();
+  final _itemKeys = <String, GlobalKey>{};
+  int _pinCursor = 0;
+  String? _pendingJump;
+
+  /// Подводит ленту к сообщению и ненадолго подсвечивает его. Лента ленивая:
+  /// пока сообщение не построено, прыгаем по оценке положения и пробуем снова.
+  Future<void> _jumpTo(String messageId, List<ChatMessage> items) async {
+    final index = items.indexWhere((m) => m.id == messageId);
+    if (index < 0) {
+      await _showOutsideHistory(messageId);
+      return;
+    }
+    for (var attempt = 0; attempt < 8; attempt++) {
+      if (!mounted) return;
+      final target = _itemKeys[messageId]?.currentContext;
+      if (target != null && target.mounted) {
+        await Scrollable.ensureVisible(
+          target,
+          alignment: 0.4,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+        if (!mounted) return;
+        _flash(messageId);
+        return;
+      }
+      if (!_scroll.hasClients) return;
+      final max = _scroll.position.maxScrollExtent;
+      final fromBottom = items.length - 1 - index;
+      _scroll.jumpTo((max * fromBottom / items.length).clamp(0.0, max));
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    await _showOutsideHistory(messageId);
+  }
+
+  void _flash(String messageId) {
+    setState(() => _selectedId = messageId);
+    Future<void>.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted && _selectedId == messageId) setState(() => _selectedId = null);
+    });
+  }
+
+  /// Сообщение старше загруженной истории: показываем его отдельным окном.
+  Future<void> _showOutsideHistory(String messageId) async {
+    try {
+      final found = await ref
+          .read(chatRepositoryProvider)
+          .loadMessagesByIds(widget.conversationId, [messageId]);
+      if (!mounted) return;
+      final text = found.isEmpty ? 'Сообщение не найдено' : found.first.preview;
+      await showDialog<void>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: const Text('Старое сообщение'),
+          content: SingleChildScrollView(child: SelectableText(text)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialog).pop(),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      AppLog.add('Старое сообщение не открылось: $error');
+    }
+  }
 
   String _nameOf(ChatMessage message, String myId, Conversation? info) {
     if (message.senderId == myId) {
@@ -160,6 +236,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _push = ref.read(pushServiceProvider)
       ..activeConversationId = widget.conversationId
       ..clearConversation(widget.conversationId);
+    _pendingJump = widget.jumpToMessageId;
     _markRead();
   }
 
@@ -174,6 +251,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scroll.dispose();
     if (_push.activeConversationId == widget.conversationId) {
       _push.activeConversationId = null;
     }
@@ -201,6 +279,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     final reactions =
         ref.watch(chatReactionsProvider(widget.conversationId)).value ?? const {};
+    final pinned = ref.watch(pinnedMessagesProvider(widget.conversationId)).value ?? const <ChatMessage>[];
+    final hasBookmarks = ref
+            .watch(myBookmarksProvider)
+            .value
+            ?.any((b) => b.conversationId == widget.conversationId) ??
+        false;
+    final canPin = info != null && (info.isDirect || info.isOwner);
     // Шапка по макету «Диалог»: аватар, имя и «в сети / был(а) …».
     final presence = isDirect
         ? ref.watch(peerPresenceProvider(widget.conversationId)).value
@@ -265,6 +350,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
         titleTextStyle: Theme.of(context).textTheme.titleLarge,
         actions: [
+          if (hasBookmarks)
+            IconButton(
+              onPressed: () async {
+                final id = await showChatBookmarks(context, widget.conversationId);
+                if (id != null && mounted) {
+                  _jumpTo(id, ref.read(messagesProvider(widget.conversationId)).value ?? const []);
+                }
+              },
+              tooltip: 'Закладки',
+              icon: const Icon(Icons.bookmarks_outlined),
+            ),
           IconButton(
             onPressed: () => showChatNotifySheet(
               context,
@@ -297,6 +393,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ),
       body: Column(
         children: [
+          if (pinned.isNotEmpty)
+            PinnedBar(
+              pins: pinned,
+              index: _pinCursor,
+              onTap: () {
+                final i = _pinCursor.clamp(0, pinned.length - 1);
+                _jumpTo(pinned[i].id, ref.read(messagesProvider(widget.conversationId)).value ?? const []);
+                // Следующее нажатие — к следующему закрепу.
+                setState(() => _pinCursor = (i + 1) % pinned.length);
+              },
+              onUnpin: canPin
+                  ? () async {
+                      final i = _pinCursor.clamp(0, pinned.length - 1);
+                      try {
+                        await setPinned(ref, widget.conversationId, pinned[i].id, pinned: false);
+                      } catch (error) {
+                        AppLog.add('Открепить: $error');
+                      }
+                    }
+                  : null,
+            ),
           if (info != null && !isDirect) const _PlainTextNotice(),
           Expanded(
             child: messages.when(
@@ -339,7 +456,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 }
                 // reverse: новые снизу, и лента сама держится у последнего
                 // сообщения при входящих.
+                if (_pendingJump != null) {
+                  final id = _pendingJump!;
+                  _pendingJump = null;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _jumpTo(id, items);
+                  });
+                }
                 final list = ListView.builder(
+                  controller: _scroll,
                   reverse: true,
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.gutter,
@@ -351,7 +476,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   itemBuilder: (context, index) {
                     final message = items[items.length - 1 - index];
                     final mine = message.senderId == myId;
-                    return Semantics(
+                    return KeyedSubtree(
+                      key: _itemKeys.putIfAbsent(message.id, GlobalKey.new),
+                      child: Semantics(
                       customSemanticsActions: {
                         const CustomSemanticsAction(
                           label: 'Действия с сообщением',
@@ -404,6 +531,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                           ),
                         ),
                         ),
+                      ),
                       ),
                     );
                   },

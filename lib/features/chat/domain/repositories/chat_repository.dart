@@ -71,6 +71,14 @@ abstract interface class ChatRepository {
 
   Future<void> markRead(String conversationId);
 
+  /// Сообщения чата по id: для закрепов и закладок. Старые, которых нет в
+  /// загруженной ленте, докачиваются и расшифровываются здесь же. Удалённые у
+  /// всех в результат не попадают. Порядок — от старых к новым.
+  Future<List<ChatMessage>> loadMessagesByIds(
+    String conversationId,
+    List<String> ids,
+  );
+
   /// Отпечаток общего секрета — то, что собеседники сверяют голосом,
   /// чтобы исключить подмену ключей посередине. Только для личных диалогов.
   Future<String> securityCode(String conversationId);

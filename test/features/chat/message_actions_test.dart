@@ -27,6 +27,8 @@ void main() {
         MessageAction.copy,
         MessageAction.copyPart,
         MessageAction.forward,
+        MessageAction.editForward,
+        MessageAction.bookmark,
         MessageAction.info,
         MessageAction.delete,
       ]);
@@ -42,10 +44,27 @@ void main() {
           MessageAction.saveToGallery,
           MessageAction.share,
           MessageAction.forward,
+          MessageAction.editForward,
+          MessageAction.bookmark,
           MessageAction.info,
           MessageAction.delete,
         ],
       );
+    });
+
+    test('закреп: только с правом; закреплённое — «открепить»', () {
+      expect(messageActions(message()), isNot(contains(MessageAction.pin)));
+      expect(messageActions(message(), canPin: true), contains(MessageAction.pin));
+      final pinned = messageActions(message(), canPin: true, isPinned: true);
+      expect(pinned, contains(MessageAction.unpin));
+      expect(pinned, isNot(contains(MessageAction.pin)));
+    });
+
+    test('закладка: поставить или убрать по состоянию', () {
+      expect(messageActions(message()), contains(MessageAction.bookmark));
+      final marked = messageActions(message(), isBookmarked: true);
+      expect(marked, contains(MessageAction.unbookmark));
+      expect(marked, isNot(contains(MessageAction.bookmark)));
     });
 
     test('в закрытом чате отвечать нельзя, пересылать можно', () {

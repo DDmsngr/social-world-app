@@ -227,6 +227,23 @@ class SecureChatRepository implements ChatRepository {
     log: AppLog.add,
   );
 
+  @override
+  Future<List<ChatMessage>> loadMessagesByIds(
+    String conversationId,
+    List<String> ids,
+  ) async {
+    if (ids.isEmpty) return const [];
+    final rows = await _client
+        .from('chat_messages')
+        .select()
+        .eq('conversation_id', conversationId)
+        .inFilter('id', ids)
+        .timeout(_netTimeout);
+    final sorted = List<Map<String, dynamic>>.from(rows)
+      ..sort((a, b) => (b['sent_at'] as String).compareTo(a['sent_at'] as String));
+    return _decodeBatch(sorted, await _openFeed(conversationId), conversationId);
+  }
+
   Future<_Feed> _openFeed(String conversationId) async {
     await _ready;
     final conversation = await loadConversation(

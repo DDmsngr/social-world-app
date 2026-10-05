@@ -44,6 +44,9 @@ Future<ForwardResult> forwardMessages({
   required List<ChatMessage> messages,
   required List<Conversation> targets,
   required String Function(ChatMessage message) authorOf,
+  // false — «Изменить и переслать»: уходит обычным новым сообщением, без
+  // пометки «Переслано от».
+  bool withAuthor = true,
 }) async {
   final files = <String, String>{};
   final delivered = <String>{};
@@ -52,7 +55,9 @@ Future<ForwardResult> forwardMessages({
   for (final target in targets) {
     try {
       for (final message in messages) {
-        final options = SendOptions(forwardedFrom: authorOf(message));
+        final options = withAuthor
+            ? SendOptions(forwardedFrom: authorOf(message))
+            : SendOptions.none;
         final attachment = message.attachment;
         if (attachment == null || message.kind == MessageKind.sticker) {
           await repository.send(

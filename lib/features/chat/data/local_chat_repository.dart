@@ -216,6 +216,15 @@ class LocalChatRepository implements ChatRepository {
   }
 
   @override
+  Future<List<ChatMessage>> loadMessagesByIds(
+    String conversationId,
+    List<String> ids,
+  ) async => [
+    for (final m in _messages[conversationId] ?? const <ChatMessage>[])
+      if (ids.contains(m.id)) m,
+  ];
+
+  @override
   Future<void> markRead(String conversationId) async {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index != -1) {

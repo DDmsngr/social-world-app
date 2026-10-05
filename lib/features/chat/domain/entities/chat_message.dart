@@ -151,14 +151,14 @@ class ChatMessage {
         : kind.preview;
   }
 
-  ChatMessage copyWith({MessageStatus? status, bool? signatureValid}) =>
+  ChatMessage copyWith({MessageStatus? status, bool? signatureValid, String? text}) =>
       ChatMessage(
         id: id,
         conversationId: conversationId,
         senderId: senderId,
         sentAt: sentAt,
         kind: kind,
-        text: text,
+        text: text ?? this.text,
         attachment: attachment,
         status: status ?? this.status,
         signatureValid: signatureValid ?? this.signatureValid,

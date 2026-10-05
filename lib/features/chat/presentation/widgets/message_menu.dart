@@ -16,6 +16,7 @@ import '../../domain/repositories/chat_repository.dart';
 import '../providers/chat_providers.dart';
 import '../providers/hidden_messages_provider.dart';
 import '../providers/chat_extras_providers.dart';
+import '../providers/chat_pins_providers.dart';
 import 'forward_picker.dart';
 
 /// Меню сообщения: долгий тап в переписке и «⋮» в просмотре фото.
@@ -35,9 +36,19 @@ Future<bool> showMessageMenu(
   void Function(String emoji)? onReact,
 }) async {
   HapticFeedback.mediumImpact();
+  // Закреплять: в личном чате оба, в группе владелец (права проверяет и сервер).
+  final canPin = conversation != null && (conversation.isDirect || conversation.isOwner);
+  final isPinned = ref
+      .read(chatPinsProvider(message.conversationId))
+      .value
+      ?.any((p) => p.messageId == message.id) ??
+      false;
   final actions = messageActions(
     message,
     canReply: onReply != null && !(conversation?.closed ?? false),
+    canPin: canPin && onReact != null,
+    isPinned: isPinned,
+    isBookmarked: ref.read(myBookmarksProvider.notifier).has(message.id),
   );
   // Плавающая панель у самого сообщения, как в Telegram: сверху реакции,
   // под ними пункты. Само сообщение остаётся подсвеченным на экране.
@@ -68,6 +79,46 @@ Future<bool> showMessageMenu(
     case MessageAction.copy:
       await Clipboard.setData(ClipboardData(text: message.text!.trim()));
       messenger.showSnackBar(const SnackBar(content: Text('Скопировано')));
+      return false;
+    case MessageAction.editForward:
+      await _editAndForward(context, ref, message, myId, conversation);
+      return false;
+    case MessageAction.pin:
+    case MessageAction.unpin:
+      try {
+        await setPinned(
+          ref,
+          message.conversationId,
+          message.id,
+          pinned: action == MessageAction.pin,
+        );
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(action == MessageAction.pin ? 'Сообщение закреплено' : 'Сообщение откреплено'),
+          ),
+        );
+      } catch (error) {
+        AppLog.add('Закреп: $error');
+        messenger.showSnackBar(
+          SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось изменить закреп'))),
+        );
+      }
+      return false;
+    case MessageAction.bookmark:
+    case MessageAction.unbookmark:
+      try {
+        final on = await ref
+            .read(myBookmarksProvider.notifier)
+            .toggle(message.id, message.conversationId);
+        messenger.showSnackBar(
+          SnackBar(content: Text(on ? 'Закладка поставлена' : 'Закладка убрана')),
+        );
+      } catch (error) {
+        AppLog.add('Закладка: $error');
+        messenger.showSnackBar(
+          SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось изменить закладку'))),
+        );
+      }
       return false;
     case MessageAction.copyPart:
       await showDialog<void>(
@@ -356,6 +407,11 @@ class _FloatingMenu extends StatelessWidget {
 String _label(MessageAction action) => switch (action) {
   MessageAction.reply => 'Ответить',
   MessageAction.forward => 'Переслать',
+  MessageAction.editForward => 'Изменить и переслать',
+  MessageAction.pin => 'Закрепить',
+  MessageAction.unpin => 'Открепить',
+  MessageAction.bookmark => 'Установить закладку',
+  MessageAction.unbookmark => 'Убрать закладку',
   MessageAction.copy => 'Копировать',
   MessageAction.copyPart => 'Копировать выборочно',
   MessageAction.saveToGallery => 'Сохранить в галерею',
@@ -367,6 +423,11 @@ String _label(MessageAction action) => switch (action) {
 IconData _icon(MessageAction action) => switch (action) {
   MessageAction.reply => Icons.reply_rounded,
   MessageAction.forward => Icons.shortcut_rounded,
+  MessageAction.editForward => Icons.drive_file_rename_outline_rounded,
+  MessageAction.pin => Icons.push_pin_outlined,
+  MessageAction.unpin => Icons.push_pin,
+  MessageAction.bookmark => Icons.bookmark_add_outlined,
+  MessageAction.unbookmark => Icons.bookmark_remove_outlined,
   MessageAction.copy => Icons.copy_rounded,
   MessageAction.copyPart => Icons.content_paste_search_rounded,
   MessageAction.saveToGallery => Icons.download_rounded,
@@ -461,6 +522,104 @@ Future<void> _forward(
   if (result == null) return;
   final all = ref.read(conversationsProvider).value ?? const <Conversation>[];
   messenger.showSnackBar(SnackBar(content: Text(forwardSummary(result, all))));
+}
+
+/// «Изменить и переслать»: правим текст (или подпись), выбираем чаты, сообщение
+/// уходит как новое, без пометки об авторе. Вложение остаётся как есть.
+Future<void> _editAndForward(
+  BuildContext context,
+  WidgetRef ref,
+  ChatMessage message,
+  String myId,
+  Conversation? source,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final edited = await showDialog<String>(
+    context: context,
+    useRootNavigator: true,
+    builder: (_) => _EditForwardDialog(
+      initial: message.text ?? '',
+      hasAttachment: message.attachment != null,
+    ),
+  );
+  if (edited == null || !context.mounted) return;
+  final text = edited.trim();
+  if (text.isEmpty && message.attachment == null) return;
+  final copy = message.copyWith(text: text);
+  final myName = ref.read(currentUserProvider)?.displayName ?? 'Вы';
+  final result = await showForwardPicker(
+    context,
+    messages: [copy],
+    withAuthor: false,
+    authorOf: (m) => forwardAuthor(m, myId: myId, myName: myName, source: source),
+  );
+  if (result == null) return;
+  final all = ref.read(conversationsProvider).value ?? const <Conversation>[];
+  messenger.showSnackBar(SnackBar(content: Text(forwardSummary(result, all))));
+}
+
+class _EditForwardDialog extends StatefulWidget {
+  const _EditForwardDialog({required this.initial, required this.hasAttachment});
+
+  final String initial;
+  final bool hasAttachment;
+
+  @override
+  State<_EditForwardDialog> createState() => _EditForwardDialogState();
+}
+
+class _EditForwardDialogState extends State<_EditForwardDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Изменить и переслать'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            minLines: 2,
+            maxLines: 8,
+            maxLength: 4000,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: widget.hasAttachment ? 'Подпись' : 'Текст сообщения',
+            ),
+          ),
+          if (widget.hasAttachment)
+            Text(
+              'Фото, видео или файл уйдут без изменений.',
+              style: TextStyle(color: AppColors.textDim, fontSize: 12.5),
+            ),
+          const SizedBox(height: 4),
+          Text(
+            'Уйдёт как новое сообщение, без пометки «Переслано от».',
+            style: TextStyle(color: AppColors.textDim, fontSize: 12.5),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Отмена'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Далее'),
+        ),
+      ],
+    );
+  }
 }
 
 Future<void> _saveToGallery(

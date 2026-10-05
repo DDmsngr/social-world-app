@@ -432,6 +432,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                       builder: (_, state) => ChatScreen(
                         conversationId: state.pathParameters['conversationId']!,
                         peerName: state.extra as String? ?? 'Чат',
+                        jumpToMessageId: state.uri.queryParameters['m'],
                       ),
                       routes: [
                         GoRoute(

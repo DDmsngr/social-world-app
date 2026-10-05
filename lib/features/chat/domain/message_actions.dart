@@ -11,6 +11,14 @@ enum MessageAction {
   share,
   forward,
 
+  /// «Изменить и переслать»: правка текста и пересылка без пометки об авторе.
+  editForward,
+
+  pin,
+  unpin,
+  bookmark,
+  unbookmark,
+
   /// «Свойства сообщения»: время, статус, размер вложения.
   info,
   delete,
@@ -20,9 +28,13 @@ enum MessageAction {
 /// просмотрщик и подсказки для экранного чтеца.
 ///
 /// [canReply] — в чат можно писать (в закрытом квест-чате отвечать некуда).
+/// [canPin] — можно закреплять в этом чате (права проверяет и сервер).
 List<MessageAction> messageActions(
   ChatMessage message, {
   bool canReply = true,
+  bool canPin = false,
+  bool isPinned = false,
+  bool isBookmarked = false,
 }) {
   final text = message.text?.trim() ?? '';
   final attachment = message.attachment;
@@ -44,6 +56,9 @@ List<MessageAction> messageActions(
     if (attachment != null && message.kind != MessageKind.sticker)
       MessageAction.share,
     if (trusted) MessageAction.forward,
+    if (trusted && (text.isNotEmpty || attachment != null)) MessageAction.editForward,
+    if (canPin && trusted) isPinned ? MessageAction.unpin : MessageAction.pin,
+    if (trusted) isBookmarked ? MessageAction.unbookmark : MessageAction.bookmark,
     MessageAction.info,
     MessageAction.delete,
   ];
