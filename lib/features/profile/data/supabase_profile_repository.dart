@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/media/media_uploader.dart';
 import '../domain/profile_models.dart';
 import '../domain/profile_repository.dart';
 
@@ -27,6 +28,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       id: row['id'] as String,
       displayName: (row['display_name'] as String?) ?? 'Без имени',
       avatarUrl: row['avatar_url'] as String?,
+      avatarVideoUrl: row['avatar_video_url'] as String?,
       bio: row['bio'] as String?,
       city: row['city'] as String?,
       socialScore: (row['social_score'] as num?)?.toInt() ?? 0,
@@ -35,6 +37,21 @@ class SupabaseProfileRepository implements ProfileRepository {
       followedByMe: row['followed_by_me'] as bool? ?? false,
       blockKind: BlockKind.parse(row['block_kind']),
     );
+  }
+
+  @override
+  Future<bool> isPremium() async =>
+      (await _client.rpc('my_is_premium')) as bool? ?? false;
+
+  @override
+  Future<void> setAvatarVideo(String? localPath) async {
+    // Файл уезжает в бакет раньше записи ссылки: сорвавшаяся загрузка не
+    // оставит в профиле ссылку на несуществующий ролик. Сервер ещё раз
+    // проверяет и премиум, и что ссылка ведёт в свою папку.
+    final url = localPath == null
+        ? null
+        : await MediaUploader(_client, bucket: 'avatars').upload(localPath);
+    await _client.rpc('set_avatar_video', params: {'in_url': url});
   }
 
   @override

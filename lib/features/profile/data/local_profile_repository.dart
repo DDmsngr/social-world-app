@@ -21,6 +21,15 @@ class LocalProfileRepository implements ProfileRepository {
     'person-6': 'Ника',
   };
 
+  // Премиума в режиме заглушек нет: видеоаватар недоступен.
+  @override
+  Future<bool> isPremium() async => false;
+
+  @override
+  Future<void> setAvatarVideo(String? localPath) async {
+    if (localPath != null) throw StateError('Видеоаватар доступен в премиуме');
+  }
+
   @override
   Future<UserProfile?> loadProfile(String userId) async {
     await Future<void>.delayed(const Duration(milliseconds: 150));

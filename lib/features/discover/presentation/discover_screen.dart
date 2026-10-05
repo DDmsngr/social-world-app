@@ -21,6 +21,7 @@ import '../domain/entities/nearby_person.dart';
 import '../domain/entities/place.dart';
 import 'providers/discover_providers.dart';
 import 'providers/city_provider.dart';
+import 'providers/map_start.dart';
 import 'providers/presence_publisher.dart';
 import 'widgets/city_picker.dart';
 import 'widgets/discover_map.dart';
@@ -45,6 +46,27 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const LogViewerScreen()));
+  }
+
+  /// Один раз за запуск приложения: карта открывается не на центре города, а
+  /// на вашем месте или на самой активной зоне — как выбрано в настройках.
+  static var _startApplied = false;
+
+  Future<void> _applyStart() async {
+    if (_startApplied) return;
+    _startApplied = true;
+    final city = ref.read(cityProvider);
+    final target = await planMapStart(
+      mode: await MapStart.load(),
+      cityLatitude: city.latitude,
+      cityLongitude: city.longitude,
+      loadActivity: () => ref.read(activityProvider.future),
+    );
+    // За время ожидания человек мог уйти с карты, выбрать «Рядом» или
+    // сам передвинуть камеру поиском — тогда не перебиваем.
+    if (!mounted || target == null) return;
+    if (ref.read(nearbyAnchorProvider) != null || ref.read(mapFocusProvider) != null) return;
+    _focus(target.latitude, target.longitude, zoom: target.zoom);
   }
 
   void _focus(double? latitude, double? longitude, {double zoom = 16}) {
@@ -87,6 +109,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     ref.watch(presencePublisherProvider);
 
     final data = ref.watch(discoverDataProvider);
+    if (!_startApplied && data.hasValue) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyStart());
+    }
     ref.listen(discoverDataProvider, (_, next) {
       AppLog.add(
         'Карта: данные — ${next.isLoading

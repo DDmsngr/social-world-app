@@ -18,4 +18,9 @@ abstract final class Features {
 
   /// В dev-режиме чат работает на локальном репозитории без Supabase.
   static bool get chat => DevMode.enabled || _chatOverride;
+
+  /// Видеоаватар (короткий кружок вместо фото). Механика готова — миграция
+  /// 0044, запись только у премиума, — но показ закрыт, пока продукт не решил,
+  /// когда и кому её открыть. Флаг: `--dart-define=FEATURE_VIDEO_AVATAR=true`.
+  static const videoAvatar = bool.fromEnvironment('FEATURE_VIDEO_AVATAR');
 }

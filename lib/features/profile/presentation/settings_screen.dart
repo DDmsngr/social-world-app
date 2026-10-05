@@ -16,6 +16,7 @@ import '../../../core/update/update_controller.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
+import '../../discover/presentation/providers/map_start.dart';
 import '../../discover/presentation/providers/presence_publisher.dart';
 import '../../referrals/presentation/widgets/referral_code_sheet.dart';
 
@@ -62,6 +63,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SectionLabel('Оформление'),
           const SizedBox(height: 12),
           const _ThemePicker(),
+          const SizedBox(height: 26),
+          const SectionLabel('Карта'),
+          const SizedBox(height: 12),
+          const _MapStartPicker(),
           const SizedBox(height: 26),
           const SectionLabel('Приватность геолокации'),
           const SizedBox(height: 12),
@@ -216,6 +221,58 @@ class _LastSeenSwitchState extends State<_LastSeenSwitch> {
         onChanged: show == null ? null : _set,
         title: const Text('Показывать, когда я в сети'),
         subtitle: const Text('Если выключить, вы тоже не увидите время других'),
+      ),
+    );
+  }
+}
+
+/// С чего начинается карта: с моего места или с самой активной зоны города.
+class _MapStartPicker extends StatefulWidget {
+  const _MapStartPicker();
+
+  @override
+  State<_MapStartPicker> createState() => _MapStartPickerState();
+}
+
+class _MapStartPickerState extends State<_MapStartPicker> {
+  MapStart? _value;
+
+  @override
+  void initState() {
+    super.initState();
+    MapStart.load().then((value) {
+      if (mounted) setState(() => _value = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = _value;
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      child: RadioGroup<MapStart>(
+        groupValue: current,
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => _value = value);
+          value.save();
+        },
+        child: Column(
+          children: [
+            for (final option in MapStart.values)
+              RadioListTile<MapStart>(
+                value: option,
+                activeColor: AppColors.primaryTint,
+                title: Text(option.label),
+                subtitle: Text(
+                  option == MapStart.myLocation
+                      ? 'Нужен доступ к геолокации. Без него или в другом городе откроется активная зона.'
+                      : 'Там, где сейчас больше всего событий и людей.',
+                  style: TextStyle(color: AppColors.textDim, fontSize: 12.5),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

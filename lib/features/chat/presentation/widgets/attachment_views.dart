@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:open_filex/open_filex.dart';
@@ -422,6 +425,65 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
     super.dispose();
   }
 
+  // ── перемотка по кольцу ────────────────────────────────────────────────
+  // Палец у края кружка ведёт ползунок по кольцу, как стрелку часов: верх —
+  // начало, полный круг — конец. Пока тянем, ролик на паузе.
+  bool _scrubbing = false;
+  bool _wasPlaying = false;
+  double _scrubFraction = 0;
+
+  /// Касание в полосе кольца (внешние ~15% радиуса) и звук включён.
+  bool _onRing(Offset local) {
+    if (!_ready || _controller.value.volume == 0) return false;
+    final r = _size / 2;
+    final d = (local - Offset(r, r)).distance;
+    return d >= r * 0.78 && d <= r * 1.18;
+  }
+
+  double _fractionAt(Offset local) {
+    const r = _size / 2;
+    final dx = local.dx - r;
+    final dy = local.dy - r;
+    var angle = math.atan2(dx, -dy); // от верха по часовой, -π..π
+    if (angle < 0) angle += 2 * math.pi;
+    var fraction = angle / (2 * math.pi);
+    // Переход через «12 часов» не должен перекидывать с конца в начало.
+    if ((fraction - _scrubFraction).abs() > 0.5) {
+      fraction = _scrubFraction > 0.5 ? 1.0 : 0.0;
+    }
+    return fraction.clamp(0.0, 1.0);
+  }
+
+  void _scrubTo(Offset local) {
+    final duration = _controller.value.duration;
+    if (duration == Duration.zero) return;
+    _scrubFraction = _fractionAt(local);
+    _controller.seekTo(duration * _scrubFraction);
+    setState(() {});
+  }
+
+  void _scrubStart(Offset local) {
+    _wasPlaying = _controller.value.isPlaying;
+    _scrubbing = true;
+    _scrubFraction = _controller.value.duration == Duration.zero
+        ? 0
+        : _controller.value.position.inMilliseconds /
+              _controller.value.duration.inMilliseconds;
+    _controller.pause();
+    HapticFeedback.selectionClick();
+    _scrubTo(local);
+  }
+
+  void _scrubEnd() {
+    _scrubbing = false;
+    // Дотянули до конца — ролик играет с начала, а не замирает на последнем кадре.
+    if (_scrubFraction >= 0.995) {
+      _controller.seekTo(Duration.zero);
+    }
+    if (_wasPlaying || _scrubFraction >= 0.995) _controller.play();
+    setState(() {});
+  }
+
   void _toggle() {
     final value = _controller.value;
     if (value.volume == 0) {
@@ -447,8 +509,25 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
         : value.position.inMilliseconds / value.duration.inMilliseconds;
     final withSound = value.volume > 0;
 
-    return GestureDetector(
-      onTap: _ready ? _toggle : null,
+    return RawGestureDetector(
+      gestures: {
+        _RingScrubRecognizer: GestureRecognizerFactoryWithHandlers<_RingScrubRecognizer>(
+          () => _RingScrubRecognizer(),
+          (recognizer) {
+            recognizer
+              ..accepts = _onRing
+              ..onStart = _scrubStart
+              ..onMove = _scrubTo
+              ..onEnd = _scrubEnd;
+          },
+        ),
+        TapGestureRecognizer: GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
+          () => TapGestureRecognizer(),
+          (recognizer) {
+            recognizer.onTap = _ready && !_scrubbing ? _toggle : null;
+          },
+        ),
+      },
       child: SizedBox.square(
         dimension: _size,
         child: Stack(
@@ -470,12 +549,13 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
               ),
             ),
             if (withSound)
-              SizedBox.square(
-                dimension: _size,
-                child: CircularProgressIndicator(
-                  value: progress.clamp(0.0, 1.0),
-                  strokeWidth: 3,
+              CustomPaint(
+                size: const Size.square(_size),
+                painter: _RingPainter(
+                  progress: (_scrubbing ? _scrubFraction : progress).clamp(0.0, 1.0),
                   color: AppColors.primaryTint,
+                  track: Colors.white24,
+                  knob: _scrubbing,
                 ),
               ),
             if (withSound)
@@ -511,6 +591,77 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
       ),
     );
   }
+}
+
+/// Кольцо прогресса кружка: тонкая дорожка и дуга от «12 часов» по часовой;
+/// при перемотке на конце дуги — ползунок.
+class _RingPainter extends CustomPainter {
+  _RingPainter({
+    required this.progress,
+    required this.color,
+    required this.track,
+    required this.knob,
+  });
+
+  final double progress;
+  final Color color;
+  final Color track;
+  final bool knob;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = knob ? 5.0 : 3.0;
+    final rect = (Offset.zero & size).deflate(stroke / 2 + 1);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, 0, 2 * math.pi, false, paint..color = track);
+    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * progress, false, paint..color = color);
+    if (knob) {
+      final angle = -math.pi / 2 + 2 * math.pi * progress;
+      final center = rect.center + Offset(math.cos(angle), math.sin(angle)) * (rect.width / 2);
+      canvas.drawCircle(center, 9, Paint()..color = Colors.white);
+      canvas.drawCircle(center, 6, Paint()..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.progress != progress || old.knob != knob || old.color != color;
+}
+
+/// Забирает касание сразу, если оно началось на кольце кружка, и отдаёт
+/// положение пальца: так перемотка не конфликтует со свайпом «ответить».
+class _RingScrubRecognizer extends OneSequenceGestureRecognizer {
+  bool Function(Offset local) accepts = (_) => false;
+  void Function(Offset local)? onStart;
+  void Function(Offset local)? onMove;
+  VoidCallback? onEnd;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (!accepts(event.localPosition)) return;
+    startTrackingPointer(event.pointer, event.transform);
+    resolve(GestureDisposition.accepted);
+    onStart?.call(event.localPosition);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) {
+      onMove?.call(event.localPosition);
+    } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      stopTrackingPointer(event.pointer);
+      onEnd?.call();
+    }
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {}
+
+  @override
+  String get debugDescription => 'ring scrub';
 }
 
 /// Видео в ленте как видео: рамка фиксированных пропорций (чтобы список не

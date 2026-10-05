@@ -18,7 +18,10 @@ class VideoNoteResult {
 /// Запись кружка: фронтальная камера, круглое превью, до минуты. Запись
 /// начинается сразу при открытии, как в DDChat; «стоп» отправляет.
 class VideoNoteRecorderScreen extends StatefulWidget {
-  const VideoNoteRecorderScreen({super.key});
+  const VideoNoteRecorderScreen({super.key, this.maxDuration = const Duration(seconds: 60)});
+
+  /// Потолок записи: в чате минута, у видеоаватара — несколько секунд.
+  final Duration maxDuration;
 
   @override
   State<VideoNoteRecorderScreen> createState() =>
@@ -26,7 +29,7 @@ class VideoNoteRecorderScreen extends StatefulWidget {
 }
 
 class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
-  static const _max = Duration(seconds: 60);
+  Duration get _max => widget.maxDuration;
 
   CameraController? _camera;
   final _stopwatch = Stopwatch();

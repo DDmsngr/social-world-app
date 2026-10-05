@@ -17,6 +17,7 @@ class UserProfile {
     required this.id,
     required this.displayName,
     this.avatarUrl,
+    this.avatarVideoUrl,
     this.bio,
     this.city,
     this.socialScore = 0,
@@ -29,6 +30,9 @@ class UserProfile {
   final String id;
   final String displayName;
   final String? avatarUrl;
+
+  /// Видеоаватар. Сервер отдаёт его, только пока у владельца действует премиум.
+  final String? avatarVideoUrl;
   final String? bio;
   final String? city;
   final int socialScore;
@@ -46,6 +50,7 @@ class UserProfile {
     id: id,
     displayName: displayName,
     avatarUrl: avatarUrl,
+    avatarVideoUrl: avatarVideoUrl,
     bio: bio,
     city: city,
     socialScore: socialScore,

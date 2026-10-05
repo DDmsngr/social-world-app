@@ -265,6 +265,7 @@ class SupabaseAuthRepository implements AuthRepository {
         phone: user.phone,
         displayName: row['display_name'] as String?,
         avatarUrl: row['avatar_url'] as String?,
+        avatarVideoUrl: row['avatar_video_url'] as String?,
         bio: row['bio'] as String?,
         city: row['city'] as String?,
         socialScore: (row['social_score'] as num?)?.toInt() ?? 0,

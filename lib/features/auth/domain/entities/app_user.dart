@@ -5,6 +5,7 @@ class AppUser {
     this.phone,
     this.displayName,
     this.avatarUrl,
+    this.avatarVideoUrl,
     this.bio,
     this.city,
     this.socialScore = 0,
@@ -16,6 +17,10 @@ class AppUser {
   final String? phone;
   final String? displayName;
   final String? avatarUrl;
+
+  /// Видеоаватар (премиум). Пока флаг `Features.videoAvatar` выключен, нигде
+  /// не показывается.
+  final String? avatarVideoUrl;
   final String? bio;
   final String? city;
   final int socialScore;
@@ -42,6 +47,8 @@ class AppUser {
   AppUser copyWith({
     String? displayName,
     String? avatarUrl,
+    String? avatarVideoUrl,
+    bool clearAvatarVideo = false,
     String? bio,
     String? city,
     int? socialScore,
@@ -53,6 +60,7 @@ class AppUser {
         phone: phone,
         displayName: displayName ?? this.displayName,
         avatarUrl: avatarUrl ?? this.avatarUrl,
+        avatarVideoUrl: clearAvatarVideo ? null : (avatarVideoUrl ?? this.avatarVideoUrl),
         bio: bio ?? this.bio,
         city: city ?? this.city,
         socialScore: socialScore ?? this.socialScore,

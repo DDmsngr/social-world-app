@@ -11,6 +11,7 @@ import '../../../core/permissions/content_permissions.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/share/share_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/video_avatar.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/update/update_dot.dart';
@@ -261,11 +262,22 @@ class _Body extends ConsumerWidget {
               onTap: profile.avatarUrl == null
                   ? null
                   : () => showPhotoViewer(context, urls: [profile.avatarUrl!]),
-              child: UserAvatar(
-                name: profile.displayName,
-                url: profile.avatarUrl,
-                radius: 38,
-              ),
+              child: Features.videoAvatar && profile.avatarVideoUrl != null
+                  ? VideoAvatar(
+                      url: profile.avatarVideoUrl!,
+                      radius: 38,
+                      // Пока ролик грузится — обычное фото.
+                      fallback: UserAvatar(
+                        name: profile.displayName,
+                        url: profile.avatarUrl,
+                        radius: 38,
+                      ),
+                    )
+                  : UserAvatar(
+                      name: profile.displayName,
+                      url: profile.avatarUrl,
+                      radius: 38,
+                    ),
             ),
             const SizedBox(width: 16),
             Expanded(
