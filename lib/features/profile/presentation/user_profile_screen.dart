@@ -344,6 +344,11 @@ class _Body extends ConsumerWidget {
             title: 'Сохранённое',
             onTap: () => context.push(Routes.saved),
           ),
+          _MenuTile(
+            icon: Icons.move_to_inbox_outlined,
+            title: 'Импорт из запрещённограмма',
+            onTap: () => context.push(Routes.importData),
+          ),
           Consumer(
             builder: (context, ref, _) {
               if (ref.watch(isAssistantOwnerProvider).value != true) {

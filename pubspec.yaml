@@ -85,6 +85,8 @@ dependencies:
   gal: ^2.3.3
   flutter_contacts: ^2.5.0
   crypto: ^3.0.7
+  # Переезд из другой соцсети: читать zip-выгрузку данных на телефоне.
+  archive: ^4.0.7
 
 dev_dependencies:
   flutter_test:

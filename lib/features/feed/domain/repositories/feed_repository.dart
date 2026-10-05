@@ -41,6 +41,9 @@ abstract interface class FeedRepository {
     double? placeLongitude,
     String? routeId,
     String? questId,
+
+    /// Исходная дата — для переезда из другой соцсети. Обычные посты без неё.
+    DateTime? createdAt,
   });
 
   /// Правка собственного поста. [keepMediaUrls] — вложения, которые остаются,

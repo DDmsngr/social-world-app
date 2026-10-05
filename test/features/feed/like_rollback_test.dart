@@ -69,6 +69,7 @@ class _FailingFeedRepository implements FeedRepository {
     double? placeLongitude,
     String? routeId,
     String? questId,
+    DateTime? createdAt,
   }) async => _post;
 
   @override

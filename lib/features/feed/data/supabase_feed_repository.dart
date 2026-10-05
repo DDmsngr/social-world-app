@@ -56,6 +56,7 @@ class SupabaseFeedRepository implements FeedRepository {
     double? placeLongitude,
     String? routeId,
     String? questId,
+    DateTime? createdAt,
   }) async {
     // UID фиксируем один раз: между двумя await к _client.auth.currentUser
     // в теории может успеть смениться сессия, а вставлять и читать профиль
@@ -86,6 +87,7 @@ class SupabaseFeedRepository implements FeedRepository {
           // Только когда задан: до миграции 0023 колонки нет, и обычный пост
           // с 'quest_id': null упал бы на неизвестном поле.
           'quest_id': ?questId,
+          if (createdAt != null) 'created_at': createdAt.toUtc().toIso8601String(),
         })
         .select()
         .single();
