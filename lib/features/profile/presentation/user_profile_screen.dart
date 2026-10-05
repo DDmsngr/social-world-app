@@ -18,6 +18,7 @@ import '../../../core/update/update_dot.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
+import '../../assistant/assistant.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../feed/presentation/post_actions.dart';
@@ -342,6 +343,18 @@ class _Body extends ConsumerWidget {
             icon: Icons.bookmark_border,
             title: 'Сохранённое',
             onTap: () => context.push(Routes.saved),
+          ),
+          Consumer(
+            builder: (context, ref, _) {
+              if (ref.watch(isAssistantOwnerProvider).value != true) {
+                return const SizedBox.shrink();
+              }
+              return _MenuTile(
+                icon: Icons.support_agent,
+                title: 'Помощник',
+                onTap: () => context.push(Routes.assistant),
+              );
+            },
           ),
           Consumer(
             builder: (context, ref, _) {
