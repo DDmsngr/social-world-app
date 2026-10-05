@@ -19,6 +19,9 @@ import '../../feed/domain/entities/post.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
 import '../../feed/presentation/providers/publish_settings_provider.dart';
 import '../../feed/presentation/widgets/publish_settings_panel.dart';
+import '../../feed/domain/repositories/feed_repository.dart';
+import 'widgets/article_editor.dart';
+import 'widgets/article_media.dart';
 import 'widgets/composer_parts.dart';
 import 'widgets/post_body_editor.dart';
 
@@ -59,6 +62,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   final _picker = ImagePicker();
   final _geocoder = NominatimGeocoder();
   final _attachments = <XFile>[];
+  final _article = ArticleController();
   var _markdown = false;
 
   // Место храним целиком, а не только название: у places title не уникален
@@ -73,7 +77,16 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   static const _maxAttachments = 4;
 
   @override
+  void initState() {
+    super.initState();
+    _article.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
+    _article.dispose();
     _bodyController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
@@ -82,6 +95,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
 
   void _resetForm() {
     _bodyController.clear();
+    _article.clear();
     _titleController.clear();
     _descriptionController.clear();
     _attachments.clear();
@@ -124,7 +138,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     final settings = ref.read(publishSettingsProvider).current;
 
     final post = await ref.read(feedRepositoryProvider).createPost(
-      body: _bodyController.text,
+      body: isArticle ? _article.markdown : _bodyController.text,
       postType: isArticle ? PostType.article : PostType.moment,
       title: isArticle ? _titleController.text : null,
       bodyFormat: isArticle || _markdown ? BodyFormat.markdown : BodyFormat.plain,
@@ -213,51 +227,29 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     setState(() => _attachments.add(video));
   }
 
-  /// Фото, вставляемое прямо в текст статьи: в отличие от вложений оно нужно
-  /// в хранилище ещё до публикации, чтобы получить ссылку.
-  Future<String?> _insertInlineImage() async {
-    final file = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
+  FeedRepository get _feedRepo => ref.read(feedRepositoryProvider);
+
+  void _uploadFailed(Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(friendlyError(error, fallback: 'Не загрузилось'))),
     );
-    if (file == null) return null;
-    try {
-      return await ref.read(feedRepositoryProvider).uploadInlineImage(file.path);
-    } catch (error) {
-      AppLog.add('Фото в текст не загрузилось: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(friendlyError(error, fallback: 'Фото не загрузилось')),
-          ),
-        );
-      }
-      return null;
-    }
   }
 
-  /// Видео в тексте статьи: до минуты (как вложение), заливается заранее.
-  /// Тот же загрузчик, что и для фото: он просто кладёт файл в `post-media`.
-  Future<String?> _insertInlineVideo() async {
-    final file = await _picker.pickVideo(
-      source: ImageSource.gallery,
-      maxDuration: const Duration(minutes: 1),
-    );
-    if (file == null) return null;
-    try {
-      return await ref.read(feedRepositoryProvider).uploadInlineImage(file.path);
-    } catch (error) {
-      AppLog.add('Видео в текст не загрузилось: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(friendlyError(error, fallback: 'Видео не загрузилось')),
-          ),
-        );
-      }
-      return null;
-    }
-  }
+  /// Фото и видео в тексте статьи нужны в хранилище ещё до публикации, чтобы
+  /// получить ссылку для Markdown.
+  Future<List<String>> _pickArticleImages(int limit) => pickArticleImages(
+    picker: _picker,
+    repository: _feedRepo,
+    limit: limit,
+    onError: _uploadFailed,
+  );
+
+  Future<String?> _pickArticleVideo() => pickArticleVideo(
+    picker: _picker,
+    repository: _feedRepo,
+    onError: _uploadFailed,
+  );
 
   Future<void> _pickStartsAt() async {
     final now = DateTime.now();
@@ -289,7 +281,8 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
         _bodyController.text.trim().length >= 3 || _attachments.isNotEmpty,
       _CreateKind.article =>
         _titleController.text.trim().length >= 3 &&
-            _bodyController.text.trim().length >= 20,
+            _article.markdown.trim().length >= 20 &&
+            _article.markdown.length <= ArticleController.maxLength,
       _CreateKind.event =>
         _titleController.text.trim().length >= 3 && _startsAt != null,
       _CreateKind.route => false,
@@ -378,8 +371,8 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             Text('Расскажите\nподробно', style: AppTypography.serif(32)),
             const SizedBox(height: 8),
             Text(
-              'Длинный текст с заголовком: маршрут выходных, обзор места, '
-              'история. Поддерживается Markdown.',
+              'Заголовок, текст и до 10 фото между абзацами: маршрут выходных, '
+              'обзор места, история.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
@@ -391,21 +384,13 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 10),
-            PostBodyEditor(
-              controller: _bodyController,
-              markdown: true,
-              alwaysMarkdown: true,
-              onMarkdownChanged: (_) {},
-              maxLength: 20000,
-              minLines: 10,
-              maxLines: 24,
-              hint: 'Текст статьи',
-              onInsertImage: _insertInlineImage,
-              onInsertVideo: _insertInlineVideo,
-              onChanged: () => setState(() {}),
+            ArticleEditor(
+              controller: _article,
+              onPickImages: _pickArticleImages,
+              onPickVideo: _pickArticleVideo,
             ),
           ],
-          if (_kind.isPost) ...[
+          if (_kind == _CreateKind.moment) ...[
             const SizedBox(height: 6),
             Row(
               children: [

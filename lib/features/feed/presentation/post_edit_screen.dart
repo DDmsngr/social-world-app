@@ -11,6 +11,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../create/presentation/widgets/article_editor.dart';
+import '../../create/presentation/widgets/article_media.dart';
 import '../../create/presentation/widgets/composer_parts.dart';
 import '../../create/presentation/widgets/post_body_editor.dart';
 import '../../discover/domain/entities/place.dart';
@@ -40,6 +42,7 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
 
   final _title = TextEditingController();
   final _body = TextEditingController();
+  final _article = ArticleController();
   final _picker = ImagePicker();
 
   var _markdown = false;
@@ -57,11 +60,15 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
   @override
   void initState() {
     super.initState();
+    _article.addListener(() {
+      if (mounted) setState(() {});
+    });
     _resolve();
   }
 
   @override
   void dispose() {
+    _article.dispose();
     _title.dispose();
     _body.dispose();
     super.dispose();
@@ -80,6 +87,7 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
     if (post != null) {
       _title.text = post.title ?? '';
       _body.text = post.body ?? '';
+      if (post.isArticle) _article.load(post.body ?? '');
       _markdown = post.bodyFormat == BodyFormat.markdown;
       _settings = PublishSettings(
         visibility: post.visibility,
@@ -103,7 +111,12 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
   bool get _canSave {
     if (_busy) return false;
     final text = _body.text.trim();
-    if (_isArticle) return _title.text.trim().isNotEmpty && text.length >= 20;
+    if (_isArticle) {
+      final article = _article.markdown;
+      return _title.text.trim().isNotEmpty &&
+          article.trim().length >= 20 &&
+          article.length <= ArticleController.maxLength;
+    }
     return text.length >= 3 || _keepMedia.isNotEmpty || _newMedia.isNotEmpty;
   }
 
@@ -113,43 +126,25 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
     setState(() => _newMedia.addAll(picked.take(_freeSlots)));
   }
 
-  Future<String?> _insertImage() async {
-    final file = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
+  void _uploadFailed(Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(friendlyError(error, fallback: 'Не загрузилось'))),
     );
-    if (file == null) return null;
-    try {
-      return await ref.read(feedRepositoryProvider).uploadInlineImage(file.path);
-    } catch (error) {
-      AppLog.add('Фото в текст не загрузилось: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(error, fallback: 'Фото не загрузилось'))),
-        );
-      }
-      return null;
-    }
   }
 
-  Future<String?> _insertVideo() async {
-    final file = await _picker.pickVideo(
-      source: ImageSource.gallery,
-      maxDuration: const Duration(minutes: 1),
-    );
-    if (file == null) return null;
-    try {
-      return await ref.read(feedRepositoryProvider).uploadInlineImage(file.path);
-    } catch (error) {
-      AppLog.add('Видео в текст не загрузилось: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(error, fallback: 'Видео не загрузилось'))),
-        );
-      }
-      return null;
-    }
-  }
+  Future<List<String>> _pickArticleImages(int limit) => pickArticleImages(
+    picker: _picker,
+    repository: ref.read(feedRepositoryProvider),
+    limit: limit,
+    onError: _uploadFailed,
+  );
+
+  Future<String?> _pickArticleVideo() => pickArticleVideo(
+    picker: _picker,
+    repository: ref.read(feedRepositoryProvider),
+    onError: _uploadFailed,
+  );
 
   Future<void> _save() async {
     final post = _post;
@@ -158,7 +153,7 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
     try {
       final updated = await ref.read(feedRepositoryProvider).updatePost(
         post,
-        body: _body.text,
+        body: _isArticle ? _article.markdown : _body.text,
         title: _isArticle ? _title.text : null,
         bodyFormat: _isArticle
             ? BodyFormat.markdown
@@ -223,30 +218,33 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
             ),
             const SizedBox(height: 10),
           ],
-          PostBodyEditor(
-            controller: _body,
-            markdown: _markdown,
-            alwaysMarkdown: _isArticle,
-            onMarkdownChanged: (value) => setState(() => _markdown = value),
-            maxLength: _isArticle ? 20000 : 500,
-            minLines: _isArticle ? 10 : 4,
-            maxLines: _isArticle ? 24 : 8,
-            hint: _isArticle ? 'Текст статьи' : 'Текст',
-            onInsertImage: _isArticle ? _insertImage : null,
-            onInsertVideo: _isArticle ? _insertVideo : null,
-            onChanged: () => setState(() {}),
-          ),
+          if (_isArticle)
+            ArticleEditor(
+              controller: _article,
+              onPickImages: _pickArticleImages,
+              onPickVideo: _pickArticleVideo,
+            )
+          else
+            PostBodyEditor(
+              controller: _body,
+              markdown: _markdown,
+              onMarkdownChanged: (value) => setState(() => _markdown = value),
+              maxLength: 500,
+              hint: 'Текст',
+              onChanged: () => setState(() {}),
+            ),
           const SizedBox(height: 12),
           if (!post.isRoute) ...[
-            Row(
-              children: [
-                AttachButton(
-                  icon: Icons.photo_library_outlined,
-                  label: 'Добавить фото',
-                  onTap: _freeSlots <= 0 ? null : _addPhotos,
-                ),
-              ],
-            ),
+            if (!_isArticle)
+              Row(
+                children: [
+                  AttachButton(
+                    icon: Icons.photo_library_outlined,
+                    label: 'Добавить фото',
+                    onTap: _freeSlots <= 0 ? null : _addPhotos,
+                  ),
+                ],
+              ),
             if (_keepMedia.isNotEmpty || _newMedia.isNotEmpty) ...[
               const SizedBox(height: 12),
               SizedBox(
