@@ -103,7 +103,49 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
       _post = post;
       _loading = false;
     });
+    if (post != null) _initial = _snapshot();
   }
+
+  /// Слепок формы на момент открытия: по нему видно, что человек что-то
+  /// изменил, и системная «назад» не выбрасывает правки молча.
+  String _initial = '';
+
+  String _snapshot() => [
+    _title.text,
+    _isArticle ? _article.markdown : _body.text,
+    _keepMedia.join(','),
+    _newMedia.length,
+    _settings.toJson(),
+    _placeId,
+    _markdown,
+  ].join('|');
+
+  bool get _dirty => !_loading && _post != null && _snapshot() != _initial;
+
+  /// Спрашивает, уходить ли без сохранения. Возвращает true — можно уходить.
+  Future<bool> _confirmLeave() async {
+    if (!_dirty || _busy) return true;
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Выйти без сохранения?'),
+        content: const Text('Изменения в публикации пропадут.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Остаться'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Выйти'),
+          ),
+        ],
+      ),
+    );
+    return leave == true;
+  }
+
+  void _leave() => context.canPop() ? context.pop() : context.go(Routes.feed);
 
   bool get _isArticle => _post?.isArticle ?? false;
   int get _freeSlots => _maxAttachments - _keepMedia.length - _newMedia.length;
@@ -318,17 +360,25 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isArticle ? 'Правка статьи' : 'Правка публикации'),
-        leading: IconButton(
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go(Routes.feed),
-          tooltip: 'Назад',
-          icon: const Icon(Icons.arrow_back),
+    return PopScope(
+      canPop: !_dirty || _busy,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (await _confirmLeave() && mounted) _leave();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_isArticle ? 'Правка статьи' : 'Правка публикации'),
+          leading: IconButton(
+            onPressed: () async {
+              if (await _confirmLeave() && mounted) _leave();
+            },
+            tooltip: 'Назад',
+            icon: const Icon(Icons.arrow_back),
+          ),
         ),
+        body: body,
       ),
-      body: body,
     );
   }
 }

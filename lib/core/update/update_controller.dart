@@ -108,7 +108,20 @@ class UpdateController extends Notifier<UpdateState> {
   Future<void> check({bool silent = true}) async {
     if (!_supported || !Env.isConfigured) return;
 
-    final pending = await _loadPending();
+    var pending = await _loadPending();
+    if (pending != null) {
+      // Вышла версия новее скачанной — старый файл ставить незачем. Раньше
+      // «готовое» обновление перекрывало проверку, и человек застревал на нём.
+      try {
+        final latest = await _service.fetchManifest();
+        if (latest != null && latest.versionCode > pending.info.versionCode) {
+          await _discardPending(pending.path);
+          pending = null;
+        }
+      } catch (_) {
+        // Нет сети — остаёмся на том, что скачано.
+      }
+    }
     if (pending != null) {
       state = UpdateState(
         stage: UpdateStage.readyToInstall,
@@ -144,6 +157,9 @@ class UpdateController extends Notifier<UpdateState> {
   Future<void> download() async {
     final info = state.info;
     if (info == null) return;
+    // Две закачки в один файл склеивают его в негодный: второй тап по кнопке
+    // не должен начинать вторую.
+    if (state.stage == UpdateStage.downloading) return;
 
     state = state.copyWith(stage: UpdateStage.downloading, progress: 0);
     try {
@@ -161,6 +177,12 @@ class UpdateController extends Notifier<UpdateState> {
         try {
           await for (final progress in _service.downloadTo(url, file)) {
             state = state.copyWith(progress: progress);
+          }
+          // Файл должен быть целым APK. Нет — стираем и качаем с нуля: докачка
+          // поверх битого куска только множит битое.
+          if (!UpdateService.apkLooksValid(file)) {
+            if (file.existsSync()) await file.delete();
+            throw Exception('Скачанный файл повреждён');
           }
           break;
         } catch (error) {
@@ -215,15 +237,24 @@ class UpdateController extends Notifier<UpdateState> {
     final file = File(path);
 
     // versionCode догнал скачанный файл — значит установка прошла (или версию
-    // поставили другим способом), мусор можно убирать.
-    if (info.versionCode <= await _currentVersionCode() || !file.existsSync()) {
-      await prefs.remove(_prefsPathKey);
-      await prefs.remove(_prefsManifestKey);
-      if (file.existsSync()) await file.delete();
+    // поставили другим способом), мусор можно убирать. Битый файл тоже: его
+    // установщик всё равно отвергнет.
+    if (info.versionCode <= await _currentVersionCode() ||
+        !file.existsSync() ||
+        !UpdateService.apkLooksValid(file)) {
+      await _discardPending(path);
       return null;
     }
 
     return (info: info, path: path);
+  }
+
+  Future<void> _discardPending(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsPathKey);
+    await prefs.remove(_prefsManifestKey);
+    final file = File(path);
+    if (file.existsSync()) await file.delete();
   }
 
   Future<void> _savePending(UpdateInfo info, String path) async {

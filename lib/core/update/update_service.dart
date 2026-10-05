@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:http/http.dart' as http;
 
 import 'update_info.dart';
@@ -18,6 +19,23 @@ class UpdateService {
 
   static const _manifestUrl =
       'https://raw.githubusercontent.com/DDmsngr/social-world-releases/main/manifest.json';
+
+  /// Целый ли это APK: читаем оглавление zip и ищем манифест приложения.
+  /// Оборванная, склеенная из кусков или обрезанная закачка сюда не пройдёт.
+  /// Без этой проверки такой файл оседал «готовым обновлением», установщик
+  /// отвечал «пакет повреждён», а новые версии не предлагались.
+  static bool apkLooksValid(File file) {
+    if (!file.existsSync() || file.lengthSync() < 1024) return false;
+    final input = InputFileStream(file.path);
+    try {
+      final archive = ZipDecoder().decodeStream(input);
+      return archive.any((entry) => entry.name == 'AndroidManifest.xml');
+    } catch (_) {
+      return false;
+    } finally {
+      input.closeSync();
+    }
+  }
 
   Future<UpdateInfo?> fetchManifest() async {
     final uri = Uri.parse(_manifestUrl);
