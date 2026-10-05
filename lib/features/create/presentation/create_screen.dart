@@ -238,17 +238,20 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
 
   /// Фото и видео в тексте статьи нужны в хранилище ещё до публикации, чтобы
   /// получить ссылку для Markdown.
-  Future<List<String>> _pickArticleImages(int limit) => pickArticleImages(
-    picker: _picker,
-    repository: _feedRepo,
-    limit: limit,
-    onError: _uploadFailed,
-  );
+  Future<List<String>> _pickArticleImages(int limit, UploadProgress onProgress) =>
+      pickArticleImages(
+        picker: _picker,
+        repository: _feedRepo,
+        limit: limit,
+        onError: _uploadFailed,
+        onProgress: onProgress,
+      );
 
-  Future<String?> _pickArticleVideo() => pickArticleVideo(
+  Future<String?> _pickArticleVideo(UploadProgress onProgress) => pickArticleVideo(
     picker: _picker,
     repository: _feedRepo,
     onError: _uploadFailed,
+    onProgress: onProgress,
   );
 
   Future<void> _pickStartsAt() async {

@@ -133,17 +133,20 @@ class _PostEditScreenState extends ConsumerState<PostEditScreen> {
     );
   }
 
-  Future<List<String>> _pickArticleImages(int limit) => pickArticleImages(
-    picker: _picker,
-    repository: ref.read(feedRepositoryProvider),
-    limit: limit,
-    onError: _uploadFailed,
-  );
+  Future<List<String>> _pickArticleImages(int limit, UploadProgress onProgress) =>
+      pickArticleImages(
+        picker: _picker,
+        repository: ref.read(feedRepositoryProvider),
+        limit: limit,
+        onError: _uploadFailed,
+        onProgress: onProgress,
+      );
 
-  Future<String?> _pickArticleVideo() => pickArticleVideo(
+  Future<String?> _pickArticleVideo(UploadProgress onProgress) => pickArticleVideo(
     picker: _picker,
     repository: ref.read(feedRepositoryProvider),
     onError: _uploadFailed,
+    onProgress: onProgress,
   );
 
   Future<void> _save() async {

@@ -207,8 +207,13 @@ class SupabaseFeedRepository implements FeedRepository {
   }
 
   @override
-  Future<String> uploadInlineImage(String localPath) =>
-      MediaUploader(_client, bucket: 'post-media').upload(localPath);
+  Future<String> uploadInlineImage(
+    String localPath, {
+    void Function(double)? onProgress,
+  }) => MediaUploader(
+    _client,
+    bucket: 'post-media',
+  ).upload(localPath, onProgress: onProgress);
 
   @override
   Future<Post> toggleLike(Post post) async {

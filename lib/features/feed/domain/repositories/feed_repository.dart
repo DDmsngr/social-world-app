@@ -64,7 +64,10 @@ abstract interface class FeedRepository {
 
   /// Кладёт картинку в хранилище и возвращает ссылку — для вставки в текст
   /// статьи, где файл нужен ещё до публикации.
-  Future<String> uploadInlineImage(String localPath);
+  Future<String> uploadInlineImage(
+    String localPath, {
+    void Function(double)? onProgress,
+  });
 
   /// Возвращает пост с обновлённым счётчиком, чтобы экран не пересчитывал сам.
   Future<Post> toggleLike(Post post);

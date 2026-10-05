@@ -1,11 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/debug/app_log.dart';
+import '../../../../core/errors/friendly_error.dart';
 import '../../../../core/media/media_kind.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/markdown_view.dart';
 import '../../domain/article_parts.dart';
+import 'article_media.dart';
 
 /// Один блок статьи: поле текста или фото/видео.
 class ArticleBlock {
@@ -192,10 +195,10 @@ class ArticleEditor extends StatefulWidget {
   final ArticleController controller;
 
   /// Выбирает и загружает фото (не больше переданного числа), возвращает ссылки.
-  final Future<List<String>> Function(int limit) onPickImages;
+  final Future<List<String>> Function(int limit, UploadProgress onProgress) onPickImages;
 
   /// То же для одного видео.
-  final Future<String?> Function() onPickVideo;
+  final Future<String?> Function(UploadProgress onProgress) onPickVideo;
   final int maxMedia;
 
   @override
@@ -205,6 +208,8 @@ class ArticleEditor extends StatefulWidget {
 class _ArticleEditorState extends State<ArticleEditor> {
   var _preview = false;
   var _busy = false;
+  var _label = '';
+  var _fraction = 0.0;
 
   ArticleController get _c => widget.controller;
 
@@ -235,15 +240,39 @@ class _ArticleEditorState extends State<ArticleEditor> {
 
   int get _free => widget.maxMedia - _c.mediaCount;
 
+  void _progress(String label, double fraction) {
+    if (!mounted) return;
+    setState(() {
+      _label = label;
+      _fraction = fraction.clamp(0.0, 1.0);
+    });
+  }
+
+  /// Любой сбой выбора или загрузки показываем: иначе кнопки просто снова
+  /// загораются, и непонятно, что пошло не так.
+  void _failed(Object error) {
+    AppLog.add('Вставка в статью не удалась: $error');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(friendlyError(error, fallback: 'Не получилось вставить'))),
+    );
+  }
+
   Future<void> _addImages() async {
     if (_busy) return;
     if (_free <= 0) return _full();
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _label = 'Выбираем фото';
+      _fraction = 0;
+    });
     try {
-      final urls = await widget.onPickImages(_free);
+      final urls = await widget.onPickImages(_free, _progress);
       for (final url in urls.take(_free)) {
         _c.insertMedia(url, 'фото');
       }
+    } catch (error) {
+      _failed(error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -252,10 +281,16 @@ class _ArticleEditorState extends State<ArticleEditor> {
   Future<void> _addVideo() async {
     if (_busy) return;
     if (_free <= 0) return _full();
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _label = 'Выбираем видео';
+      _fraction = 0;
+    });
     try {
-      final url = await widget.onPickVideo();
+      final url = await widget.onPickVideo(_progress);
       if (url != null) _c.insertMedia(url, 'видео');
+    } catch (error) {
+      _failed(error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -348,7 +383,31 @@ class _ArticleEditorState extends State<ArticleEditor> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        if (_busy)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _fraction > 0 && _fraction < 1
+                      ? '$_label · ${(_fraction * 100).round()}%'
+                      : _label,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    minHeight: 6,
+                    value: _fraction > 0 ? _fraction : null,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          const SizedBox(height: 4),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -424,7 +483,8 @@ class _ArticleEditorState extends State<ArticleEditor> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Фото встанет туда, где стоит курсор. Двигайте его стрелками.',
+          'Фото встанет в то место текста, где вы остановились. Потом его можно '
+          'сдвинуть стрелками или убрать крестиком.',
           style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textFaint),
         ),
       ],

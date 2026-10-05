@@ -52,7 +52,10 @@ class _FailingFeedRepository implements FeedRepository {
   }) async => _post;
 
   @override
-  Future<String> uploadInlineImage(String localPath) async => localPath;
+  Future<String> uploadInlineImage(
+    String localPath, {
+    void Function(double)? onProgress,
+  }) async => localPath;
 
   @override
   Future<Post> createPost({

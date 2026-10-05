@@ -1,7 +1,16 @@
+import 'dart:io';
+
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../feed/domain/repositories/feed_repository.dart';
+
+/// Подпись к полосе загрузки и доля готового (0–1).
+typedef UploadProgress = void Function(String label, double fraction);
+
+/// Потолок на одно видео в статье: дальше загрузка на мобильном интернете
+/// всё равно не доживёт.
+const maxArticleVideoBytes = 150 * 1024 * 1024;
 
 /// Выбор и загрузка фото для текста статьи: загружаются сразу, потому что в
 /// Markdown нужна готовая ссылка. Фото, которое не загрузилось, пропускается
@@ -11,12 +20,20 @@ Future<List<String>> pickArticleImages({
   required FeedRepository repository,
   required int limit,
   required void Function(Object error) onError,
+  required UploadProgress onProgress,
 }) async {
-  final files = await picker.pickMultiImage(imageQuality: 85);
+  final files = (await picker.pickMultiImage(imageQuality: 85)).take(limit).toList();
   final urls = <String>[];
-  for (final file in files.take(limit)) {
+  for (var i = 0; i < files.length; i++) {
+    final label = files.length == 1 ? 'Загружаем фото' : 'Загружаем фото ${i + 1} из ${files.length}';
+    onProgress(label, i / files.length);
     try {
-      urls.add(await repository.uploadInlineImage(file.path));
+      urls.add(
+        await repository.uploadInlineImage(
+          files[i].path,
+          onProgress: (p) => onProgress(label, (i + p) / files.length),
+        ),
+      );
     } catch (error) {
       AppLog.add('Фото в текст не загрузилось: $error');
       onError(error);
@@ -30,6 +47,7 @@ Future<String?> pickArticleVideo({
   required ImagePicker picker,
   required FeedRepository repository,
   required void Function(Object error) onError,
+  required UploadProgress onProgress,
 }) async {
   final file = await picker.pickVideo(
     source: ImageSource.gallery,
@@ -37,7 +55,15 @@ Future<String?> pickArticleVideo({
   );
   if (file == null) return null;
   try {
-    return await repository.uploadInlineImage(file.path);
+    final size = await File(file.path).length();
+    if (size > maxArticleVideoBytes) {
+      throw StateError('Видео больше ${maxArticleVideoBytes ~/ (1024 * 1024)} МБ');
+    }
+    onProgress('Загружаем видео', 0);
+    return await repository.uploadInlineImage(
+      file.path,
+      onProgress: (p) => onProgress('Загружаем видео', p),
+    );
   } catch (error) {
     AppLog.add('Видео в текст не загрузилось: $error');
     onError(error);
