@@ -114,6 +114,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
+  Future<void> _quickReact(
+    BuildContext context,
+    ChatMessage message,
+    String myId,
+  ) async {
+    setState(() => _selectedId = message.id);
+    try {
+      final emoji = await showReactionPicker(
+        context,
+        mine: message.senderId == myId,
+        myReaction: _myReaction(message.id),
+      );
+      if (emoji != null) await _react(message.id, emoji);
+    } finally {
+      if (mounted) setState(() => _selectedId = null);
+    }
+  }
+
   String? _myReaction(String messageId) {
     final list = ref.read(chatReactionsProvider(widget.conversationId)).value?[messageId];
     for (final r in list ?? const <ReactionCount>[]) {
@@ -346,6 +364,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         onReply: () => _startReply(message, myId),
                         child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
+                        // Короткий тап в личной переписке — реакции, долгий —
+                        // выделение и меню. Реакцию можно поставить только на
+                        // дошедшее сообщение.
+                        onTap: isDirect &&
+                                message.status != MessageStatus.failed &&
+                                message.status != MessageStatus.sending
+                            ? () => _quickReact(context, message, myId)
+                            : null,
                         onLongPress: () => _openMenu(context, message, myId),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),

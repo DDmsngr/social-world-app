@@ -1,7 +1,20 @@
 import 'entities/chat_message.dart';
 
 /// Пункты меню сообщения (долгий тап) и «⋮» в просмотре фото из чата.
-enum MessageAction { reply, copy, saveToGallery, share, forward, delete }
+enum MessageAction {
+  reply,
+  copy,
+
+  /// «Копировать выборочно»: текст в окне, где можно выделить кусок.
+  copyPart,
+  saveToGallery,
+  share,
+  forward,
+
+  /// «Свойства сообщения»: время, статус, размер вложения.
+  info,
+  delete,
+}
 
 /// Что можно сделать с сообщением. Одно место для правил: его читают меню,
 /// просмотрщик и подсказки для экранного чтеца.
@@ -26,10 +39,12 @@ List<MessageAction> messageActions(
   return [
     if (canReply && trusted) MessageAction.reply,
     if (text.isNotEmpty) MessageAction.copy,
+    if (text.length > 1) MessageAction.copyPart,
     if (media) MessageAction.saveToGallery,
     if (attachment != null && message.kind != MessageKind.sticker)
       MessageAction.share,
     if (trusted) MessageAction.forward,
+    MessageAction.info,
     MessageAction.delete,
   ];
 }

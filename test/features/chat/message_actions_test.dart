@@ -25,7 +25,9 @@ void main() {
       expect(messageActions(message()), [
         MessageAction.reply,
         MessageAction.copy,
+        MessageAction.copyPart,
         MessageAction.forward,
+        MessageAction.info,
         MessageAction.delete,
       ]);
     });
@@ -40,6 +42,7 @@ void main() {
           MessageAction.saveToGallery,
           MessageAction.share,
           MessageAction.forward,
+          MessageAction.info,
           MessageAction.delete,
         ],
       );

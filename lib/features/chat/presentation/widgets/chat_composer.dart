@@ -7,6 +7,8 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../../../../core/audio/send_sound.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -499,6 +501,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   // ── общее ────────────────────────────────────────────────────────────────
 
   void _afterSend() {
+    SendSound.play();
     // Новый личный диалог появляется в списке только после первого сообщения.
     ref.invalidate(conversationsProvider);
   }

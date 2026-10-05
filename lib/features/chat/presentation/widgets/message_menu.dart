@@ -15,8 +15,8 @@ import '../../domain/message_actions.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../providers/chat_providers.dart';
 import '../providers/hidden_messages_provider.dart';
+import '../providers/chat_extras_providers.dart';
 import 'forward_picker.dart';
-import 'reaction_chips.dart';
 
 /// Меню сообщения: долгий тап в переписке и «⋮» в просмотре фото.
 ///
@@ -39,50 +39,14 @@ Future<bool> showMessageMenu(
     message,
     canReply: onReply != null && !(conversation?.closed ?? false),
   );
-  final picked = await showModalBottomSheet<Object>(
-    context: context,
-    useRootNavigator: true,
-    backgroundColor: AppColors.ink2,
-    showDragHandle: true,
-    builder: (context) => SafeArea(
-      // Превью + до шести пунктов на маленьком экране не помещаются по высоте.
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (onReact != null)
-              QuickReactionBar(
-                current: myReaction,
-                onPick: (emoji) => Navigator.of(context).pop(_Reaction(emoji)),
-              ),
-            // Шторка с затемнением закрывает переписку, и было непонятно, над
-            // каким сообщением открыто меню. Показываем его здесь же.
-            _MenuPreview(message: message, mine: message.senderId == myId),
-            for (final action in actions) ...[
-              // Разрушительное — отдельно и последним, чтобы по нему не
-              // попадали вместо соседнего пункта.
-              if (action == MessageAction.delete && actions.length > 1)
-                Divider(height: 12, color: AppColors.hair),
-              ListTile(
-                leading: Icon(
-                  _icon(action),
-                  color: action == MessageAction.delete
-                      ? AppColors.danger
-                      : AppColors.textDim,
-                ),
-                title: Text(
-                  _label(action),
-                  style: action == MessageAction.delete
-                      ? TextStyle(color: AppColors.danger)
-                      : null,
-                ),
-                onTap: () => Navigator.of(context).pop(action),
-              ),
-            ],
-          ],
-        ),
-      ),
-    ),
+  // Плавающая панель у самого сообщения, как в Telegram: сверху реакции,
+  // под ними пункты. Само сообщение остаётся подсвеченным на экране.
+  final picked = await _showFloating(
+    context,
+    mine: message.senderId == myId,
+    myReaction: myReaction,
+    withReactions: onReact != null,
+    actions: actions,
   );
   if (picked is _Reaction) {
     onReact?.call(picked.emoji);
@@ -105,6 +69,30 @@ Future<bool> showMessageMenu(
       await Clipboard.setData(ClipboardData(text: message.text!.trim()));
       messenger.showSnackBar(const SnackBar(content: Text('Скопировано')));
       return false;
+    case MessageAction.copyPart:
+      await showDialog<void>(
+        context: context,
+        useRootNavigator: true,
+        builder: (_) => AlertDialog(
+          title: const Text('Выделите нужное'),
+          content: SingleChildScrollView(
+            child: SelectableText(
+              message.text!.trim(),
+              style: const TextStyle(fontSize: 16),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+              child: const Text('Готово'),
+            ),
+          ],
+        ),
+      );
+      return false;
+    case MessageAction.info:
+      await _showInfo(context, message, myId: myId, conversation: conversation);
+      return false;
     case MessageAction.saveToGallery:
       await _saveToGallery(messenger, repository, message);
       return false;
@@ -122,55 +110,243 @@ Future<bool> showMessageMenu(
   }
 }
 
-/// Выбор реакции из шторки — отдельный тип, чтобы не путать с пунктами меню.
+/// Выбор реакции из панели — отдельный тип, чтобы не путать с пунктами меню.
 class _Reaction {
   const _Reaction(this.emoji);
   final String emoji;
 }
 
-class _MenuPreview extends StatelessWidget {
-  const _MenuPreview({required this.message, required this.mine});
+/// Короткий тап по сообщению в личной переписке: только полоса реакций у
+/// сообщения, без меню. Возвращает выбранный эмодзи или null.
+Future<String?> showReactionPicker(
+  BuildContext context, {
+  required bool mine,
+  String? myReaction,
+}) async {
+  HapticFeedback.selectionClick();
+  final picked = await _showFloating(
+    context,
+    mine: mine,
+    myReaction: myReaction,
+    withReactions: true,
+    actions: const [],
+    dim: false,
+  );
+  return picked is _Reaction ? picked.emoji : null;
+}
 
-  final ChatMessage message;
+/// Где на экране лежит сообщение: от этого прямоугольника считается, куда
+/// повесить панель.
+Rect? _anchorOf(BuildContext context) {
+  final box = context.findRenderObject();
+  if (box is RenderBox && box.attached && box.hasSize) {
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+  return null;
+}
+
+Future<Object?> _showFloating(
+  BuildContext context, {
+  required bool mine,
+  required String? myReaction,
+  required bool withReactions,
+  required List<MessageAction> actions,
+  bool dim = true,
+}) {
+  final anchor = _anchorOf(context);
+  return showGeneralDialog<Object>(
+    context: context,
+    useRootNavigator: true,
+    barrierDismissible: true,
+    barrierLabel: 'Закрыть меню',
+    barrierColor: dim ? const Color(0x59000000) : const Color(0x14000000),
+    transitionDuration: const Duration(milliseconds: 140),
+    pageBuilder: (dialog, _, _) => _FloatingMenu(
+      anchor: anchor,
+      mine: mine,
+      myReaction: myReaction,
+      withReactions: withReactions,
+      actions: actions,
+    ),
+    transitionBuilder: (_, animation, _, child) => FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child: ScaleTransition(
+        scale: Tween(begin: 0.94, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        ),
+        child: child,
+      ),
+    ),
+  );
+}
+
+class _FloatingMenu extends StatelessWidget {
+  const _FloatingMenu({
+    required this.anchor,
+    required this.mine,
+    required this.myReaction,
+    required this.withReactions,
+    required this.actions,
+  });
+
+  final Rect? anchor;
   final bool mine;
+  final String? myReaction;
+  final bool withReactions;
+  final List<MessageAction> actions;
+
+  static const _barHeight = 54.0;
+  static const _rowHeight = 50.0;
+  static const _menuWidth = 268.0;
+  static const _gap = 8.0;
 
   @override
   Widget build(BuildContext context) {
-    final who = mine ? 'Вы' : (message.senderName ?? 'Собеседник');
-    final time =
-        '${message.sentAt.hour.toString().padLeft(2, '0')}:'
-        '${message.sentAt.minute.toString().padLeft(2, '0')}';
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: BoxDecoration(
-        color: mine ? AppColors.bubbleMine : AppColors.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border(left: BorderSide(color: AppColors.primaryTint, width: 3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+    final mq = MediaQuery.of(context);
+    final size = mq.size;
+    final top = mq.padding.top + 8;
+    final bottom =
+        size.height - (mq.padding.bottom > mq.viewInsets.bottom ? mq.padding.bottom : mq.viewInsets.bottom) - 8;
+
+    // Просмотрщик фото отдаёт весь экран — тогда вешаем панель ближе к середине.
+    var rect = anchor ?? Rect.fromLTWH(0, size.height * 0.45, size.width, 0);
+    if (rect.height > size.height * 0.5) {
+      rect = Rect.fromLTWH(0, size.height * 0.45, size.width, 0);
+    }
+
+    final hasDelete = actions.contains(MessageAction.delete) && actions.length > 1;
+    final menuHeight = actions.isEmpty
+        ? 0.0
+        : actions.length * _rowHeight + (hasDelete ? 9 : 0) + 12;
+    final barWidth = quickReactions.length * 44.0 + 20;
+
+    double barTop;
+    double menuTop = 0;
+    if (actions.isEmpty) {
+      barTop = rect.top - _barHeight - _gap;
+      if (barTop < top) barTop = rect.bottom + _gap;
+    } else {
+      menuTop = rect.bottom + _gap;
+      if (menuTop + menuHeight > bottom) menuTop = bottom - menuHeight;
+      barTop = rect.top - _barHeight - _gap;
+      if (barTop < top || barTop + _barHeight + _gap > menuTop) {
+        barTop = menuTop - _barHeight - _gap;
+      }
+      if (barTop < top) {
+        barTop = top;
+        menuTop = barTop + _barHeight + _gap;
+      }
+    }
+
+    double left(double width) => mine ? size.width - 12 - width : 12;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
         children: [
-          Text(
-            '$who · $time',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primaryTint,
+          if (withReactions)
+            Positioned(
+              top: barTop,
+              left: left(barWidth),
+              child: Container(
+                height: _barHeight,
+                width: barWidth,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.ink2,
+                  borderRadius: BorderRadius.circular(_barHeight / 2),
+                  border: Border.all(color: AppColors.hair),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x40000000), blurRadius: 18, offset: Offset(0, 6)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    for (final emoji in quickReactions)
+                      Expanded(
+                        child: Semantics(
+                          button: true,
+                          label: 'Реакция $emoji',
+                          child: InkResponse(
+                            onTap: () => Navigator.of(context).pop(_Reaction(emoji)),
+                            radius: 24,
+                            child: Container(
+                              height: 40,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: emoji == myReaction
+                                    ? AppColors.primary.withValues(alpha: 0.22)
+                                    : Colors.transparent,
+                              ),
+                              child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            message.preview,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14,
-              color: mine ? AppColors.onBubbleMine : AppColors.text,
+          if (actions.isNotEmpty)
+            Positioned(
+              top: menuTop,
+              left: left(_menuWidth),
+              child: Container(
+                width: _menuWidth,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.ink2,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.hair),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x40000000), blurRadius: 18, offset: Offset(0, 6)),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final action in actions) ...[
+                      // Разрушительное — отдельно и последним, чтобы по нему не
+                      // попадали вместо соседнего пункта.
+                      if (action == MessageAction.delete && actions.length > 1)
+                        Divider(height: 9, thickness: 1, color: AppColors.hair),
+                      InkWell(
+                        onTap: () => Navigator.of(context).pop(action),
+                        child: SizedBox(
+                          height: _rowHeight,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _label(action),
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: action == MessageAction.delete
+                                          ? AppColors.danger
+                                          : AppColors.text,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  _icon(action),
+                                  size: 22,
+                                  color: action == MessageAction.delete
+                                      ? AppColors.danger
+                                      : AppColors.textDim,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -181,8 +357,10 @@ String _label(MessageAction action) => switch (action) {
   MessageAction.reply => 'Ответить',
   MessageAction.forward => 'Переслать',
   MessageAction.copy => 'Копировать',
+  MessageAction.copyPart => 'Копировать выборочно',
   MessageAction.saveToGallery => 'Сохранить в галерею',
   MessageAction.share => 'Поделиться',
+  MessageAction.info => 'Свойства сообщения',
   MessageAction.delete => 'Удалить',
 };
 
@@ -190,10 +368,79 @@ IconData _icon(MessageAction action) => switch (action) {
   MessageAction.reply => Icons.reply_rounded,
   MessageAction.forward => Icons.shortcut_rounded,
   MessageAction.copy => Icons.copy_rounded,
+  MessageAction.copyPart => Icons.content_paste_search_rounded,
   MessageAction.saveToGallery => Icons.download_rounded,
   MessageAction.share => Icons.ios_share_rounded,
+  MessageAction.info => Icons.info_outline_rounded,
   MessageAction.delete => Icons.delete_outline_rounded,
 };
+
+Future<void> _showInfo(
+  BuildContext context,
+  ChatMessage message, {
+  required String myId,
+  required Conversation? conversation,
+}) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  final t = message.sentAt.toLocal();
+  final status = switch (message.status) {
+    MessageStatus.sending => 'Отправляется',
+    MessageStatus.sent => 'Отправлено',
+    MessageStatus.delivered => 'Доставлено',
+    MessageStatus.read => 'Прочитано',
+    MessageStatus.failed => 'Не отправлено',
+  };
+  final size = message.attachment?.size;
+  final rows = <(String, String)>[
+    ('Отправлено', '${two(t.day)}.${two(t.month)}.${t.year}, ${two(t.hour)}:${two(t.minute)}'),
+    ('От', message.senderId == myId ? 'Вас' : (message.senderName ?? 'Собеседника')),
+    if (message.senderId == myId) ('Статус', status),
+    if (message.kind != MessageKind.text) ('Тип', message.kind.preview),
+    if (size != null)
+      (
+        'Размер файла',
+        size >= 1024 * 1024
+            ? '${(size / 1024 / 1024).toStringAsFixed(1)} МБ'
+            : '${(size / 1024).ceil()} КБ',
+      ),
+    if (conversation != null)
+      ('Защита', conversation.isDirect ? 'Сквозное шифрование' : 'Без сквозного шифрования'),
+  ];
+  return showDialog<void>(
+    context: context,
+    useRootNavigator: true,
+    builder: (dialog) => AlertDialog(
+      title: const Text('Свойства сообщения'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (name, value) in rows)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 110,
+                    child: Text(name, style: TextStyle(color: AppColors.textDim)),
+                  ),
+                  Expanded(child: Text(value)),
+                ],
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialog).pop(),
+          child: const Text('Закрыть'),
+        ),
+      ],
+    ),
+  );
+}
+
 
 Future<void> _forward(
   BuildContext context,

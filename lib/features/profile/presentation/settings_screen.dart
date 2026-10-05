@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/audio/send_sound.dart';
 import '../../../core/config/env.dart';
 import '../../../core/errors/friendly_error.dart';
 import '../../../core/push/push_service.dart';
@@ -80,6 +81,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const SizedBox(height: 10),
           const _LastSeenSwitch(),
+          const SizedBox(height: 26),
+          const SectionLabel('Чаты'),
+          const SizedBox(height: 12),
+          const _SendSoundSwitch(),
           const SizedBox(height: 26),
           const SectionLabel('Приглашение'),
           const SizedBox(height: 12),
@@ -211,6 +216,47 @@ class _LastSeenSwitchState extends State<_LastSeenSwitch> {
         onChanged: show == null ? null : _set,
         title: const Text('Показывать, когда я в сети'),
         subtitle: const Text('Если выключить, вы тоже не увидите время других'),
+      ),
+    );
+  }
+}
+
+/// Звук при отправке сообщения.
+class _SendSoundSwitch extends StatefulWidget {
+  const _SendSoundSwitch();
+
+  @override
+  State<_SendSoundSwitch> createState() => _SendSoundSwitchState();
+}
+
+class _SendSoundSwitchState extends State<_SendSoundSwitch> {
+  bool? _on;
+
+  @override
+  void initState() {
+    super.initState();
+    SendSound.isEnabled().then((value) {
+      if (mounted) setState(() => _on = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = _on;
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 4, 8, 4),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        value: on ?? true,
+        onChanged: on == null
+            ? null
+            : (value) {
+                setState(() => _on = value);
+                SendSound.setEnabled(value);
+                if (value) SendSound.play();
+              },
+        title: const Text('Звук отправки сообщения'),
+        subtitle: const Text('Короткий сигнал, когда сообщение ушло'),
       ),
     );
   }

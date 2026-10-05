@@ -165,11 +165,13 @@ void main() {
       await openMenu(tester, peerMessage);
       expect(find.text('Копировать'), findsOneWidget);
       expect(find.text('Сохранить в галерею'), findsNothing);
-      final labels = tester
-          .widgetList<ListTile>(find.byType(ListTile))
-          .map((t) => (t.title! as Text).data)
-          .toList();
-      expect(labels.last, 'Удалить');
+      expect(find.text('Копировать выборочно'), findsOneWidget);
+      expect(find.text('Свойства сообщения'), findsOneWidget);
+      // «Удалить» — ниже всех остальных пунктов.
+      final deleteY = tester.getTopLeft(find.text('Удалить')).dy;
+      for (final other in ['Копировать', 'Переслать', 'Свойства сообщения']) {
+        expect(tester.getTopLeft(find.text(other)).dy, lessThan(deleteY), reason: other);
+      }
     });
 
     testWidgets('чужое в личном — скрывается у меня сразу, с отменой', (
