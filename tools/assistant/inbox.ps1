@@ -12,14 +12,18 @@
 
 $ErrorActionPreference = 'Stop'
 $ref = 'veofltvuenisdzbqvwkr'
-$token = (Get-Content 'D:\Temp\supabase-token.txt' -Raw).Trim()
+$token = (Get-Content 'D:\Temp\supabase-token2.txt' -Raw).Trim()
 $h = @{ Authorization = "Bearer $token" }
 
 function Sql([string]$query) {
   $body = @{ query = $query } | ConvertTo-Json
   $bytes = [Text.Encoding]::UTF8.GetBytes($body)
-  Invoke-RestMethod -Method Post -Uri "https://api.supabase.com/v1/projects/$ref/database/query" `
+  $r = Invoke-WebRequest -UseBasicParsing -Method Post -Uri "https://api.supabase.com/v1/projects/$ref/database/query" `
     -Headers $h -ContentType 'application/json; charset=utf-8' -Body $bytes
+  # Ответ без charset PowerShell читает как Latin-1 и ломает кириллицу: берём байты сами.
+  $ms = New-Object IO.MemoryStream
+  $r.RawContentStream.CopyTo($ms)
+  [Text.Encoding]::UTF8.GetString($ms.ToArray()) | ConvertFrom-Json
 }
 
 switch ($Action) {

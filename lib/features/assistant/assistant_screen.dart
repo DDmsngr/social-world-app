@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -46,25 +48,30 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
     }
   }
 
-  Future<void> _sendText() async {
-    final text = _text.text.trim();
-    if (text.isEmpty) return;
-    await _run((repo) async {
-      await repo.send(text: text);
-      _text.clear();
-    });
+  /// Приложенные, но ещё не отправленные снимки.
+  final _pending = <String>[];
+
+  Future<void> _attach() async {
+    final files = await _picker.pickMultiImage(imageQuality: 85);
+    if (files.isEmpty || !mounted) return;
+    setState(() => _pending.addAll(files.map((f) => f.path)));
   }
 
-  Future<void> _sendImages() async {
-    final files = await _picker.pickMultiImage(imageQuality: 85);
-    if (files.isEmpty) return;
-    // Подпись, если она уже набрана, уходит вместе с первым снимком.
-    final caption = _text.text.trim();
+  Future<void> _send() async {
+    final text = _text.text.trim();
+    if (text.isEmpty && _pending.isEmpty) return;
+    final shots = [..._pending];
     await _run((repo) async {
-      for (var i = 0; i < files.length; i++) {
-        await repo.send(text: i == 0 ? caption : null, imagePath: files[i].path);
+      // Подпись уходит вместе с первым снимком, остальные — следом.
+      if (shots.isEmpty) {
+        await repo.send(text: text);
+      } else {
+        for (var i = 0; i < shots.length; i++) {
+          await repo.send(text: i == 0 ? text : null, imagePath: shots[i]);
+        }
       }
       _text.clear();
+      if (mounted) setState(_pending.clear);
     });
   }
 
@@ -122,6 +129,42 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                         ),
                 ),
               ),
+              if (_pending.isNotEmpty)
+                SizedBox(
+                  height: 84,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                    itemCount: _pending.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) => Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            File(_pending[i]),
+                            width: 72,
+                            height: 72,
+                            fit: BoxFit.cover,
+                            cacheWidth: 216,
+                          ),
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: GestureDetector(
+                            onTap: _busy ? null : () => setState(() => _pending.removeAt(i)),
+                            child: const CircleAvatar(
+                              radius: 11,
+                              backgroundColor: Colors.black54,
+                              child: Icon(Icons.close, size: 14, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               SafeArea(
                 top: false,
                 child: Padding(
@@ -130,7 +173,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       IconButton(
-                        onPressed: _busy ? null : _sendImages,
+                        onPressed: _busy ? null : _attach,
                         tooltip: 'Скриншоты',
                         icon: const Icon(Icons.attach_file),
                       ),
@@ -147,7 +190,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: _busy ? null : _sendText,
+                        onPressed: _busy ? null : _send,
                         tooltip: 'Отправить',
                         icon: _busy
                             ? const SizedBox(

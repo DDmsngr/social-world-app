@@ -53,7 +53,12 @@ class AssistantRepository {
       .from('assistant_messages')
       .stream(primaryKey: ['id'])
       .order('created_at')
-      .map((rows) => [for (final row in rows) AssistantMessage.fromRow(row)]);
+      .map(
+        (rows) => [for (final row in rows) AssistantMessage.fromRow(row)]
+          // Новые строки из реалтайма приходят в конец списка как есть — порядок
+          // по времени наводим сами.
+          ..sort((a, b) => a.createdAt.compareTo(b.createdAt)),
+      );
 
   /// [imagePath] — локальный файл скриншота, если он приложен.
   Future<void> send({String? text, String? imagePath}) async {
