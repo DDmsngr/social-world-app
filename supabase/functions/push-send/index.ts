@@ -40,6 +40,8 @@ Deno.serve(async (req) => {
       ? await forMessage(payload.message_id)
       : payload?.type === "notification"
       ? await forNotification(payload.notification_id)
+      : payload?.type === "reaction"
+      ? await forReaction(payload.message_id, payload.profile_id)
       : [];
 
     let sent = 0;
@@ -167,6 +169,67 @@ async function forMessage(messageId: string): Promise<Job[]> {
     recipients: ids,
     push: { ...push, channel: picked, data: { ...push.data, channel: picked } },
   }));
+}
+
+// Реакция на сообщение: пуш получает только его автор. В каналах реакций
+// без пуша — под постом их десятки, а автор там системный профиль.
+async function forReaction(messageId: string, reactorId: string): Promise<Job[]> {
+  const [{ data: message }, { data: reaction }] = await Promise.all([
+    db.from("chat_messages").select("id, conversation_id, sender_id").eq("id", messageId).maybeSingle(),
+    db.from("chat_message_reactions")
+      .select("emoji")
+      .eq("message_id", messageId)
+      .eq("profile_id", reactorId)
+      .maybeSingle(),
+  ]);
+  if (!message || !reaction || message.sender_id === reactorId) return [];
+
+  const { data: conversation } = await db
+    .from("chat_conversations")
+    .select("id, direct_key, title, is_channel")
+    .eq("id", message.conversation_id)
+    .single();
+  if (!conversation || conversation.is_channel === true) return [];
+
+  const { data: block } = await db
+    .from("user_blocks")
+    .select("blocker_id")
+    .eq("blocker_id", message.sender_id)
+    .eq("blocked_id", reactorId)
+    .maybeSingle();
+  if (block) return [];
+
+  const { data: reactor } = await db.from("profiles").select("display_name").eq("id", reactorId).maybeSingle();
+  const who = reactor?.display_name ?? "Кто-то";
+
+  const { data: pref } = await db
+    .from("chat_notification_prefs")
+    .select("profile_id, mode, muted_until")
+    .eq("conversation_id", conversation.id)
+    .eq("profile_id", message.sender_id)
+    .maybeSingle();
+  const picked = decide((pref ?? undefined) as Prefs, false, new Date());
+  if (!picked) return [];
+
+  const direct = !!conversation.direct_key;
+  const title = direct ? who : (conversation.title ?? "Группа");
+  return [{
+    recipients: [message.sender_id as string],
+    push: {
+      title,
+      body: direct
+        ? `Реакция ${reaction.emoji} на ваше сообщение`
+        : `${who}: реакция ${reaction.emoji} на ваше сообщение`,
+      channel: picked,
+      tag: `${conversation.id}:reaction`,
+      data: {
+        type: "message",
+        conversation_id: conversation.id,
+        title,
+        channel: picked,
+      },
+    },
+  }];
 }
 
 async function forNotification(notificationId: string): Promise<Job[]> {
