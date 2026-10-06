@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/debug/app_log.dart';
-import '../../../../core/media/file_too_large.dart';
+import '../../../../core/media/video_compressor.dart';
 import '../../../feed/domain/repositories/feed_repository.dart';
 
 /// Подпись к полосе загрузки и доля готового (0–1).
@@ -53,7 +53,7 @@ Future<String?> pickArticleVideo({
   if (file == null) return null;
   try {
     final size = await File(file.path).length();
-    if (size > maxUploadBytes) throw FileTooLargeException(size);
+    if (size > maxVideoSourceBytes) throw StateError(videoTooBigMessage(size));
     onProgress('Загружаем видео', 0);
     return await repository.uploadInlineImage(
       file.path,

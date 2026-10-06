@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../config/env.dart';
 import 'exif_strip.dart';
 import 'file_too_large.dart';
+import 'video_compressor.dart';
 
 /// Загрузка фотографий и видео в Supabase Storage.
 ///
@@ -48,8 +49,37 @@ class MediaUploader {
     '.webm': 'video/webm',
   };
 
-  /// [onProgress] — доля отправленного от 0 до 1.
-  Future<String> upload(String localPath, {void Function(double)? onProgress}) async {
+  /// [onProgress] — доля готового от 0 до 1. Тяжёлое видео сначала сжимается
+  /// на телефоне (первые 40% полосы), потом уходит; [onStage] сообщает, что
+  /// происходит сейчас.
+  Future<String> upload(
+    String localPath, {
+    void Function(double)? onProgress,
+    void Function(String stage)? onStage,
+  }) async {
+    final size = await File(localPath).length();
+    if (!VideoCompressor.shouldCompress(localPath, size)) {
+      return _send(localPath, onProgress: onProgress);
+    }
+
+    onStage?.call('Сжимаем видео');
+    onProgress?.call(0);
+    try {
+      final compressed = await VideoCompressor.compress(
+        localPath,
+        onProgress: (p) => onProgress?.call(p * 0.4),
+      );
+      onStage?.call('Загружаем видео');
+      return await _send(
+        compressed.path,
+        onProgress: (p) => onProgress?.call(0.4 + p * 0.6),
+      );
+    } finally {
+      await VideoCompressor.cleanup();
+    }
+  }
+
+  Future<String> _send(String localPath, {void Function(double)? onProgress}) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw const AuthException('Нет активной сессии');
 

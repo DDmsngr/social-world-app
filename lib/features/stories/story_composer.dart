@@ -7,8 +7,8 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/debug/app_log.dart';
 import '../../core/errors/friendly_error.dart';
-import '../../core/media/file_too_large.dart';
 import '../../core/media/media_kind.dart';
+import '../../core/media/video_compressor.dart';
 import '../../core/text/markdown_preview.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/user_avatar.dart';
@@ -99,8 +99,8 @@ Future<void> addStory(BuildContext context, WidgetRef ref) async {
       );
       if (file != null) {
         final size = await File(file.path).length();
-        if (size > maxUploadBytes) {
-          if (context.mounted) _toast(context, FileTooLargeException(size).message);
+        if (size > maxVideoSourceBytes) {
+          if (context.mounted) _toast(context, videoTooBigMessage(size));
           return;
         }
         draft = StoryDraft(kind: StoryKind.video, localPath: file.path);
@@ -246,6 +246,9 @@ class _StoryComposerScreenState extends ConsumerState<StoryComposerScreen> {
           draft.localPath!,
           onProgress: (p) {
             if (mounted) setState(() => _progress = p);
+          },
+          onStage: (stage) {
+            if (mounted) setState(() => _label = stage);
           },
         );
       }

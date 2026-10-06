@@ -224,8 +224,14 @@ class StoriesRepository {
   }
 
   /// Фото или видео уходит в тот же бакет, что и посты.
-  Future<String> uploadMedia(String localPath, {void Function(double)? onProgress}) =>
-      MediaUploader(_client!, bucket: 'post-media').upload(localPath, onProgress: onProgress);
+  Future<String> uploadMedia(
+    String localPath, {
+    void Function(double)? onProgress,
+    void Function(String stage)? onStage,
+  }) => MediaUploader(
+    _client!,
+    bucket: 'post-media',
+  ).upload(localPath, onProgress: onProgress, onStage: onStage);
 
   Future<void> create({
     required StoryKind kind,
