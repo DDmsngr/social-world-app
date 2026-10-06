@@ -14,6 +14,7 @@ import '../../chat/presentation/providers/chat_providers.dart';
 import '../data/channels_repository.dart';
 import 'channel_screen.dart';
 import 'providers/channel_providers.dart';
+import 'widgets/channel_avatar.dart';
 
 /// Каталог публичных каналов: поиск, темы, подписка одним касанием.
 class ChannelCatalogScreen extends ConsumerStatefulWidget {
@@ -161,11 +162,7 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       onTap: () => context.push(Routes.channel(channel.id)),
-      leading: CircleAvatar(
-        radius: 22,
-        backgroundColor: AppColors.ink,
-        child: Icon(Icons.campaign_outlined, color: AppColors.primaryTint, size: 20),
-      ),
+      leading: ChannelAvatar(url: channel.avatarUrl, radius: 22),
       title: Text(channel.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

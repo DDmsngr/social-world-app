@@ -9,6 +9,7 @@ import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../channels/presentation/widgets/channel_avatar.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/conversation.dart';
 import 'providers/chat_notify_providers.dart';
@@ -271,6 +272,8 @@ class _ConversationTile extends StatelessWidget {
               url: conversation.peerAvatarUrl,
               radius: 22,
             )
+          else if (conversation.isChannel)
+            ChannelAvatar(url: conversation.peerAvatarUrl, radius: 22)
           else
             CircleAvatar(
               radius: 22,

@@ -16,6 +16,7 @@ import '../../chat/presentation/widgets/chat_composer.dart';
 import '../../chat/presentation/widgets/chat_notify_sheet.dart';
 import '../data/channels_repository.dart';
 import 'providers/channel_providers.dart';
+import 'widgets/channel_avatar.dart';
 import 'widgets/channel_post_card.dart';
 
 /// Канал: лента постов снизу вверх, как в Telegram. Админы пишут обычным полем
@@ -196,12 +197,20 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         ),
         title: InkWell(
           onTap: () => context.push('${Routes.channel(widget.channelId)}/info'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(info?.title ?? 'Канал', maxLines: 1, overflow: TextOverflow.ellipsis),
-              if (subtitle != null && subtitle.isNotEmpty)
-                Text(subtitle, style: TextStyle(fontSize: 12, color: AppColors.textDim)),
+              ChannelAvatar(url: info?.avatarUrl, radius: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(info?.title ?? 'Канал', maxLines: 1, overflow: TextOverflow.ellipsis),
+                    if (subtitle != null && subtitle.isNotEmpty)
+                      Text(subtitle, style: TextStyle(fontSize: 12, color: AppColors.textDim)),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

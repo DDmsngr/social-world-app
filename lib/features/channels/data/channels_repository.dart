@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/media/media_uploader.dart';
 import '../../chat/domain/entities/chat_message.dart';
 import '../../chat/domain/entities/chat_meta.dart';
 
@@ -95,6 +96,7 @@ class CatalogChannel {
     this.handle,
     this.subscriberCount,
     this.lastPostAt,
+    this.avatarUrl,
   });
 
   final String id;
@@ -105,6 +107,7 @@ class CatalogChannel {
   final int? subscriberCount;
   final bool joined;
   final DateTime? lastPostAt;
+  final String? avatarUrl;
 }
 
 /// Пост канала: сообщение + число комментариев.
@@ -132,6 +135,18 @@ class ChannelsRepository {
   ChannelsRepository(this._client);
 
   final SupabaseClient _client;
+
+  /// Аватар канала: файл с телефона (уже обрезанный под круг) или null —
+  /// убрать. Файл кладётся в общий бакет аватаров, в папку автора.
+  Future<void> setAvatar(String channelId, String? localPath) async {
+    final url = localPath == null
+        ? null
+        : await MediaUploader(_client, bucket: 'avatars').upload(localPath);
+    await _client.rpc(
+      'set_channel_avatar',
+      params: {'in_channel': channelId, 'in_url': url},
+    );
+  }
 
   Future<ChannelInfo?> info(String channelId) async {
     final rows = await _client.rpc('channel_info', params: {'in_channel': channelId}) as List;
@@ -182,6 +197,7 @@ class ChannelsRepository {
           lastPostAt: raw['last_post_at'] == null
               ? null
               : DateTime.parse(raw['last_post_at'] as String).toLocal(),
+          avatarUrl: raw['avatar_url'] as String?,
         ),
     ];
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/debug/app_log.dart';
@@ -14,6 +15,8 @@ import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
+import '../../profile/presentation/avatar_crop_screen.dart';
+import 'widgets/channel_avatar.dart';
 import '../data/channels_repository.dart';
 import 'channel_screen.dart';
 import 'providers/channel_providers.dart';
@@ -99,10 +102,23 @@ class ChannelInfoScreen extends ConsumerWidget {
             padding: AppSpacing.page(context, top: 16),
             children: [
               Center(
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundColor: AppColors.ink,
-                  child: Icon(Icons.campaign_outlined, color: AppColors.primaryTint, size: 34),
+                child: GestureDetector(
+                  onTap: info.isAdmin ? () => _changeAvatar(context, ref, info) : null,
+                  child: Stack(
+                    children: [
+                      ChannelAvatar(url: info.avatarUrl, radius: 40),
+                      if (info.isAdmin)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: AppColors.primary,
+                            child: Icon(Icons.photo_camera, size: 16, color: AppColors.onPrimary),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -167,6 +183,54 @@ class ChannelInfoScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  /// Аватар канала: выбрать фото и поставить кадр (тот же экран, что у
+  /// аватара профиля) или убрать текущий.
+  Future<void> _changeAvatar(BuildContext context, WidgetRef ref, ChannelInfo info) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: AppColors.ink2,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Выбрать фото'),
+              onTap: () => Navigator.of(sheet).pop('pick'),
+            ),
+            if (info.avatarUrl != null)
+              ListTile(
+                leading: Icon(Icons.delete_outline, color: AppColors.danger),
+                title: const Text('Убрать аватар'),
+                onTap: () => Navigator.of(sheet).pop('remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+
+    String? path;
+    if (choice == 'pick') {
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
+      if (picked == null || !context.mounted) return;
+      path = await openAvatarCrop(context, source: picked.path);
+      if (path == null) return;
+    }
+    try {
+      await ref.read(channelsRepositoryProvider).setAvatar(channelId, path);
+      ref.invalidate(channelInfoProvider(channelId));
+      ref.invalidate(conversationsProvider);
+      if (context.mounted) _snack(context, path == null ? 'Аватар убран' : 'Аватар обновлён');
+    } catch (error) {
+      AppLog.add('Аватар канала: $error');
+      if (context.mounted) _snack(context, friendlyError(error, fallback: 'Не удалось сменить аватар'));
+    }
   }
 
   Future<void> _edit(BuildContext context, WidgetRef ref, ChannelInfo info) async {
