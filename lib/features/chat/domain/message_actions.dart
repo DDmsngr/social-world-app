@@ -3,6 +3,9 @@ import 'entities/chat_message.dart';
 /// Пункты меню сообщения (долгий тап) и «⋮» в просмотре фото из чата.
 enum MessageAction {
   reply,
+
+  /// Правка своего текста (или подписи). У сообщения появится карандаш.
+  edit,
   copy,
 
   /// «Копировать выборочно»: текст в окне, где можно выделить кусок.
@@ -29,12 +32,14 @@ enum MessageAction {
 ///
 /// [canReply] — в чат можно писать (в закрытом квест-чате отвечать некуда).
 /// [canPin] — можно закреплять в этом чате (права проверяет и сервер).
+/// [mine] — сообщение моё: только такое можно править.
 List<MessageAction> messageActions(
   ChatMessage message, {
   bool canReply = true,
   bool canPin = false,
   bool isPinned = false,
   bool isBookmarked = false,
+  bool mine = false,
 }) {
   final text = message.text?.trim() ?? '';
   final attachment = message.attachment;
@@ -48,8 +53,20 @@ List<MessageAction> messageActions(
   // нельзя ни цитировать, ни пересылать: там нет достоверного содержимого.
   final trusted =
       message.signatureValid != false && message.status != MessageStatus.failed;
+  // Как в Telegram: пересланное не правится, голосовое, кружок и стикер —
+  // тоже (у них нет текста).
+  final editable =
+      mine &&
+      trusted &&
+      message.status != MessageStatus.sending &&
+      message.forwardedFrom == null &&
+      switch (message.kind) {
+        MessageKind.voice || MessageKind.videoNote || MessageKind.sticker => false,
+        _ => true,
+      };
   return [
     if (canReply && trusted) MessageAction.reply,
+    if (editable) MessageAction.edit,
     if (text.isNotEmpty) MessageAction.copy,
     if (text.length > 1) MessageAction.copyPart,
     if (media) MessageAction.saveToGallery,

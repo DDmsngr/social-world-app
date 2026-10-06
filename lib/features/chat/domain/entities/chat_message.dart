@@ -105,6 +105,7 @@ class ChatMessage {
     this.senderName,
     this.replyTo,
     this.forwardedFrom,
+    this.editedAt,
   });
 
   final String id;
@@ -135,6 +136,9 @@ class ChatMessage {
   /// Автор оригинала, если сообщение переслано.
   final String? forwardedFrom;
 
+  /// Когда автор последний раз правил текст; null — не правил.
+  final DateTime? editedAt;
+
   /// Строка для списка чатов.
   String get preview {
     // Посты каналов приходят с Markdown — в списке чатов разметка не нужна.
@@ -151,7 +155,12 @@ class ChatMessage {
         : kind.preview;
   }
 
-  ChatMessage copyWith({MessageStatus? status, bool? signatureValid, String? text}) =>
+  ChatMessage copyWith({
+    MessageStatus? status,
+    bool? signatureValid,
+    String? text,
+    DateTime? editedAt,
+  }) =>
       ChatMessage(
         id: id,
         conversationId: conversationId,
@@ -165,5 +174,6 @@ class ChatMessage {
         senderName: senderName,
         replyTo: replyTo,
         forwardedFrom: forwardedFrom,
+        editedAt: editedAt ?? this.editedAt,
       );
 }

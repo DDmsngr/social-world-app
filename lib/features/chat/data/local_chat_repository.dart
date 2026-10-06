@@ -169,6 +169,21 @@ class LocalChatRepository implements ChatRepository {
       message.attachment?.path ?? (throw StateError('Нет вложения'));
 
   @override
+  Future<ChatMessage> editMessage(ChatMessage message, String text) async {
+    if (message.senderId != currentUserId()) {
+      throw StateError('Менять можно только свои сообщения');
+    }
+    final edited = message.copyWith(text: text.trim(), editedAt: DateTime.now());
+    final thread = _messages[message.conversationId];
+    final index = thread?.indexWhere((m) => m.id == message.id) ?? -1;
+    if (thread != null && index >= 0) {
+      thread[index] = edited;
+      _controllers[message.conversationId]?.add(List.unmodifiable(thread));
+    }
+    return edited;
+  }
+
+  @override
   Future<Set<String>> deleteForEveryone(List<ChatMessage> messages) async {
     final me = currentUserId();
     final deleted = <String>{};

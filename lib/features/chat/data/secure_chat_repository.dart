@@ -221,7 +221,8 @@ class SecureChatRepository implements ChatRepository {
     decode: (rows, feed) => _decodeBatch(rows, feed, conversationId),
     signature: (rows, feed) =>
         '${feed.peerLastReadAt?.millisecondsSinceEpoch}|'
-        '${rows.map((r) => '${r['id']}:${r['deleted_at'] ?? ''}').join(',')}',
+        // edited_at — чтобы правка сообщения перерисовала ленту.
+        '${rows.map((r) => '${r['id']}:${r['deleted_at'] ?? ''}:${r['edited_at'] ?? ''}').join(',')}',
     firstPoll: _firstPoll,
     pollEvery: _pollEvery,
     log: AppLog.add,
@@ -318,8 +319,60 @@ class SecureChatRepository implements ChatRepository {
           attachment: ChatAttachment.fromJson(row['media']),
           replyTo: ChatMeta.fromJson(row['meta']).reply,
           forwardedFrom: ChatMeta.fromJson(row['meta']).forwardedFrom,
+          editedAt: _editedAt(row),
         ),
     ];
+  }
+
+  DateTime? _editedAt(Map<String, dynamic> row) {
+    final raw = row['edited_at'];
+    return raw is String ? DateTime.parse(raw).toLocal() : null;
+  }
+
+  @override
+  Future<ChatMessage> editMessage(ChatMessage message, String text) async {
+    final clean = text.trim();
+    if (message.senderId != currentUserId) {
+      throw StateError('Менять можно только свои сообщения');
+    }
+    final crypto = await _ready;
+    final params = <String, Object?>{'in_id': message.id};
+
+    if (await _kind(message.conversationId) == ConversationKind.direct) {
+      // Тот же конверт, что при отправке: вложение с ключом, цитата и
+      // пересылка остаются, меняется только текст.
+      final peerId = await _peerId(message.conversationId);
+      final keys = await _loadPublicKeys(peerId);
+      if (keys == null) {
+        throw StateError('Собеседник ещё не опубликовал ключи шифрования');
+      }
+      final payload = await crypto.encrypt(
+        conversationId: message.conversationId,
+        messageId: message.id,
+        senderId: currentUserId,
+        recipientExchangeKey: keys.exchangeKey,
+        text: MessageEnvelope.encode(
+          kind: message.kind,
+          text: clean.isEmpty ? null : clean,
+          attachment: message.attachment,
+          meta: ChatMeta(reply: message.replyTo, forwardedFrom: message.forwardedFrom),
+        ),
+      );
+      params.addAll({
+        'in_ciphertext': payload.ciphertext,
+        'in_nonce': payload.nonce,
+        'in_mac': payload.mac,
+        'in_signature': payload.signature,
+      });
+    } else {
+      params['in_body'] = clean;
+    }
+
+    final stamp = await _client.rpc('edit_chat_message', params: params);
+    return message.copyWith(
+      text: clean,
+      editedAt: stamp is String ? DateTime.parse(stamp).toLocal() : DateTime.now(),
+    );
   }
 
   @override
@@ -849,6 +902,7 @@ class SecureChatRepository implements ChatRepository {
         signatureValid: decrypted.signatureValid,
         replyTo: meta.reply,
         forwardedFrom: meta.forwardedFrom,
+        editedAt: _editedAt(row),
       );
     } catch (_) {
       return ChatMessage(

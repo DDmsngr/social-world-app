@@ -67,6 +67,27 @@ void main() {
       expect(marked, isNot(contains(MessageAction.bookmark)));
     });
 
+    test('изменить — только своё, не пересланное и не голосовое', () {
+      expect(messageActions(message()), isNot(contains(MessageAction.edit)));
+      expect(messageActions(message(), mine: true), contains(MessageAction.edit));
+      expect(
+        messageActions(
+          message(kind: MessageKind.voice, text: null, withFile: true),
+          mine: true,
+        ),
+        isNot(contains(MessageAction.edit)),
+      );
+      final forwarded = ChatMessage(
+        id: 'm9',
+        conversationId: 'c1',
+        senderId: 'me',
+        sentAt: DateTime(2026, 9, 30),
+        text: 'Привет',
+        forwardedFrom: 'Марк',
+      );
+      expect(messageActions(forwarded, mine: true), isNot(contains(MessageAction.edit)));
+    });
+
     test('в закрытом чате отвечать нельзя, пересылать можно', () {
       final actions = messageActions(message(), canReply: false);
       expect(actions, isNot(contains(MessageAction.reply)));

@@ -166,6 +166,11 @@ class _Meta extends StatelessWidget {
           ),
           const SizedBox(width: 8),
         ],
+        // Изменённое — карандаш у времени, как в Telegram.
+        if (message.editedAt != null) ...[
+          Icon(Icons.edit, size: 11, color: color),
+          const SizedBox(width: 3),
+        ],
         Text(
           _time(message.sentAt),
           style: TextStyle(fontSize: 11, color: color),

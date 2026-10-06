@@ -49,6 +49,7 @@ Future<bool> showMessageMenu(
     canPin: canPin && onReact != null,
     isPinned: isPinned,
     isBookmarked: ref.read(myBookmarksProvider.notifier).has(message.id),
+    mine: message.senderId == myId,
   );
   // Плавающая панель у самого сообщения, как в Telegram: сверху реакции,
   // под ними пункты. Само сообщение остаётся подсвеченным на экране.
@@ -82,6 +83,29 @@ Future<bool> showMessageMenu(
       return false;
     case MessageAction.editForward:
       await _editAndForward(context, ref, message, myId, conversation);
+      return false;
+    case MessageAction.edit:
+      final edited = await showDialog<String>(
+        context: context,
+        useRootNavigator: true,
+        builder: (_) => _EditTextDialog(
+          initial: message.text ?? '',
+          hasAttachment: message.attachment != null,
+          title: 'Изменить сообщение',
+          confirm: 'Сохранить',
+        ),
+      );
+      final text = edited?.trim();
+      if (text == null || text == (message.text ?? '').trim()) return false;
+      if (text.isEmpty && message.attachment == null) return false;
+      try {
+        await repository.editMessage(message, text);
+      } catch (error) {
+        AppLog.add('Правка сообщения: $error');
+        messenger.showSnackBar(
+          SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось изменить'))),
+        );
+      }
       return false;
     case MessageAction.pin:
     case MessageAction.unpin:
@@ -406,6 +430,7 @@ class _FloatingMenu extends StatelessWidget {
 
 String _label(MessageAction action) => switch (action) {
   MessageAction.reply => 'Ответить',
+  MessageAction.edit => 'Изменить',
   MessageAction.forward => 'Переслать',
   MessageAction.editForward => 'Изменить и переслать',
   MessageAction.pin => 'Закрепить',
@@ -422,6 +447,7 @@ String _label(MessageAction action) => switch (action) {
 
 IconData _icon(MessageAction action) => switch (action) {
   MessageAction.reply => Icons.reply_rounded,
+  MessageAction.edit => Icons.edit_outlined,
   MessageAction.forward => Icons.shortcut_rounded,
   MessageAction.editForward => Icons.drive_file_rename_outline_rounded,
   MessageAction.pin => Icons.push_pin_outlined,
@@ -537,9 +563,12 @@ Future<void> _editAndForward(
   final edited = await showDialog<String>(
     context: context,
     useRootNavigator: true,
-    builder: (_) => _EditForwardDialog(
+    builder: (_) => _EditTextDialog(
       initial: message.text ?? '',
       hasAttachment: message.attachment != null,
+      title: 'Изменить и переслать',
+      confirm: 'Далее',
+      note: 'Уйдёт как новое сообщение, без пометки «Переслано от».',
     ),
   );
   if (edited == null || !context.mounted) return;
@@ -558,17 +587,27 @@ Future<void> _editAndForward(
   messenger.showSnackBar(SnackBar(content: Text(forwardSummary(result, all))));
 }
 
-class _EditForwardDialog extends StatefulWidget {
-  const _EditForwardDialog({required this.initial, required this.hasAttachment});
+/// Окно правки текста: для «Изменить» и для «Изменить и переслать».
+class _EditTextDialog extends StatefulWidget {
+  const _EditTextDialog({
+    required this.initial,
+    required this.hasAttachment,
+    required this.title,
+    required this.confirm,
+    this.note,
+  });
 
   final String initial;
   final bool hasAttachment;
+  final String title;
+  final String confirm;
+  final String? note;
 
   @override
-  State<_EditForwardDialog> createState() => _EditForwardDialogState();
+  State<_EditTextDialog> createState() => _EditTextDialogState();
 }
 
-class _EditForwardDialogState extends State<_EditForwardDialog> {
+class _EditTextDialogState extends State<_EditTextDialog> {
   late final _controller = TextEditingController(text: widget.initial);
 
   @override
@@ -580,7 +619,7 @@ class _EditForwardDialogState extends State<_EditForwardDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Изменить и переслать'),
+      title: Text(widget.title),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,11 +640,13 @@ class _EditForwardDialogState extends State<_EditForwardDialog> {
               'Фото, видео или файл уйдут без изменений.',
               style: TextStyle(color: AppColors.textDim, fontSize: 12.5),
             ),
-          const SizedBox(height: 4),
-          Text(
-            'Уйдёт как новое сообщение, без пометки «Переслано от».',
-            style: TextStyle(color: AppColors.textDim, fontSize: 12.5),
-          ),
+          if (widget.note != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              widget.note!,
+              style: TextStyle(color: AppColors.textDim, fontSize: 12.5),
+            ),
+          ],
         ],
       ),
       actions: [
@@ -615,7 +656,7 @@ class _EditForwardDialogState extends State<_EditForwardDialog> {
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('Далее'),
+          child: Text(widget.confirm),
         ),
       ],
     );

@@ -65,6 +65,11 @@ abstract interface class ChatRepository {
   /// себя» — не сюда, это настройка устройства (hiddenMessagesProvider).
   Future<Set<String>> deleteForEveryone(List<ChatMessage> messages);
 
+  /// Правка своего сообщения: новый текст (или подпись к вложению). Вложение,
+  /// цитата и пересылка остаются как были. Возвращает сообщение с пометкой
+  /// «изменено».
+  Future<ChatMessage> editMessage(ChatMessage message, String text);
+
   /// Путь к файлу вложения на устройстве: скачивает и расшифровывает при
   /// первом обращении, дальше берёт из кэша.
   Future<String> attachmentFile(ChatMessage message);

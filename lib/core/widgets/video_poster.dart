@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
+// Не video_thumbnail: его сборка тянет jcenter(), которого больше нет в Gradle.
+import 'package:get_thumbnail_video/index.dart';
+import 'package:get_thumbnail_video/video_thumbnail.dart';
 
 import '../debug/app_log.dart';
 import '../theme/app_colors.dart';
@@ -45,7 +47,7 @@ class VideoPoster extends StatelessWidget {
           quality: 75,
           timeMs: 400,
         );
-        if (bytes != null && bytes.isNotEmpty) {
+        if (bytes.isNotEmpty) {
           _cache[url] = bytes;
           if (_cache.length > 80) _cache.remove(_cache.keys.first);
         }
