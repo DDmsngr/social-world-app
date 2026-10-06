@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../discover/presentation/providers/city_provider.dart';
 import '../../notifications/notifications.dart';
+import '../../stories/stories.dart';
 import 'providers/feed_providers.dart';
 import 'widgets/post_card.dart';
 import 'widgets/story_strip.dart';
@@ -125,12 +126,13 @@ class FeedScreen extends ConsumerWidget {
             );
           }
 
-          final stories = storiesFrom(posts);
-
           return RefreshIndicator(
             color: AppColors.primaryTint,
             backgroundColor: AppColors.ink2,
-            onRefresh: () => ref.read(feedProvider.notifier).refresh(),
+            onRefresh: () async {
+              ref.read(storiesProvider.notifier).refresh();
+              await ref.read(feedProvider.notifier).refresh();
+            },
             child: ListView.builder(
               padding: EdgeInsets.only(
                 top: 8,
@@ -145,7 +147,7 @@ class FeedScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        StoryStrip(stories: stories),
+                        const StoryStrip(),
                         const _TrendingTags(),
                       ],
                     ),

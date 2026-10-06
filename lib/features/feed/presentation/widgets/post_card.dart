@@ -13,6 +13,7 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../profile/domain/profile_models.dart';
 import '../../../routes/presentation/widgets/route_post_preview.dart';
 import '../../../saved/saved.dart';
+import '../../../stories/story_composer.dart';
 import '../../domain/entities/post.dart';
 import '../post_actions.dart';
 import '../providers/feed_providers.dart';
@@ -22,6 +23,7 @@ import 'post_share_sheet.dart';
 enum _PostMenu {
   edit,
   settings,
+  story,
   save,
   delete,
   report,
@@ -65,6 +67,8 @@ class PostCard extends ConsumerWidget {
         return editPost(context, ref, post);
       case _PostMenu.settings:
         return changePostSettings(context, ref, post);
+      case _PostMenu.story:
+        return storyFromPost(context, ref, post);
       case _PostMenu.save:
         return toggleSavePost(context, ref, post);
       case _PostMenu.delete:
@@ -169,6 +173,11 @@ class PostCard extends ConsumerWidget {
                       const PopupMenuItem(
                         value: _PostMenu.settings,
                         child: Text('Настройки публикации'),
+                      ),
+                    if (permissions.isOwner)
+                      const PopupMenuItem(
+                        value: _PostMenu.story,
+                        child: Text('Добавить в историю'),
                       ),
                     PopupMenuItem(
                       value: _PostMenu.save,
