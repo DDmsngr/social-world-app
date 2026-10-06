@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/link_text.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_meta.dart';
 import 'attachment_views.dart';
@@ -88,8 +89,9 @@ class MessageBubble extends StatelessWidget {
           if (hasAttachment) const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerLeft,
-            child: Text(
+            child: LinkText(
               caption.isEmpty && !hasAttachment ? message.preview : caption,
+              linkColor: mine ? AppColors.onBubbleMine : AppColors.primaryTint,
               style: TextStyle(
                 fontSize: 15,
                 height: 1.4,

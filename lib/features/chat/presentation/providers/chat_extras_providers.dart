@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -144,6 +145,8 @@ Future<void> toggleReaction(
   String messageId,
   String emoji,
 ) async {
+  // Лёгкий отклик сразу при нажатии, не дожидаясь сети.
+  unawaited(HapticFeedback.lightImpact());
   await Supabase.instance.client.rpc(
     'toggle_chat_reaction',
     params: {'in_message': messageId, 'in_emoji': emoji},

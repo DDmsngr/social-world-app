@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/link_text.dart';
 import '../../core/widgets/state_message.dart';
 import 'assistant.dart';
 
@@ -240,7 +241,7 @@ class _Bubble extends ConsumerWidget {
           children: [
             if (path != null) _Shot(path: path),
             if (path != null && message.body != null) const SizedBox(height: 6),
-            if (message.body != null) SelectableText(message.body!),
+            if (message.body != null) LinkText(message.body!, selectable: true),
             const SizedBox(height: 4),
             Text(
               [

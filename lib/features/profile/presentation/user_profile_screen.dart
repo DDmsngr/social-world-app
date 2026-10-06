@@ -330,7 +330,7 @@ class _Body extends ConsumerWidget {
         ],
         const SizedBox(height: 4),
         Text(
-          'Social Score: ${profile.socialScore}',
+          'Activity Points: ${profile.socialScore}',
           style: TextStyle(fontSize: 12, color: AppColors.textDim),
         ),
         const SizedBox(height: 14),

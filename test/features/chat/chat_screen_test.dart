@@ -393,7 +393,7 @@ void main() {
         ),
       );
       expect(find.text('Идём?'), findsOneWidget);
-      expect(tester.widget<Text>(find.text('👍')).style!.fontSize, lessThan(30));
+      expect(tester.widget<Text>(find.text('👍')).textSpan!.style!.fontSize, lessThan(30));
     });
   });
 

@@ -7,6 +7,7 @@ import '../../../../core/media/media_kind.dart';
 import '../../../../core/media/photo_viewer.dart';
 import '../../../../core/media/playback_focus.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../../core/widgets/video_poster.dart';
 import '../../../../core/theme/app_colors.dart';
 
 /// Вложения поста: одна фотография, лента из нескольких или видео.
@@ -278,15 +279,19 @@ class _VideoItemState extends State<_VideoItem> {
     }
 
     if (!_ready) {
-      return ColoredBox(
-        color: AppColors.ink2,
-        child: Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2),
+      // Пока видео готовится — его кадр, а не чёрный квадрат.
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          VideoPoster(url: widget.url, showPlay: false),
+          const Center(
+            child: SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            ),
           ),
-        ),
+        ],
       );
     }
 

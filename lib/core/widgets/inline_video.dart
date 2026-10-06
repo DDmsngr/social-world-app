@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 
 import '../media/playback_focus.dart';
 import '../theme/app_colors.dart';
+import 'video_poster.dart';
 
 /// Расширения, по которым ссылка в `![](…)` считается видео, а не картинкой.
 const _videoExtensions = {'.mp4', '.mov', '.m4v', '.webm', '.3gp', '.mkv'};
@@ -90,7 +91,10 @@ class _InlineVideoState extends State<InlineVideo> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                ColoredBox(color: AppColors.ink2),
+                if (ready)
+                  const ColoredBox(color: Colors.black)
+                else
+                  VideoPoster(url: widget.url, showPlay: false),
                 if (ready) VideoPlayer(controller),
                 if (_failed)
                   Center(

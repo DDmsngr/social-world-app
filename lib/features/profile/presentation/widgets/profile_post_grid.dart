@@ -6,6 +6,7 @@ import '../../../../core/media/media_kind.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/text/markdown_preview.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/video_poster.dart';
 import '../../../feed/domain/entities/post.dart';
 
 /// Публикации профиля сеткой в три колонки, как в привычных фотосетях.
@@ -32,6 +33,62 @@ class ProfilePostGrid extends StatelessWidget {
   }
 }
 
+/// Пост без фото: цветная плитка с началом текста. Цвет берётся из id поста,
+/// поэтому у одного и того же поста он всегда один.
+class _TextTile extends StatelessWidget {
+  const _TextTile({required this.post});
+
+  final Post post;
+
+  static const _palettes = [
+    [Color(0xFFEA2249), Color(0xFFFF7A59)],
+    [Color(0xFF5B5BD6), Color(0xFF8E7CFF)],
+    [Color(0xFF0E9F8E), Color(0xFF4ADE9C)],
+    [Color(0xFFF59E0B), Color(0xFFFB7185)],
+    [Color(0xFF2563EB), Color(0xFF22B8CF)],
+    [Color(0xFF7C3AED), Color(0xFFEC4899)],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = post.isArticle
+        ? (post.title ?? markdownPreview(post.body ?? ''))
+        : markdownPreview(post.body ?? '');
+    final text = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final colors = _palettes[post.id.hashCode.abs() % _palettes.length];
+    // Чем короче текст, тем крупнее: короткая фраза должна читаться издалека.
+    final size = text.length <= 24 ? 17.0 : (text.length <= 60 ? 14.0 : 12.0);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: colors,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Center(
+          child: Text(
+            text.isEmpty ? '·' : text,
+            textAlign: TextAlign.center,
+            maxLines: 6,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: size,
+              height: 1.2,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              shadows: const [Shadow(blurRadius: 3, color: Color(0x33000000))],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Tile extends StatelessWidget {
   const _Tile({required this.post});
 
@@ -53,33 +110,10 @@ class _Tile extends StatelessWidget {
         placeholder: (_, _) => ColoredBox(color: AppColors.ink2),
         errorWidget: (_, _, _) => ColoredBox(color: AppColors.ink2),
       );
-    } else if (video) {
-      content = ColoredBox(
-        color: const Color(0xFF15151A),
-        child: Center(
-          child: Icon(Icons.play_circle_outline, color: Colors.white70, size: 36),
-        ),
-      );
+    } else if (video && first.startsWith('http')) {
+      content = VideoPoster(url: first, maxWidth: 360, showPlay: false);
     } else {
-      final text = post.isArticle
-          ? (post.title ?? markdownPreview(post.body ?? ''))
-          : markdownPreview(post.body ?? '');
-      content = ColoredBox(
-        color: AppColors.card,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Text(
-            text,
-            maxLines: 5,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.25,
-              fontWeight: post.isArticle ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ),
-      );
+      content = _TextTile(post: post);
     }
 
     final badge = video

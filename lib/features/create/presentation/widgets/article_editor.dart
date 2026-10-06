@@ -7,6 +7,7 @@ import '../../../../core/media/media_kind.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/markdown_view.dart';
+import '../../../../core/widgets/video_poster.dart';
 import '../../domain/article_parts.dart';
 import 'article_media.dart';
 
@@ -561,12 +562,7 @@ class _MediaCard extends StatelessWidget {
     final url = block.url!;
     final remote = url.startsWith('http');
     if (remote && isVideoUrl(url)) {
-      return Container(
-        height: 180,
-        color: Colors.black87,
-        alignment: Alignment.center,
-        child: const Icon(Icons.play_circle_outline, color: Colors.white70, size: 56),
-      );
+      return SizedBox(height: 200, child: VideoPoster(url: url));
     }
     if (!remote) {
       return Container(
