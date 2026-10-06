@@ -22,6 +22,7 @@ class ChannelMedia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if ((message.attachment?.album.length ?? 0) > 0) return _Album(message: message);
     return switch (message.kind) {
       MessageKind.image => _ChannelPhoto(message: message),
       MessageKind.video => VideoPreview(message: message),
@@ -33,6 +34,138 @@ class ChannelMedia extends StatelessWidget {
         ),
       ),
     };
+  }
+}
+
+/// Пост-альбом: несколько фото и видео сеткой, как в Telegram. Ряды: 2 → [2],
+/// 3 → [1, 2], 4 → [2, 2], 6 → [3, 3] и т. д. Нажатие на фото открывает
+/// просмотр всех фото альбома.
+class _Album extends ConsumerWidget {
+  const _Album({required this.message});
+
+  final ChatMessage message;
+
+  static const _gap = 2.0;
+
+  static List<int> rows(int n) => switch (n) {
+    1 => [1],
+    2 => [2],
+    3 => [1, 2],
+    4 => [2, 2],
+    5 => [2, 3],
+    6 => [3, 3],
+    7 => [2, 2, 3],
+    8 => [2, 3, 3],
+    9 => [3, 3, 3],
+    _ => [3, 3, 4],
+  };
+
+  /// Каждый файл альбома — как отдельное сообщение: так работают и кэш
+  /// файлов (по id сообщения), и готовые виджеты фото и видео.
+  List<ChatMessage> _items() {
+    final all = message.attachment!.all;
+    return [
+      for (var i = 0; i < all.length; i++)
+        ChatMessage(
+          id: i == 0 ? message.id : '${message.id}-a$i',
+          conversationId: message.conversationId,
+          senderId: message.senderId,
+          sentAt: message.sentAt,
+          kind: (all[i].mime ?? '').startsWith('video') ? MessageKind.video : MessageKind.image,
+          attachment: all[i],
+        ),
+    ];
+  }
+
+  Future<void> _openPhotos(BuildContext context, WidgetRef ref, List<ChatMessage> items, ChatMessage tapped) async {
+    final photos = items.where((m) => m.kind == MessageKind.image).toList();
+    final repo = ref.read(chatRepositoryProvider);
+    try {
+      final paths = await Future.wait(photos.map(repo.attachmentFile));
+      if (!context.mounted) return;
+      await showPhotoViewer(context, urls: paths, initialIndex: photos.indexOf(tapped));
+    } catch (error) {
+      AppLog.add('Альбом канала не открылся: $error');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = _items();
+    final layout = rows(items.length.clamp(1, 10));
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        var index = 0;
+        final children = <Widget>[];
+        for (var r = 0; r < layout.length; r++) {
+          final k = layout[r];
+          final cellW = (width - _gap * (k - 1)) / k;
+          // Одиночный ряд сверху — широкая «обложка», остальные — квадраты.
+          final cellH = k == 1 ? width * 0.62 : cellW;
+          final cells = <Widget>[];
+          for (var c = 0; c < k && index < items.length; c++, index++) {
+            final item = items[index];
+            cells.add(
+              SizedBox(
+                width: cellW,
+                height: cellH,
+                child: item.kind == MessageKind.video
+                    ? VideoPreview(message: item, aspectRatio: cellW / cellH)
+                    : _AlbumPhoto(
+                        message: item,
+                        onTap: () => _openPhotos(context, ref, items, item),
+                      ),
+              ),
+            );
+            if (c < k - 1) cells.add(const SizedBox(width: _gap));
+          }
+          if (r > 0) children.add(const SizedBox(height: _gap));
+          children.add(Row(children: cells));
+        }
+        return Column(mainAxisSize: MainAxisSize.min, children: children);
+      },
+    );
+  }
+}
+
+class _AlbumPhoto extends ConsumerStatefulWidget {
+  const _AlbumPhoto({required this.message, required this.onTap});
+
+  final ChatMessage message;
+  final VoidCallback onTap;
+
+  @override
+  ConsumerState<_AlbumPhoto> createState() => _AlbumPhotoState();
+}
+
+class _AlbumPhotoState extends ConsumerState<_AlbumPhoto> {
+  late Future<String> _file = ref.read(chatRepositoryProvider).attachmentFile(widget.message);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _file,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return InkWell(
+            onTap: () => setState(
+              () => _file = ref.read(chatRepositoryProvider).attachmentFile(widget.message),
+            ),
+            child: ColoredBox(
+              color: AppColors.card,
+              child: Center(child: Icon(Icons.refresh, color: AppColors.textFaint)),
+            ),
+          );
+        }
+        final path = snapshot.data;
+        if (path == null) return ColoredBox(color: AppColors.card);
+        return GestureDetector(
+          onTap: widget.onTap,
+          child: Image.file(File(path), fit: BoxFit.cover, cacheWidth: 600, gaplessPlayback: true),
+        );
+      },
+    );
   }
 }
 

@@ -50,6 +50,7 @@ class ChatAttachment {
     this.durationMs,
     this.waveform,
     this.key,
+    this.album = const [],
   });
 
   final String path;
@@ -62,6 +63,13 @@ class ChatAttachment {
   final List<double>? waveform;
   final String? key;
 
+  /// Остальные файлы альбома (пост канала из нескольких фото). Первый файл —
+  /// само это вложение.
+  final List<ChatAttachment> album;
+
+  /// Все файлы по порядку: это вложение и альбом за ним.
+  List<ChatAttachment> get all => [this, ...album];
+
   Map<String, Object?> toJson({bool withKey = true}) => {
     'path': path,
     'size': size,
@@ -71,13 +79,20 @@ class ChatAttachment {
     if (waveform != null)
       'waveform': [for (final v in waveform!) double.parse(v.toStringAsFixed(2))],
     if (withKey && key != null) 'key': key,
+    if (album.isNotEmpty) 'album': [for (final a in album) a.toJson(withKey: withKey)],
   };
 
-  static ChatAttachment? fromJson(Object? raw) {
+  static ChatAttachment? fromJson(Object? raw, {bool nested = false}) {
     if (raw is! Map) return null;
     final path = raw['path'];
     if (path is! String) return null;
+    final album = raw['album'];
     return ChatAttachment(
+      album: nested || album is! List
+          ? const []
+          : [
+              for (final item in album) ?ChatAttachment.fromJson(item, nested: true),
+            ],
       path: path,
       size: (raw['size'] as num?)?.toInt() ?? 0,
       name: raw['name'] as String?,

@@ -40,4 +40,20 @@ test('разбор страницы: фото, видео, кружки и оп�
   assert.deepEqual(posts.map((p) => p.ref), ['tg:ch/1', 'tg:ch/3']);
   assert.equal(posts[0].media.kind, 'image');
   assert.equal(posts[1].media.kind, 'video');
+  assert.deepEqual(posts[0].album, []);
+});
+
+test('альбом: все фото поста, по порядку', () => {
+  const html = `
+    <div class="tgme_widget_message_wrap"><div data-post="ch/7">
+      <div class="tgme_widget_message_grouped_wrap js-message_grouped_wrap">
+        <a class="tgme_widget_message_photo_wrap grouped_media_wrap" style="left:0px;background-image:url('https://cdn/1.jpg')"></a>
+        <a class="tgme_widget_message_photo_wrap grouped_media_wrap" style="left:186px;background-image:url('https://cdn/2.jpg')"></a>
+        <a class="tgme_widget_message_photo_wrap grouped_media_wrap" style="background-image:url('https://cdn/3.jpg')"></a>
+      </div>
+      <div class="tgme_widget_message_text js-message_text">Рецепт</div>
+      <time datetime="2026-10-01T10:00:00+00:00"></time></div></div>`;
+  const [post] = parseChannelPage(html, 'ch');
+  assert.equal(post.media.url, 'https://cdn/1.jpg');
+  assert.deepEqual(post.album.map((m) => m.url), ['https://cdn/2.jpg', 'https://cdn/3.jpg']);
 });

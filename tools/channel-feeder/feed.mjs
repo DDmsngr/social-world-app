@@ -34,6 +34,8 @@ const CHANNELS = [
 const MAX_AGE_HOURS = 12;
 // Бесплатный Supabase Cloud не принимает файлы больше 50 МБ.
 const MAX_MEDIA_BYTES = 45 * 1024 * 1024;
+/** Сколько файлов альбома берём (в Telegram их до 10). */
+const MAX_ALBUM = 10;
 const BROWSER_UA =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 
@@ -169,8 +171,15 @@ export function parseChannelPage(html, channel) {
 
     const date = /<time[^>]*datetime="([^"]+)"/.exec(block)?.[1];
     const textHtml = /<div class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/.exec(block)?.[1] ?? '';
-    const video = /<video[^>]*\ssrc=["']([^"']+)["']/.exec(block)?.[1];
-    const photo = /tgme_widget_message_photo_wrap[\s\S]*?background-image:url\('([^']+)'/.exec(block)?.[1];
+    // Альбом — один пост с несколькими фото/видео (grouped_wrap). Раньше брали
+    // только первое, и посты «из 6 картинок» приезжали с одной.
+    const items = [];
+    const mediaRe = /<video[^>]*\ssrc=["']([^"']+)["']|tgme_widget_message_photo_wrap[^>]*?background-image:url\('([^']+)'/g;
+    for (const m of block.matchAll(mediaRe)) {
+      if (m[1]) items.push({ kind: 'video', url: m[1], mime: 'video/mp4' });
+      else if (m[2]) items.push({ kind: 'image', url: m[2], mime: 'image/jpeg' });
+      if (items.length >= MAX_ALBUM) break;
+    }
     const tooBig = /message_media_not_supported/i.test(block);
     if (tooBig && !textHtml) continue;
 
@@ -181,9 +190,8 @@ export function parseChannelPage(html, channel) {
       date: date ? new Date(date) : null,
       text: stripSignature(htmlToMarkdown(textHtml)),
       plain: decodeEntities(textHtml.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')),
-      media: video ? { kind: 'video', url: video, mime: 'video/mp4' }
-        : photo ? { kind: 'image', url: photo, mime: 'image/jpeg' }
-        : null,
+      media: items[0] ?? null,
+      album: items.slice(1),
     });
   }
   return posts;
@@ -264,6 +272,19 @@ async function publish(handle, post, credit) {
     } catch (e) {
       console.warn(`  медиа не загрузилось (${post.ref}): ${e.message}`);
     }
+  }
+  // Остальные файлы альбома — внутри того же media: { …первый, album: [...] }.
+  if (media && post.album?.length) {
+    const album = [];
+    for (const item of post.album) {
+      try {
+        const uploaded = await uploadMedia(state.id, item);
+        if (uploaded) album.push(uploaded.json);
+      } catch (e) {
+        console.warn(`  файл альбома не загрузился (${post.ref}): ${e.message}`);
+      }
+    }
+    if (album.length) media = { ...media, album };
   }
   if (!media && !post.text) return false; // без картинки и текста постить нечего
   const id = await rest('rpc/channel_feed_post', {
