@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../media/file_too_large.dart';
 import '../permissions/content_permissions.dart';
 import 'rule_violation.dart';
 
@@ -7,6 +8,7 @@ import 'rule_violation.dart';
 /// snackbar; сырая причина при этом остаётся в AppLog.
 String friendlyError(Object error, {String fallback = 'Что-то пошло не так'}) {
   if (error is PermissionDeniedException) return error.message;
+  if (error is FileTooLargeException) return error.message;
   if (error is TimeoutException) return 'Сервер долго не отвечает';
 
   final rule = ruleCodeIn(error);

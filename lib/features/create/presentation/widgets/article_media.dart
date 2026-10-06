@@ -3,14 +3,11 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/debug/app_log.dart';
+import '../../../../core/media/file_too_large.dart';
 import '../../../feed/domain/repositories/feed_repository.dart';
 
 /// Подпись к полосе загрузки и доля готового (0–1).
 typedef UploadProgress = void Function(String label, double fraction);
-
-/// Потолок на одно видео в статье: дальше загрузка на мобильном интернете
-/// всё равно не доживёт.
-const maxArticleVideoBytes = 150 * 1024 * 1024;
 
 /// Выбор и загрузка фото для текста статьи: загружаются сразу, потому что в
 /// Markdown нужна готовая ссылка. Фото, которое не загрузилось, пропускается
@@ -56,9 +53,7 @@ Future<String?> pickArticleVideo({
   if (file == null) return null;
   try {
     final size = await File(file.path).length();
-    if (size > maxArticleVideoBytes) {
-      throw StateError('Видео больше ${maxArticleVideoBytes ~/ (1024 * 1024)} МБ');
-    }
+    if (size > maxUploadBytes) throw FileTooLargeException(size);
     onProgress('Загружаем видео', 0);
     return await repository.uploadInlineImage(
       file.path,

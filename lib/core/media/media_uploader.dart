@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../config/env.dart';
 import 'exif_strip.dart';
+import 'file_too_large.dart';
 
 /// Загрузка фотографий и видео в Supabase Storage.
 ///
@@ -61,6 +62,7 @@ class MediaUploader {
     final isJpeg = extension == '.jpg' || extension == '.jpeg';
     final Uint8List? jpeg = isJpeg ? stripJpegMetadata(await File(localPath).readAsBytes()) : null;
     final length = jpeg?.length ?? await File(localPath).length();
+    if (length > maxUploadBytes) throw FileTooLargeException(length);
 
     if (length > _chunk) {
       await _uploadResumable(

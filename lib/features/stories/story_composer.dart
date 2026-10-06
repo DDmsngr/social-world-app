@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../core/debug/app_log.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/media/file_too_large.dart';
 import '../../core/media/media_kind.dart';
 import '../../core/text/markdown_preview.dart';
 import '../../core/theme/app_colors.dart';
@@ -96,7 +97,14 @@ Future<void> addStory(BuildContext context, WidgetRef ref) async {
         source: ImageSource.gallery,
         maxDuration: const Duration(seconds: maxVideoSeconds),
       );
-      if (file != null) draft = StoryDraft(kind: StoryKind.video, localPath: file.path);
+      if (file != null) {
+        final size = await File(file.path).length();
+        if (size > maxUploadBytes) {
+          if (context.mounted) _toast(context, FileTooLargeException(size).message);
+          return;
+        }
+        draft = StoryDraft(kind: StoryKind.video, localPath: file.path);
+      }
     default:
       draft = const StoryDraft(kind: StoryKind.text);
   }
