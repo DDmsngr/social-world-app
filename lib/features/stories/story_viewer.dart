@@ -8,6 +8,7 @@ import '../../core/debug/app_log.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/media/playback_focus.dart';
 import '../../core/router/app_router.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/presentation/providers/auth_providers.dart';
 import 'stories.dart';
@@ -409,12 +410,14 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                     children: [
                       if (story.postId != null)
                         FilledButton.tonal(
+                          style: AppButtons.compact,
                           onPressed: _openPost,
                           child: const Text('Открыть пост'),
                         ),
                       const Spacer(),
                       if (mine)
                         TextButton.icon(
+                          style: AppButtons.compact,
                           onPressed: _showViewers,
                           icon: const Icon(Icons.visibility_outlined, color: Colors.white),
                           label: Text(
