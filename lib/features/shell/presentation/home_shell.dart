@@ -10,6 +10,7 @@ import '../../../core/debug/app_log.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/update/update_banner.dart';
 import '../../../core/update/update_controller.dart';
 import '../../../core/update/update_dot.dart';
 import '../../../core/widgets/glass_surface.dart';
@@ -112,6 +113,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
     if (state == AppLifecycleState.resumed) {
       ref.read(notificationsProvider.notifier).refreshQuietly();
       _touchPresence();
+      unawaited(ref.read(updateControllerProvider.notifier).onResume());
     }
   }
 
@@ -178,7 +180,19 @@ class _HomeShellState extends ConsumerState<HomeShell>
         // их отступы, кнопки и поля ввода (SafeArea) считают высоту панели из
         // MediaQuery.padding.
         extendBody: true,
-        body: widget.navigationShell,
+        body: Stack(
+          children: [
+            Positioned.fill(child: widget.navigationShell),
+            // В переписке плашка закрывала бы поле ввода.
+            if (!inChat)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: MediaQuery.paddingOf(context).bottom + 84,
+                child: const UpdateReadyBanner(),
+              ),
+          ],
+        ),
         // Именно null, а не пустой виджет: Scaffold с любой нижней панелью,
         // даже нулевой высоты, считает, что системную полосу внизу занимает
         // она, и убирает отступ из тела — поле ввода уезжало под системные

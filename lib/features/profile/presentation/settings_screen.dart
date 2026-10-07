@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_choice.dart';
 import '../../../core/update/update_controller.dart';
+import '../../../core/update/update_policy.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
@@ -135,6 +136,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SectionLabel('Приложение'),
           const SizedBox(height: 12),
           const UpdateSettingsRow(),
+          const SizedBox(height: 4),
+          const _UpdateMobileSwitch(),
           const SizedBox(height: 10),
           const _VersionRow(),
           const SizedBox(height: 26),
@@ -327,6 +330,48 @@ class _SendSoundSwitchState extends State<_SendSoundSwitch> {
               },
         title: const Text('Звук отправки сообщения'),
         subtitle: const Text('Короткий сигнал, когда сообщение ушло'),
+      ),
+    );
+  }
+}
+
+/// Разрешение качать обновления по мобильной сети. По умолчанию выключено:
+/// без него новая версия качается сама только по Wi-Fi.
+class _UpdateMobileSwitch extends ConsumerStatefulWidget {
+  const _UpdateMobileSwitch();
+
+  @override
+  ConsumerState<_UpdateMobileSwitch> createState() => _UpdateMobileSwitchState();
+}
+
+class _UpdateMobileSwitchState extends ConsumerState<_UpdateMobileSwitch> {
+  bool? _on;
+
+  @override
+  void initState() {
+    super.initState();
+    UpdatePolicy.allowMobile().then((value) {
+      if (mounted) setState(() => _on = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = _on;
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 4, 8, 4),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        value: on ?? false,
+        onChanged: on == null
+            ? null
+            : (value) async {
+                setState(() => _on = value);
+                await UpdatePolicy.setAllowMobile(value);
+                if (value) await ref.read(updateControllerProvider.notifier).autoDownload();
+              },
+        title: const Text('Обновлять и по мобильной сети'),
+        subtitle: const Text('Иначе новая версия скачивается сама только по Wi-Fi'),
       ),
     );
   }
@@ -571,7 +616,7 @@ class UpdateSettingsRow extends ConsumerWidget {
       ),
       UpdateStage.available => (
         'Есть обновления',
-        'Нажмите, чтобы скачать',
+        'Скачается само по Wi-Fi. Нажмите, чтобы скачать сейчас',
         controller.download,
       ),
       UpdateStage.downloading => (

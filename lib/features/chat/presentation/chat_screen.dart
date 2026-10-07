@@ -18,7 +18,9 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../calls/call_controller.dart';
 import '../../calls/call_kit.dart';
+import '../../calls/call_log.dart';
 import '../domain/day_label.dart';
+import '../domain/timeline.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
@@ -312,6 +314,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // Кто-то пишет — вместо «в сети» смешная фраза («подбирает слова…»).
     final typing = ref.watch(typingEntriesProvider(widget.conversationId)).value ?? const <TypingEntry>[];
     final typingText = typingLabel(typing, direct: isDirect);
+    // Звонки бывают только в личных переписках.
+    final calls = isDirect
+        ? ref.watch(chatCallsProvider(widget.conversationId)).value ?? const <CallLogEntry>[]
+        : const <CallLogEntry>[];
     final subtitle = typingText.isNotEmpty
         ? typingText
         : info != null && !isDirect
@@ -509,7 +515,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         for (final m in all)
                           if (!hidden.contains(m.id) && (cleared == null || m.sentAt.isAfter(cleared))) m,
                       ];
-                if (items.isEmpty) {
+                final entries = mergeCallsIntoTimeline(items, [
+                  for (final c in calls)
+                    if (cleared == null || c.createdAt.isAfter(cleared)) c,
+                ]);
+                if (entries.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.gutter),
@@ -543,13 +553,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     AppSpacing.gutter,
                     14,
                   ),
-                  itemCount: items.length,
+                  itemCount: entries.length,
                   itemBuilder: (context, index) {
-                    final position = items.length - 1 - index;
-                    final message = items[position];
+                    final position = entries.length - 1 - index;
+                    final entry = entries[position];
+                    // Первое сообщение (или звонок) дня — с подписью дня над ним.
+                    final newDay = position == 0 || !sameDay(entries[position - 1].at, entry.at);
+                    final call = entry.call;
+                    if (call != null) {
+                      final tile = _CallLogTile(
+                        call: call,
+                        mine: call.callerId == myId,
+                        onTap: info == null || info.peerId == null ? null : () => _call(info, video: call.video),
+                      );
+                      if (!newDay) return tile;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(child: _DayChip(chatDayLabel(entry.at, DateTime.now()))),
+                          tile,
+                        ],
+                      );
+                    }
+                    final message = entry.message!;
                     final mine = message.senderId == myId;
-                    // Первое сообщение дня — с подписью дня над ним.
-                    final newDay = position == 0 || !sameDay(items[position - 1].sentAt, message.sentAt);
                     final item = KeyedSubtree(
                       key: _itemKeys.putIfAbsent(message.id, GlobalKey.new),
                       child: Semantics(
@@ -1066,6 +1093,69 @@ class _ConnectionBanner extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Звонок в ленте: с чьей стороны был вызов, состоялся ли и сколько длился.
+/// Тап — перезвонить тем же видом звонка.
+class _CallLogTile extends StatelessWidget {
+  const _CallLogTile({required this.call, required this.mine, this.onTap});
+
+  final CallLogEntry call;
+  final bool mine;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = !call.talked && call.status != 'ringing' && call.status != 'active';
+    final color = failed && !mine ? AppColors.danger : AppColors.primaryTint;
+    final icon = call.video
+        ? Icons.videocam_outlined
+        : failed && !mine
+        ? Icons.call_missed
+        : mine
+        ? Icons.call_made
+        : Icons.call_received;
+    final time = '${call.createdAt.hour.toString().padLeft(2, '0')}:${call.createdAt.minute.toString().padLeft(2, '0')}';
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Material(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 16, 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: color.withValues(alpha: 0.15),
+                    child: Icon(icon, size: 20, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(callLogTitle(call, mine: mine), style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${callLogStatus(call, mine: mine)} · $time',
+                        style: TextStyle(fontSize: 13, color: failed && !mine ? AppColors.danger : AppColors.textDim),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

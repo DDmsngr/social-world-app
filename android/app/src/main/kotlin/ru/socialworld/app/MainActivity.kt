@@ -5,6 +5,8 @@ import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.BitmapFactory
 import android.graphics.drawable.Icon
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -18,15 +20,26 @@ class MainActivity : FlutterActivity() {
         // только его хеш.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "chawo/device")
             .setMethodCallHandler { call, result ->
-                if (call.method == "androidId") {
-                    result.success(
+                when (call.method) {
+                    "androidId" -> result.success(
                         android.provider.Settings.Secure.getString(
                             contentResolver,
                             android.provider.Settings.Secure.ANDROID_ID,
                         ),
                     )
-                } else {
-                    result.notImplemented()
+                    // Автоскачивание обновлений (lib/core/update): по умолчанию
+                    // только по Wi-Fi, мобильный трафик человека не тратим.
+                    "onWifi" -> {
+                        val manager = getSystemService(ConnectivityManager::class.java)
+                        val caps = manager?.getNetworkCapabilities(manager.activeNetwork)
+                        result.success(
+                            caps != null && (
+                                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                                ),
+                        )
+                    }
+                    else -> result.notImplemented()
                 }
             }
         // Ярлык чата на рабочем столе (lib/core/shortcuts/home_shortcut.dart).
