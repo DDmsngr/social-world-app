@@ -21,7 +21,7 @@ import 'instagram_archive.dart';
 
 const _exportPage = 'https://accountscenter.instagram.com/info_and_permissions/dyi/';
 
-enum _Step { intro, reading, preview, importing, done }
+enum _Step { intro, copying, reading, preview, importing, done }
 
 /// Профиль → Импорт из запрещённограмма. Человек выбирает zip с выгрузкой своих
 /// данных, приложение читает его на телефоне и переносит публикации в ленту.
@@ -35,8 +35,17 @@ class ImportScreen extends ConsumerStatefulWidget {
 class _ImportScreenState extends ConsumerState<ImportScreen> {
   var _step = _Step.intro;
   DataArchive? _archive;
-  String? _zipPath;
+
+  /// Выбранные части выгрузки: путь к копии и «имя|размер» — по нему
+  /// узнаём, что ту же часть выбрали второй раз.
+  final _zips = <({String path, String key})>[];
   var _selected = <int>{};
+
+  /// Публикации, которые уже есть в ленте (перенесены раньше).
+  var _already = <int>{};
+
+  /// Публикации, часть файлов которых лежит в ещё не добавленной части.
+  var _missing = 0;
   var _visibility = PostVisibility.everyone;
 
   var _done = 0;
@@ -52,38 +61,121 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
     super.dispose();
   }
 
-  Future<void> _pick() async {
-    final file = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: const ['zip'],
-    );
-    final path = file?.path;
-    if (path == null) return;
+  void _toast(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
 
+  /// Выбор одной или нескольких частей выгрузки. [add] — добавить к уже
+  /// выбранным, иначе начать заново.
+  Future<void> _pick({bool add = false}) async {
+    final previous = _step;
+    final List<PlatformFile> files;
+    try {
+      // Телефон сначала копирует архив к себе — у гигабайтного это минуты.
+      // Без экрана ожидания казалось, что приложение ничего не делает.
+      files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['zip'],
+        onFileLoading: (status) {
+          if (!mounted) return;
+          if (status == FilePickerStatus.picking) {
+            setState(() => _step = _Step.copying);
+          }
+        },
+      );
+    } catch (error) {
+      AppLog.add('Выбор архива: $error');
+      if (mounted) setState(() => _step = previous);
+      return;
+    }
+    if (!mounted) return;
+    if (files.isEmpty) {
+      setState(() => _step = previous);
+      return;
+    }
+
+    final kept = add ? [..._zips] : <({String path, String key})>[];
+    var repeats = 0;
+    for (final file in files) {
+      final path = file.path;
+      if (path == null) continue;
+      final key = '${file.name}|${file.lengthSync() ?? await file.length()}';
+      if (kept.any((z) => z.key == key)) {
+        repeats++;
+        continue;
+      }
+      kept.add((path: path, key: key));
+    }
+    if (repeats > 0) {
+      _toast(repeats == 1 ? 'Эта часть уже добавлена' : 'Повторные части пропущены');
+    }
+    if (add && kept.length == _zips.length) {
+      setState(() => _step = previous);
+      return;
+    }
+    await _open(kept, fallback: previous);
+  }
+
+  Future<void> _open(
+    List<({String path, String key})> zips, {
+    required _Step fallback,
+  }) async {
     setState(() {
       _step = _Step.reading;
       _error = null;
     });
     try {
       await _archive?.close();
-      // Ник берём из имени файла выгрузки: у копии из кэша оно сохраняется.
-      final archive = await DataArchive.open(path);
+      _archive = null;
+      final archive = await DataArchive.open([for (final z in zips) z.path]);
+      final already = await _alreadyImported(archive.parsed.posts);
       if (!mounted) {
         await archive.close();
         return;
       }
-      _zipPath = path;
+      final posts = archive.parsed.posts;
+      _zips
+        ..clear()
+        ..addAll(zips);
       _archive = archive;
-      _selected = {for (var i = 0; i < archive.parsed.posts.length; i++) i};
+      _already = already;
+      _missing = posts.where((p) => p.media.any((m) => !archive.has(m.entry))).length;
+      _selected = {
+        for (var i = 0; i < posts.length; i++)
+          if (!already.contains(i)) i,
+      };
       setState(() => _step = _Step.preview);
     } catch (error) {
       AppLog.add('Архив не открылся: $error');
       if (!mounted) return;
       setState(() {
-        _step = _Step.intro;
+        _step = fallback == _Step.preview ? _Step.intro : fallback;
         _error = 'Не получилось открыть файл. Нужен zip, который прислала '
             'прежняя сеть, в формате JSON.';
       });
+    }
+  }
+
+  /// Какие публикации уже переносили: у перенесённой дата совпадает с
+  /// исходной до секунды. Повторный выбор того же архива их не задвоит.
+  Future<Set<int>> _alreadyImported(List<ImportedPost> posts) async {
+    try {
+      final mine = await ref.read(myPostsProvider.future);
+      final dates = {
+        for (final p in mine) p.createdAt.toUtc().millisecondsSinceEpoch ~/ 1000,
+      };
+      return {
+        for (var i = 0; i < posts.length; i++)
+          if (posts[i].takenAt case final t?
+              when dates.contains(t.toUtc().millisecondsSinceEpoch ~/ 1000))
+            i,
+      };
+    } catch (error) {
+      AppLog.add('Не проверили, что уже перенесено: $error');
+      return {};
     }
   }
 
@@ -158,7 +250,15 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
       ),
       body: switch (_step) {
         _Step.intro => _Intro(onPick: _pick, error: _error),
-        _Step.reading => const Center(child: CircularProgressIndicator()),
+        _Step.copying => const _Waiting(
+          title: 'Копируем архив на телефон',
+          text: 'Архив на несколько гигабайт копируется несколько минут. '
+              'Не закрывайте приложение и не выключайте экран.',
+        ),
+        _Step.reading => const _Waiting(
+          title: 'Читаем архив',
+          text: 'Ищем публикации, фото и видео. Обычно это меньше минуты.',
+        ),
         _Step.preview => _preview(context),
         _Step.importing => _progress(context),
         _Step.done => _finished(context),
@@ -183,11 +283,20 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
         const SizedBox(height: 6),
         Text(
           posts.isEmpty
-              ? 'Проверьте, что при выгрузке отмечены «Публикации».'
+              ? 'Проверьте, что при выгрузке отмечены «Публикации». Если '
+                    'выгрузка пришла несколькими файлами, добавьте остальные '
+                    'части — публикации могут лежать в другой.'
               : 'Подписи и даты сохранятся. Из каждой публикации возьмём до '
                     '$maxMediaPerPost фото и видео'
                     '${skipped > 0 ? ' (у $skipped их больше)' : ''}.',
           style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        _PartsCard(
+          parts: _zips.length,
+          missing: _missing,
+          already: _already.length,
+          onAdd: () => _pick(add: true),
         ),
         if (posts.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -237,6 +346,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
                 [
                   if (posts[i].takenAt != null) _date(posts[i].takenAt!),
                   '${posts[i].media.length} ${_files(posts[i].media.length)}',
+                  if (_already.contains(i)) 'уже перенесено',
                 ].join(' · '),
               ),
             ),
@@ -247,7 +357,7 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
           ),
         ],
         const SizedBox(height: 10),
-        OutlinedButton(onPressed: _pick, child: const Text('Выбрать другой архив')),
+        OutlinedButton(onPressed: _pick, child: const Text('Начать с другим архивом')),
       ],
     );
   }
@@ -307,12 +417,16 @@ class _ImportScreenState extends ConsumerState<ImportScreen> {
             const SizedBox(height: 20),
             FilledButton(
               onPressed: () async {
-                final path = _zipPath;
-                if (path != null && path.contains('file_picker')) {
-                  // Копию архива из кэша выбора файла больше хранить незачем.
+                // Копии архива в кэше выбора файла (это гигабайты) больше
+                // хранить незачем.
+                try {
+                  await _archive?.close();
+                  _archive = null;
+                } catch (_) {}
+                for (final zip in _zips) {
+                  if (!zip.path.contains('file_picker')) continue;
                   try {
-                    await _archive?.close();
-                    await File(path).delete();
+                    await File(zip.path).delete();
                   } catch (_) {}
                 }
                 if (!context.mounted) return;
@@ -345,6 +459,86 @@ String _date(DateTime t) {
   return '${two(l.day)}.${two(l.month)}.${l.year}';
 }
 
+class _Waiting extends StatelessWidget {
+  const _Waiting({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(color: AppColors.primary, backgroundColor: AppColors.hair),
+            const SizedBox(height: 12),
+            Text(text, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Сколько частей выгрузки выбрано и чего не хватает.
+class _PartsCard extends StatelessWidget {
+  const _PartsCard({
+    required this.parts,
+    required this.missing,
+    required this.already,
+    required this.onAdd,
+  });
+
+  final int parts;
+  final int missing;
+  final int already;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lines = [
+      'Частей архива: $parts',
+      if (missing > 0)
+        'У $missing ${_posts(missing)} фото или видео лежат в другой части — '
+            'добавьте её, иначе они перенесутся без этих файлов',
+      if (already > 0)
+        '$already ${_posts(already)} уже есть в ленте — их не отмечаем, '
+            'чтобы не задвоить',
+    ];
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: missing > 0 ? AppColors.primary : AppColors.hair),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final line in lines)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(line, style: theme.textTheme.bodyMedium),
+            ),
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Добавить часть архива'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Intro extends StatelessWidget {
   const _Intro({required this.onPick, this.error});
 
@@ -359,7 +553,9 @@ class _Intro extends StatelessWidget {
     'Способ — «Скачать на устройство». Период — «Всё время», формат — JSON.',
     'Нажмите «Создать файлы». Архив придёт на почту: от пары минут до пары '
         'дней. Скачайте его на телефон.',
-    'Вернитесь сюда и выберите этот файл. Остальное приложение сделает само.',
+    'Вернитесь сюда и выберите этот файл. Если выгрузка пришла несколькими '
+        'файлами, отметьте их все сразу или добавьте по одному. Остальное '
+        'приложение сделает само.',
   ];
 
   @override

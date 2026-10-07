@@ -145,4 +145,23 @@ void main() {
       expect(articleTitle('а' * 200).length, 80);
     });
   });
+
+  test('части архива: повторы убираются, старые публикации первыми', () {
+    ImportedPost post(int day, String entry, [String caption = '']) => ImportedPost(
+      media: [ImportedMedia(entry, video: false)],
+      caption: caption,
+      takenAt: DateTime.utc(2025, 1, day),
+    );
+    final result = uniquePosts([
+      post(3, 'media/c.jpg'),
+      post(1, 'media/a.jpg', 'первый'),
+      post(1, 'media/a.jpg', 'первый'), // та же часть выбрана дважды
+      post(1, 'media/b.jpg', 'другой в тот же день'),
+    ]);
+    expect([for (final p in result) p.media.first.entry], [
+      'media/a.jpg',
+      'media/b.jpg',
+      'media/c.jpg',
+    ]);
+  });
 }

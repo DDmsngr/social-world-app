@@ -138,6 +138,23 @@ List<ImportedPost> parsePosts(Object? json) {
   return posts;
 }
 
+/// Публикации без повторов (одна часть выбрана дважды или JSON лежит в двух
+/// частях), старые первыми — в ленте они встанут в исходном порядке.
+List<ImportedPost> uniquePosts(List<ImportedPost> posts) {
+  final seen = <String>{};
+  final result = [
+    for (final post in posts)
+      if (seen.add(
+        '${post.takenAt?.millisecondsSinceEpoch}|${post.media.first.entry}|${post.caption}',
+      ))
+        post,
+  ];
+  result.sort(
+    (a, b) => (a.takenAt ?? DateTime(0)).compareTo(b.takenAt ?? DateTime(0)),
+  );
+  return result;
+}
+
 String? _handleOf(Map<String, dynamic> item) {
   final data = item['string_list_data'];
   if (data is List && data.isNotEmpty && data.first is Map) {
