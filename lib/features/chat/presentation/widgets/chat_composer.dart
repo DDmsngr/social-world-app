@@ -296,12 +296,22 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     int? durationMs,
     List<double>? waveform,
   }) async {
-    final label = name ?? kind.preview;
+    final label = switch (kind) {
+      MessageKind.image => 'фото',
+      MessageKind.video => 'видео',
+      MessageKind.videoNote => 'видеосообщение',
+      MessageKind.voice => 'голосовое',
+      _ => name == null ? 'файл' : 'файл «$name»',
+    };
     final reply = widget.replyTo;
     setState(() {
       _uploads.add(label);
       _error = null;
     });
+    // Пока файл уходит, у собеседника «отправляет видео…» вместо «печатает».
+    final hub = ref.read(typingHubProvider(widget.conversationId));
+    hub?.ping(activity: kind.wire);
+    final keepAlive = Timer.periodic(const Duration(seconds: 3), (_) => hub?.ping(activity: kind.wire));
     try {
       await ref
           .read(chatRepositoryProvider)
@@ -320,6 +330,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     } catch (error) {
       _fail(error, 'Не удалось отправить: $label');
     } finally {
+      keepAlive.cancel();
+      hub?.stop();
       if (mounted) setState(() => _uploads.remove(label));
     }
   }
@@ -539,7 +551,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Отправляется: ${_uploads.join(', ')}',
+                        'Отправляем ${_uploads.join(', ')}…',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

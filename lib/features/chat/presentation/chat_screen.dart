@@ -18,6 +18,7 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../calls/call_controller.dart';
 import '../../calls/call_kit.dart';
+import '../domain/day_label.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
@@ -72,6 +73,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   ChatReply? _replyTo;
 
   final _scroll = ScrollController();
+
+  /// Плашка с датой поверх ленты, пока её листают (как в Telegram).
+  final _listBox = GlobalKey();
+  List<ChatMessage> _shown = const [];
+  String? _floatingDay;
+  bool _floatingVisible = false;
+  Timer? _floatingHide;
+  DateTime _floatingChecked = DateTime(0);
   final _itemKeys = <String, GlobalKey>{};
   int _pinCursor = 0;
   String? _pendingJump;
@@ -259,6 +268,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _floatingHide?.cancel();
     _scroll.dispose();
     if (_push.activeConversationId == widget.conversationId) {
       _push.activeConversationId = null;
@@ -523,6 +533,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     if (mounted) _jumpTo(id, items);
                   });
                 }
+                _shown = items;
                 final list = ListView.builder(
                   controller: _scroll,
                   reverse: true,
@@ -534,9 +545,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   ),
                   itemCount: items.length,
                   itemBuilder: (context, index) {
-                    final message = items[items.length - 1 - index];
+                    final position = items.length - 1 - index;
+                    final message = items[position];
                     final mine = message.senderId == myId;
-                    return KeyedSubtree(
+                    // Первое сообщение дня — с подписью дня над ним.
+                    final newDay = position == 0 || !sameDay(items[position - 1].sentAt, message.sentAt);
+                    final item = KeyedSubtree(
                       key: _itemKeys.putIfAbsent(message.id, GlobalKey.new),
                       child: Semantics(
                       customSemanticsActions: {
@@ -594,9 +608,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ),
                       ),
                     );
+                    if (!newDay) return item;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(child: _DayChip(chatDayLabel(message.sentAt, DateTime.now()))),
+                        item,
+                      ],
+                    );
                   },
                 );
-                return list;
+                return Stack(
+                  key: _listBox,
+                  children: [
+                    NotificationListener<ScrollNotification>(
+                      onNotification: _onListScroll,
+                      child: list,
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: 0,
+                      right: 0,
+                      child: IgnorePointer(
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: _floatingVisible && _floatingDay != null ? 1 : 0,
+                          child: Center(child: _DayChip(_floatingDay ?? '')),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
               },
             ),
           ),
@@ -632,6 +674,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ),
       ),
     );
+  }
+
+  /// Листают — показываем дату верхнего видимого сообщения; перестали —
+  /// через секунду плашка уходит.
+  bool _onListScroll(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final now = DateTime.now();
+      if (now.difference(_floatingChecked) > const Duration(milliseconds: 120)) {
+        _floatingChecked = now;
+        final day = _topVisibleDay();
+        if (day != _floatingDay || !_floatingVisible) {
+          setState(() {
+            _floatingDay = day;
+            _floatingVisible = day != null;
+          });
+        }
+      }
+      _floatingHide?.cancel();
+    } else if (notification is ScrollEndNotification) {
+      _floatingHide?.cancel();
+      _floatingHide = Timer(const Duration(seconds: 1), () {
+        if (mounted && _floatingVisible) setState(() => _floatingVisible = false);
+      });
+    }
+    return false;
+  }
+
+  String? _topVisibleDay() {
+    final box = _listBox.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return null;
+    final top = box.localToGlobal(Offset.zero).dy;
+    ChatMessage? best;
+    var bestY = double.infinity;
+    for (final message in _shown) {
+      final itemBox = _itemKeys[message.id]?.currentContext?.findRenderObject() as RenderBox?;
+      if (itemBox == null || !itemBox.attached) continue;
+      final y = itemBox.localToGlobal(Offset.zero).dy;
+      // Верхнее из тех, чей низ ещё виден.
+      if (y + itemBox.size.height > top && y < bestY) {
+        bestY = y;
+        best = message;
+      }
+    }
+    return best == null ? null : chatDayLabel(best.sentAt, DateTime.now());
   }
 
   IconData _notifyIcon(ChatNotify notify) => switch (notify) {
@@ -977,6 +1063,33 @@ class _ConnectionBanner extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Подпись дня в ленте и плашка с датой при прокрутке.
+class _DayChip extends StatelessWidget {
+  const _DayChip(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
           ),
         ),
       ),

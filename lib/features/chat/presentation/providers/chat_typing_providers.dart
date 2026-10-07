@@ -26,15 +26,33 @@ const typingPhrases = [
   'формулирует тактично…',
 ];
 
+/// Что человек отправляет вместо набора текста (MessageKind.wire).
+const uploadPhrases = {
+  'image': 'отправляет фото…',
+  'video': 'отправляет видео…',
+  'video_note': 'отправляет видеосообщение…',
+  'voice': 'отправляет голосовое…',
+  'file': 'отправляет файл…',
+};
+
 class TypingEntry {
-  const TypingEntry({required this.profileId, required this.name, required this.phrase, required this.until});
+  const TypingEntry({
+    required this.profileId,
+    required this.name,
+    required this.phrase,
+    required this.until,
+    this.activity,
+  });
 
   final String profileId;
   final String name;
   final int phrase;
   final DateTime until;
 
-  String get phraseText => typingPhrases[phrase % typingPhrases.length];
+  /// null — печатает; иначе тип отправляемого вложения.
+  final String? activity;
+
+  String get phraseText => uploadPhrases[activity] ?? typingPhrases[phrase % typingPhrases.length];
 }
 
 /// Как показать, кто пишет: в личном чате — одна фраза, в группе — с именем.
@@ -76,6 +94,7 @@ class TypingHub {
 
   DateTime _lastPing = DateTime(0);
   int _myPhrase = 0;
+  String? _myActivity;
 
   Stream<List<TypingEntry>> get stream => _controller.stream;
   List<TypingEntry> get current => _others.values.toList(growable: false);
@@ -90,14 +109,18 @@ class TypingHub {
       name: (payload['name'] as String?) ?? 'Кто-то',
       phrase: (payload['p'] as num?)?.toInt() ?? 0,
       until: DateTime.now().add(_holdFor),
+      activity: payload['a'] as String?,
     );
     _emit();
   }
 
   /// Вызывается на каждое изменение текста; сама решает, пора ли сообщать.
-  void ping() {
+  /// [activity] — отправляется вложение (MessageKind.wire): у собеседника
+  /// вместо «печатает» будет «отправляет фото…» и т. п.
+  void ping({String? activity}) {
     final now = DateTime.now();
-    if (now.difference(_lastPing) < _pingEvery) return;
+    if (now.difference(_lastPing) < _pingEvery && activity == _myActivity) return;
+    _myActivity = activity;
     // Новый «заход» набора — новая фраза.
     if (now.difference(_lastPing) > _burstGap) _myPhrase = _random.nextInt(typingPhrases.length);
     _lastPing = now;
@@ -105,7 +128,7 @@ class TypingHub {
       _channel
           .sendBroadcastMessage(
             event: 'typing',
-            payload: {'uid': _myId, 'name': _myName, 'p': _myPhrase},
+            payload: {'uid': _myId, 'name': _myName, 'p': _myPhrase, 'a': ?activity},
           )
           .catchError((Object error) {
             AppLog.add('Набор не отправился: $error');
@@ -116,7 +139,10 @@ class TypingHub {
 
   /// Сообщение отправлено — «печатает» у собеседника гаснет сразу, а не через
   /// пять секунд. Следующий набор начнёт новую фразу.
-  void stop() => _lastPing = DateTime(0);
+  void stop() {
+    _lastPing = DateTime(0);
+    _myActivity = null;
+  }
 
   void _prune() {
     final now = DateTime.now();
