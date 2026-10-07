@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'channel_article_screen.dart';
+
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
 import '../../../core/router/app_router.dart';
@@ -443,7 +445,32 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   Widget _bottom(ChannelInfo info) {
     if (info.isAdmin) {
-      return ChatComposer(conversationId: widget.channelId, isDirect: false);
+      // Два формата: короткий пост — полем ввода, статья с фото посреди
+      // текста — отдельным редактором.
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: TextButton.icon(
+                onPressed: () async {
+                  final published = await Navigator.of(context, rootNavigator: true).push<bool>(
+                    MaterialPageRoute(builder: (_) => ChannelArticleScreen(channelId: widget.channelId)),
+                  );
+                  if (published == true) {
+                    ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop();
+                  }
+                },
+                icon: const Icon(Icons.article_outlined, size: 18),
+                label: const Text('Статья с фото'),
+              ),
+            ),
+          ),
+          ChatComposer(conversationId: widget.channelId, isDirect: false),
+        ],
+      );
     }
     if (info.isMember) return const SizedBox.shrink();
 
