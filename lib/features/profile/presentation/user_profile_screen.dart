@@ -225,8 +225,8 @@ class _OtherMenu extends ConsumerWidget {
 /// Вкладка есть, только если у человека есть такие публикации.
 enum _PostFilter {
   all(Icons.grid_view_rounded, null),
-  photo(Icons.photo_outlined, 'Фото'),
-  video(Icons.videocam_outlined, 'Видео'),
+  photo(Icons.image_outlined, 'Фото'),
+  video(Icons.play_circle_outline, 'Видео'),
   article(Icons.article_outlined, 'Статьи'),
   route(Icons.route_outlined, 'Маршруты'),
   text(Icons.notes, 'Заметки'),
@@ -533,27 +533,49 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter, vertical: 8),
-        children: [
-          for (final f in filters)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Tooltip(
-                message: f.label ?? 'Всё',
-                child: ChoiceChip(
-                  showCheckmark: false,
-                  avatar: f.label == null ? null : Icon(f.icon, size: 18),
-                  label: f.label == null ? Icon(f.icon, size: 20) : Text(f.label!),
+    // Одна плашка, как нижняя панель: только значки, выбранный подсвечен.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 10, AppSpacing.gutter, 10),
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: AppColors.hair),
+        ),
+        child: Row(
+          children: [
+            for (final f in filters)
+              Expanded(
+                child: Semantics(
+                  button: true,
                   selected: f == selected,
-                  onSelected: (_) => onSelected(f),
+                  label: f.label ?? 'Всё подряд',
+                  child: Tooltip(
+                    message: f.label ?? 'Всё подряд',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onSelected(f),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        decoration: BoxDecoration(
+                          color: f == selected ? AppColors.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          f.icon,
+                          size: 22,
+                          color: f == selected ? AppColors.onPrimary : AppColors.textDim,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

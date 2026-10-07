@@ -50,8 +50,17 @@ Deno.serve(async (req) => {
       if (job.recipients.length === 0) continue;
       const tokens = await tokensFor(job.recipients);
       total += tokens.length;
-      for (const token of tokens) {
-        if (await send(token, job.push)) sent++;
+      // Цифра на значке приложения у каждого своя — общее число непрочитанных.
+      // Только для сообщений: реакции и уведомления число не меняют.
+      const counts = new Map<string, number>();
+      if (job.push.data.type === "message") {
+        for (const [profile] of tokens) {
+          if (counts.has(profile)) continue;
+          counts.set(profile, await unreadTotal(profile));
+        }
+      }
+      for (const [profile, token] of tokens) {
+        if (await send(token, job.push, counts.get(profile))) sent++;
       }
     }
     return json({ sent, tokens: total });
@@ -300,12 +309,23 @@ function notificationText(kind: string, who: string, title: string | null): stri
   }
 }
 
-async function tokensFor(profileIds: string[]): Promise<string[]> {
-  const { data } = await db.from("push_tokens").select("token").in("profile_id", profileIds);
-  return (data ?? []).map((t) => t.token as string);
+/** Пары [профиль, токен]: по профилю считаем число на значке. */
+async function tokensFor(profileIds: string[]): Promise<[string, string][]> {
+  const { data } = await db.from("push_tokens").select("profile_id, token").in("profile_id", profileIds);
+  return (data ?? []).map((t) => [t.profile_id as string, t.token as string]);
 }
 
-async function send(token: string, push: Push): Promise<boolean> {
+/** Сколько непрочитанного у человека. Сбой подсчёта не должен ронять пуш. */
+async function unreadTotal(profile: string): Promise<number | undefined> {
+  const { data, error } = await db.rpc("chat_unread_total", { in_profile: profile });
+  if (error) {
+    console.error("unread", error.message);
+    return undefined;
+  }
+  return typeof data === "number" ? data : undefined;
+}
+
+async function send(token: string, push: Push, badge?: number): Promise<boolean> {
   const response = await fetch(
     `https://fcm.googleapis.com/v1/projects/${SERVICE_ACCOUNT.project_id}/messages:send`,
     {
@@ -326,6 +346,8 @@ async function send(token: string, push: Push): Promise<boolean> {
               tag: push.tag,
               icon: "ic_notification",
               color: "#E89BBA",
+              // Цифра на значке приложения (лаунчеры Samsung, Xiaomi и др.).
+              ...(badge && badge > 0 ? { notification_count: badge } : {}),
             },
           },
         },

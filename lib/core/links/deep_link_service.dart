@@ -24,6 +24,20 @@ class DeepLinkService {
         handleUri,
         onError: (Object error) => AppLog.add('Ссылка не принята: $error'),
       );
+      // Холодный старт: приложение запущено ярлыком или ссылкой, пока было
+      // закрыто. Ссылку запуска поток не обязан отдавать — спрашиваем явно.
+      // Спрашиваем один раз за запуск процесса: при возврате из фона та же
+      // ссылка пришла бы второй раз.
+      if (!_launchChecked) {
+        _launchChecked = true;
+        unawaited(
+          AppLinks().getInitialLink().then((uri) {
+            if (uri != null) handleUri(uri);
+          }).catchError((Object error) {
+            AppLog.add('Ссылка запуска не прочиталась: $error');
+          }),
+        );
+      }
     } catch (error) {
       // Нет платформенного плагина (тесты, веб): ссылки просто не ловим.
       AppLog.add('Ссылки недоступны: $error');
@@ -34,6 +48,13 @@ class DeepLinkService {
   }
 
   late final RouterDelegate<Object> _delegate;
+
+  static var _launchChecked = false;
+
+  /// Одна и та же ссылка, пришедшая и из потока, и из запроса запуска, не
+  /// должна открыть экран дважды.
+  String? _lastUri;
+  DateTime _lastAt = DateTime(0);
 
   final Ref _ref;
   StreamSubscription<Uri>? _sub;
@@ -53,6 +74,13 @@ class DeepLinkService {
   /// `socialworld://auth-callback` сюда не относится — это вход через VK/Яндекс,
   /// им занимается `OAuthDeepLinkListener`.
   void handleUri(Uri uri) {
+    final now = DateTime.now();
+    if (_lastUri == uri.toString() && now.difference(_lastAt) < const Duration(seconds: 4)) {
+      return;
+    }
+    _lastUri = uri.toString();
+    _lastAt = now;
+
     final referral = DeepLinks.parseReferralCode(uri);
     if (referral != null) _pendingReferral = referral;
 
