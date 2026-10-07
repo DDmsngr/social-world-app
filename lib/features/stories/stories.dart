@@ -64,9 +64,29 @@ class Story {
     this.bg = 0,
     this.durationSec = defaultStorySeconds,
     this.postId,
+    this.postType,
     this.viewed = false,
     this.viewCount,
   });
+
+  /// Тип поста, из которого сделана сторис: 'article', 'route', 'moment'.
+  final String? postType;
+
+  /// Подпись на плитке: «статья» / «маршрут» / «пост»; null — не из поста.
+  String? get sourceLabel => postId == null
+      ? null
+      : switch (postType) {
+          'article' => 'статья',
+          'route' => 'маршрут',
+          _ => 'пост',
+        };
+
+  /// Кнопка в просмотре.
+  String get openLabel => switch (postType) {
+    'article' => 'Читать статью',
+    'route' => 'Открыть маршрут',
+    _ => 'Открыть пост',
+  };
 
   final String id;
   final String authorId;
@@ -95,6 +115,7 @@ class Story {
     bg: bg,
     durationSec: durationSec,
     postId: postId,
+    postType: postType,
     createdAt: createdAt,
     viewed: viewed ?? this.viewed,
     viewCount: viewCount,
@@ -112,6 +133,7 @@ class Story {
     durationSec: ((row['duration_sec'] as num?)?.toInt() ?? defaultStorySeconds)
         .clamp(minStorySeconds, maxVideoSeconds),
     postId: row['post_id'] as String?,
+    postType: row['post_type'] as String?,
     createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
     viewed: row['viewed'] as bool? ?? false,
     viewCount: (row['view_count'] as num?)?.toInt(),

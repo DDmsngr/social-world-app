@@ -141,6 +141,37 @@ class _Tile extends StatelessWidget {
                 shadows: const [Shadow(blurRadius: 4, color: Colors.black54)],
               ),
             ),
+          // Кому виден пост: «только мне» — замок, «подписчикам» — люди.
+          // Публичные без значка. Чужие закрытые посты сюда и не приходят.
+          if (post.visibility != PostVisibility.everyone)
+            Positioned(
+              left: 6,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      post.visibility == PostVisibility.onlyMe
+                          ? Icons.lock_outline
+                          : Icons.group_outlined,
+                      size: 13,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      post.visibility == PostVisibility.onlyMe ? 'только мне' : 'подписчикам',
+                      style: const TextStyle(color: Colors.white, fontSize: 10.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

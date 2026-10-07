@@ -53,13 +53,39 @@ class StoryStrip extends ConsumerWidget {
 }
 
 /// Превью одной сторис в квадрате: фото, кадр видео или цветная плитка с текстом.
-class _Cover extends StatelessWidget {
-  const _Cover({required this.story});
+class StoryCover extends StatelessWidget {
+  const StoryCover({super.key, required this.story});
 
   final Story story;
 
   @override
   Widget build(BuildContext context) {
+    final label = story.sourceLabel;
+    if (label == null) return _content();
+    // Сторис из поста помечена мелко снизу: «статья», «маршрут», «пост».
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _content(),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            color: Colors.black45,
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 9.5, height: 1.1),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _content() {
     switch (story.kind) {
       case StoryKind.photo:
         return Image(
@@ -73,7 +99,7 @@ class _Cover extends StatelessWidget {
         return DecoratedBox(
           decoration: BoxDecoration(gradient: storyGradient(story.bg)),
           child: Padding(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
             child: Center(
               child: Text(
                 story.body ?? '',
@@ -82,7 +108,8 @@ class _Cover extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10.5,
+                  // Мельче, чтобы длинное слово не рвалось посередине.
+                  fontSize: 9.5,
                   fontWeight: FontWeight.w700,
                   height: 1.15,
                 ),
@@ -132,7 +159,7 @@ class _GroupTile extends StatelessWidget {
             children: [
               _Frame(
                 color: group.allViewed ? AppColors.hair : AppColors.primaryTint,
-                child: _Cover(story: group.cover),
+                child: StoryCover(story: group.cover),
               ),
               const SizedBox(height: 6),
               Text(
@@ -192,7 +219,7 @@ class _MineTile extends StatelessWidget {
                         )
                       : _Frame(
                           color: mine.allViewed ? AppColors.hair : AppColors.primaryTint,
-                          child: _Cover(story: mine.cover),
+                          child: StoryCover(story: mine.cover),
                         ),
                 ),
               ),

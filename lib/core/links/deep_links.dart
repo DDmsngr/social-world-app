@@ -11,7 +11,11 @@ enum LinkTarget {
   route('route'),
   quest('quest'),
   need('need'),
-  channel('channel');
+  channel('channel'),
+
+  /// Личный чат или группа — для ярлыка на рабочем столе. Чужой чат по такой
+  /// ссылке не откроется: сервер его просто не отдаст.
+  chat('chat');
 
   const LinkTarget(this.segment);
 
@@ -195,5 +199,6 @@ abstract final class DeepLinks {
             ? '${Routes.questDetail}/$id'
             : '${Routes.questDetail}/$id?arrive=$arrivalCode',
         LinkTarget.need => '${Routes.needDetail}/$id',
+        LinkTarget.chat => '${Routes.chats}/$id',
       };
 }

@@ -23,7 +23,11 @@ import '../../chat/presentation/providers/chat_providers.dart';
 import '../../feed/presentation/post_actions.dart';
 import '../../moderation/domain/entities/report_reason.dart';
 import '../../moderation/presentation/widgets/report_sheet.dart';
+import '../../../core/media/media_kind.dart';
+import '../../feed/presentation/widgets/story_strip.dart';
 import '../../notifications/notifications.dart';
+import '../../stories/stories.dart';
+import '../../stories/story_viewer.dart';
 import '../domain/profile_models.dart';
 import '../../feed/domain/entities/post.dart';
 import 'providers/profile_providers.dart';
@@ -217,11 +221,47 @@ class _OtherMenu extends ConsumerWidget {
   }
 }
 
-class _Body extends ConsumerWidget {
+/// Что показывать в сетке профиля. Первый фильтр — «всё подряд», значком.
+/// Вкладка есть, только если у человека есть такие публикации.
+enum _PostFilter {
+  all(Icons.grid_view_rounded, null),
+  photo(Icons.photo_outlined, 'Фото'),
+  video(Icons.videocam_outlined, 'Видео'),
+  article(Icons.article_outlined, 'Статьи'),
+  route(Icons.route_outlined, 'Маршруты'),
+  text(Icons.notes, 'Заметки'),
+  stories(Icons.amp_stories_outlined, 'Истории');
+
+  const _PostFilter(this.icon, this.label);
+  final IconData icon;
+  final String? label;
+
+  bool matches(Post post) => switch (this) {
+    all => true,
+    photo => !post.isArticle && !post.isRoute && post.photoUrls.isNotEmpty,
+    video => post.mediaUrls.any(isVideoUrl),
+    article => post.isArticle,
+    route => post.isRoute,
+    text => !post.isArticle && !post.isRoute && !post.hasMedia,
+    stories => false,
+  };
+}
+
+class _Body extends ConsumerStatefulWidget {
   const _Body({required this.profile, required this.isMe});
 
   final UserProfile profile;
   final bool isMe;
+
+  @override
+  ConsumerState<_Body> createState() => _BodyState();
+}
+
+class _BodyState extends ConsumerState<_Body> {
+  var _filter = _PostFilter.all;
+
+  UserProfile get profile => widget.profile;
+  bool get isMe => widget.isMe;
 
   Future<void> _toggleFollow(BuildContext context, WidgetRef ref) async {
     final follow = !profile.followedByMe;
@@ -270,9 +310,12 @@ class _Body extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final blockKind = profile.blockKind;
+    final storyGroup = (ref.watch(storiesProvider).value ?? const <StoryGroup>[])
+        .where((g) => g.authorId == profile.id)
+        .firstOrNull;
 
     final posts = blockKind == null ? ref.watch(userPostsProvider(profile.id)) : null;
     final postCount = posts?.value?.length;
@@ -334,12 +377,9 @@ class _Body extends ConsumerWidget {
           style: TextStyle(fontSize: 12, color: AppColors.textDim),
         ),
         const SizedBox(height: 14),
+        // Правка своего профиля — в настройках (шестерёнка сверху).
         if (isMe)
-          OutlinedButton.icon(
-            onPressed: () => context.push(Routes.editProfile),
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('Редактировать профиль'),
-          )
+          const SizedBox.shrink()
         else if (blockKind != null)
           GlassCard(
             child: Column(
@@ -435,25 +475,115 @@ class _Body extends ConsumerWidget {
                   ),
                 ),
               ],
-              data: (items) => items.isEmpty
-                  ? [
-                      message(
-                        Text(
-                          isMe
-                              ? 'Вы ещё ничего не опубликовали. Начните со вкладки «Создать».'
-                              : 'Публикаций пока нет.',
-                          style: theme.textTheme.bodyMedium,
-                        ),
+              data: (items) {
+                if (items.isEmpty && storyGroup == null) {
+                  return [
+                    message(
+                      Text(
+                        isMe
+                            ? 'Вы ещё ничего не опубликовали. Начните со вкладки «Создать».'
+                            : 'Публикаций пока нет.',
+                        style: theme.textTheme.bodyMedium,
                       ),
-                    ]
-                  : [
-                      ProfilePostGrid(posts: items),
-                      SliverToBoxAdapter(child: SizedBox(height: bottom)),
-                    ],
+                    ),
+                  ];
+                }
+                final available = [
+                  for (final f in _PostFilter.values)
+                    if (f == _PostFilter.all ||
+                        (f == _PostFilter.stories ? storyGroup != null : items.any(f.matches)))
+                      f,
+                ];
+                final filter = available.contains(_filter) ? _filter : _PostFilter.all;
+                return [
+                  if (available.length > 2)
+                    SliverToBoxAdapter(
+                      child: _FilterBar(
+                        filters: available,
+                        selected: filter,
+                        onSelected: (f) => setState(() => _filter = f),
+                      ),
+                    ),
+                  if (filter == _PostFilter.stories)
+                    _StoriesGrid(group: storyGroup!)
+                  else
+                    ProfilePostGrid(posts: [for (final p in items) if (filter.matches(p)) p]),
+                  SliverToBoxAdapter(child: SizedBox(height: bottom)),
+                ];
+              },
             ),
           ] else
             SliverToBoxAdapter(child: SizedBox(height: bottom)),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
+    required this.filters,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<_PostFilter> filters;
+  final _PostFilter selected;
+  final ValueChanged<_PostFilter> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter, vertical: 8),
+        children: [
+          for (final f in filters)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Tooltip(
+                message: f.label ?? 'Всё',
+                child: ChoiceChip(
+                  showCheckmark: false,
+                  avatar: f.label == null ? null : Icon(f.icon, size: 18),
+                  label: f.label == null ? Icon(f.icon, size: 20) : Text(f.label!),
+                  selected: f == selected,
+                  onSelected: (_) => onSelected(f),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Живые истории человека плитками; нажатие открывает просмотр с этой.
+class _StoriesGrid extends StatelessWidget {
+  const _StoriesGrid({required this.group});
+
+  final StoryGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 2,
+        crossAxisSpacing: 2,
+        childAspectRatio: 9 / 16,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, i) => GestureDetector(
+          onTap: () => showStories(
+            context,
+            groups: [group.copyWith(stories: group.stories.sublist(i))],
+            initialGroup: 0,
+          ),
+          child: StoryCover(story: group.stories[i]),
+        ),
+        childCount: group.stories.length,
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/debug/app_log.dart';
 import '../../core/errors/friendly_error.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -218,6 +219,63 @@ class _Bubble extends ConsumerWidget {
 
   final AssistantMessage message;
 
+  void _toast(BuildContext context, String text) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _edit(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController(text: message.body);
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Изменить сообщение'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          minLines: 2,
+          maxLines: 10,
+          maxLength: 4000,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (text == null || text.trim() == message.body) return;
+    try {
+      await ref.read(assistantRepositoryProvider)!.edit(message.id, text);
+    } catch (error) {
+      AppLog.add('Сообщение Помощнику не изменилось: $error');
+      if (context.mounted) _toast(context, 'Не получилось — возможно, Помощник уже забрал его');
+    }
+  }
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить сообщение?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(assistantRepositoryProvider)!.delete(message.id);
+    } catch (error) {
+      AppLog.add('Сообщение Помощнику не удалилось: $error');
+      if (context.mounted) _toast(context, 'Не получилось — возможно, Помощник уже забрал его');
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mine = message.fromUser;
@@ -243,18 +301,58 @@ class _Bubble extends ConsumerWidget {
             if (path != null && message.body != null) const SizedBox(height: 6),
             if (message.body != null) LinkText(message.body!, selectable: true),
             const SizedBox(height: 4),
-            Text(
-              [
-                _time(message.createdAt),
-                if (mine) message.handledAt == null ? 'ждёт' : 'забрал',
-              ].join(' · '),
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textFaint),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  [
+                    _time(message.createdAt),
+                    if (mine) message.handledAt == null ? 'ждёт' : 'забрал',
+                  ].join(' · '),
+                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textFaint),
+                ),
+                // Пока Помощник не забрал сообщение, его можно поправить.
+                if (mine && message.handledAt == null) ...[
+                  if (message.body != null)
+                    _SmallAction(
+                      icon: Icons.edit_outlined,
+                      tooltip: 'Изменить',
+                      onTap: () => _edit(context, ref),
+                    ),
+                  _SmallAction(
+                    icon: Icons.delete_outline,
+                    tooltip: 'Удалить',
+                    onTap: () => _delete(context, ref),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _SmallAction extends StatelessWidget {
+  const _SmallAction({required this.icon, required this.tooltip, required this.onTap});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Icon(icon, size: 16, color: AppColors.textDim),
+      ),
+    ),
+  );
 }
 
 String _time(DateTime t) {

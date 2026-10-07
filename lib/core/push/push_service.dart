@@ -4,12 +4,14 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/chat/presentation/providers/chat_providers.dart';
 import '../../features/notifications/notifications.dart';
+import '../audio/incoming_click.dart';
 import '../config/env.dart';
 import '../debug/app_log.dart';
 import '../links/deep_links.dart';
@@ -61,6 +63,16 @@ class PushService {
     playSound: false,
     enableVibration: true,
   );
+  /// Сообщение, пока приложение открыто: всплывает, но без системного звука —
+  /// вместо него играет короткий щелчок [IncomingClick].
+  static const _messagesInApp = AndroidNotificationChannel(
+    'messages_inapp',
+    'Сообщения при открытом приложении',
+    description: 'Всплывают без звука, приложение само щёлкает',
+    importance: Importance.high,
+    playSound: false,
+    enableVibration: false,
+  );
   static const _activity = AndroidNotificationChannel(
     'activity',
     'Активность',
@@ -94,6 +106,7 @@ class PushService {
       await android?.createNotificationChannel(_messages);
       await android?.createNotificationChannel(_messagesSilent);
       await android?.createNotificationChannel(_messagesVibrate);
+      await android?.createNotificationChannel(_messagesInApp);
       await android?.createNotificationChannel(_activity);
       _localReady = true;
 
@@ -179,13 +192,22 @@ class PushService {
 
     final notification = message.notification;
     if (notification == null || !_localReady) return;
-    final channel = !isMessage
+    final mode = !isMessage
         ? _activity
         : switch (data['channel']) {
             'messages_silent' => _messagesSilent,
             'messages_vibrate' => _messagesVibrate,
             _ => data['silent'] == '1' ? _messagesSilent : _messages,
           };
+    // Приложение открыто, а сообщение (или реакция) из другого чата: короткий
+    // щелчок вместо звука уведомления, режим чата при этом соблюдается.
+    var channel = mode;
+    if (identical(mode, _messages)) {
+      IncomingClick.play();
+      channel = _messagesInApp;
+    } else if (identical(mode, _messagesVibrate)) {
+      HapticFeedback.mediumImpact();
+    }
     // id 0 + tag — так же, как пуш, нарисованный системой в фоне: новое
     // уведомление того же чата заменяет прошлое, а не копит стопку.
     _local.show(

@@ -412,7 +412,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                         FilledButton.tonal(
                           style: AppButtons.compact,
                           onPressed: _openPost,
-                          child: const Text('Открыть пост'),
+                          child: Text(story.openLabel),
                         ),
                       const Spacer(),
                       if (mine)

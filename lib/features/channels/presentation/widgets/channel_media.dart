@@ -38,16 +38,65 @@ class ChannelMedia extends StatelessWidget {
 }
 
 /// Пост-альбом: несколько фото и видео сеткой, как в Telegram. Ряды: 2 → [2],
-/// 3 → [1, 2], 4 → [2, 2], 6 → [3, 3] и т. д. Нажатие на фото открывает
-/// просмотр всех фото альбома.
-class _Album extends ConsumerWidget {
+/// 3 → [1, 2], 4 → [2, 2], 6 → [3, 3] и т. д. Высота ряда подбирается по
+/// пропорциям кадров: два вертикальных фото встают рядом целиком, а не
+/// обрезаются до квадратов. Нажатие на фото открывает просмотр всех фото.
+class _Album extends ConsumerStatefulWidget {
   const _Album({required this.message});
 
   final ChatMessage message;
 
   static const _gap = 2.0;
 
-  static List<int> rows(int n) => switch (n) {
+  /// Пропорции кадров (ширина/высота) по id файла альбома: при прокрутке
+  /// назад пост сразу нужной высоты.
+  static final _ratios = <String, double>{};
+
+  /// Ширины ячеек и высота ряда: ряд заполняет ширину, кадры в своих
+  /// пропорциях. Совсем высокий или низкий ряд ограничивается — тогда кадры
+  /// слегка обрезаются.
+  static ({List<double> widths, double height}) fitRow(List<double> ratios, double width) {
+    final avail = width - _gap * (ratios.length - 1);
+    final sum = ratios.fold<double>(0, (a, r) => a + r);
+    final height = (avail / sum).clamp(width * 0.3, width * 1.1);
+    return (widths: [for (final r in ratios) avail * r / sum], height: height);
+  }
+
+  @override
+  ConsumerState<_Album> createState() => _AlbumState();
+}
+
+class _AlbumState extends ConsumerState<_Album> {
+  ChatMessage get message => widget.message;
+  static const _gap = _Album._gap;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final item in _items()) {
+      if (item.kind == MessageKind.image && !_Album._ratios.containsKey(item.id)) {
+        _measure(item);
+      }
+    }
+  }
+
+  Future<void> _measure(ChatMessage item) async {
+    try {
+      final path = await ref.read(chatRepositoryProvider).attachmentFile(item);
+      final buffer = await ui.ImmutableBuffer.fromUint8List(await File(path).readAsBytes());
+      final descriptor = await ui.ImageDescriptor.encoded(buffer);
+      _Album._ratios[item.id] = (descriptor.width / descriptor.height).clamp(0.5, 2.0);
+      descriptor.dispose();
+      buffer.dispose();
+      if (mounted) setState(() {});
+    } catch (_) {
+      // Не узнали — ячейка останется квадратной.
+    }
+  }
+
+  static List<int> rows(int n) => _rows(n);
+
+  static List<int> _rows(int n) => switch (n) {
     1 => [1],
     2 => [2],
     3 => [1, 2],
@@ -77,7 +126,7 @@ class _Album extends ConsumerWidget {
     ];
   }
 
-  Future<void> _openPhotos(BuildContext context, WidgetRef ref, List<ChatMessage> items, ChatMessage tapped) async {
+  Future<void> _openPhotos(BuildContext context, List<ChatMessage> items, ChatMessage tapped) async {
     final photos = items.where((m) => m.kind == MessageKind.image).toList();
     final repo = ref.read(chatRepositoryProvider);
     try {
@@ -90,7 +139,7 @@ class _Album extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final items = _items();
     final layout = rows(items.length.clamp(1, 10));
     return LayoutBuilder(
@@ -99,13 +148,19 @@ class _Album extends ConsumerWidget {
         var index = 0;
         final children = <Widget>[];
         for (var r = 0; r < layout.length; r++) {
-          final k = layout[r];
-          final cellW = (width - _gap * (k - 1)) / k;
-          // Одиночный ряд сверху — широкая «обложка», остальные — квадраты.
-          final cellH = k == 1 ? width * 0.62 : cellW;
+          final rowItems = items.skip(index).take(layout[r]).toList();
+          final k = rowItems.length;
+          if (k == 0) break;
+          // Пока пропорция неизвестна (или это видео): одиночный ряд —
+          // широкая «обложка», в рядах — квадраты.
+          final fit = _Album.fitRow([
+            for (final item in rowItems) _Album._ratios[item.id] ?? (k == 1 ? 1 / 0.62 : 1.0),
+          ], width);
+          final cellH = fit.height;
           final cells = <Widget>[];
-          for (var c = 0; c < k && index < items.length; c++, index++) {
-            final item = items[index];
+          for (var c = 0; c < k; c++, index++) {
+            final item = rowItems[c];
+            final cellW = fit.widths[c];
             cells.add(
               SizedBox(
                 width: cellW,
@@ -114,7 +169,7 @@ class _Album extends ConsumerWidget {
                     ? VideoPreview(message: item, aspectRatio: cellW / cellH)
                     : _AlbumPhoto(
                         message: item,
-                        onTap: () => _openPhotos(context, ref, items, item),
+                        onTap: () => _openPhotos(context, items, item),
                       ),
               ),
             );

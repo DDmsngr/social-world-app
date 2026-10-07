@@ -82,6 +82,23 @@ class AssistantRepository {
     });
   }
 
+  /// Правка и удаление — только пока сообщение «ждёт»; это проверяет сервер.
+  Future<void> edit(String id, String text) async {
+    final body = text.trim();
+    if (body.isEmpty) return delete(id);
+    final rows = await _client
+        .from('assistant_messages')
+        .update({'body': body})
+        .eq('id', id)
+        .select('id');
+    if ((rows as List).isEmpty) throw StateError('Сообщение уже забрано');
+  }
+
+  Future<void> delete(String id) async {
+    final rows = await _client.from('assistant_messages').delete().eq('id', id).select('id');
+    if ((rows as List).isEmpty) throw StateError('Сообщение уже забрано');
+  }
+
   Future<String> signedUrl(String path) =>
       _client.storage.from(bucket).createSignedUrl(path, 3600);
 }

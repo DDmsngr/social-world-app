@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/debug/app_log.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/shortcuts/home_shortcut.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
@@ -388,6 +389,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ),
               tooltip: 'О группе',
               icon: const Icon(Icons.info_outline),
+            ),
+          if (HomeShortcut.supported)
+            PopupMenuButton<String>(
+              tooltip: 'Ещё',
+              color: AppColors.ink2,
+              onSelected: (_) async {
+                final pinned = await HomeShortcut.pinChat(
+                  conversationId: widget.conversationId,
+                  title: info?.displayName ?? widget.peerName,
+                  avatarUrl: isDirect ? info?.peerAvatarUrl : null,
+                );
+                if (!pinned && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Этот телефон не даёт добавлять ярлыки на рабочий стол'),
+                    ),
+                  );
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'shortcut', child: Text('Ярлык на рабочий стол')),
+              ],
             ),
         ],
       ),
