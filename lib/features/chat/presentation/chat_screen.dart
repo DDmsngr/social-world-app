@@ -180,6 +180,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // время уведомление уже прочитано здесь — убираем его из шторки (раньше
     // оно уходило, только если войти через само уведомление).
     _push.clearConversation(widget.conversationId);
+    _markRead();
     ref.invalidate(messagesProvider(widget.conversationId));
     ref.invalidate(conversationProvider(widget.conversationId));
     ref.invalidate(scheduledMessagesProvider(widget.conversationId));
@@ -257,7 +258,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _push = ref.read(pushServiceProvider)
-      ..activeConversationId = widget.conversationId
+      ..enterChat(widget.conversationId)
       ..clearConversation(widget.conversationId);
     _pendingJump = widget.jumpToMessageId;
     _markRead();
@@ -276,9 +277,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     WidgetsBinding.instance.removeObserver(this);
     _floatingHide?.cancel();
     _scroll.dispose();
-    if (_push.activeConversationId == widget.conversationId) {
-      _push.activeConversationId = null;
-    }
+    _push.leaveChat(widget.conversationId);
     super.dispose();
   }
 

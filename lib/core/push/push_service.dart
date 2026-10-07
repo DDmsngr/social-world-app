@@ -38,8 +38,20 @@ class PushService {
   bool _localReady = false;
   String? _token;
 
-  /// Открытый сейчас чат: пуши о нём не показываются, человек и так его видит.
-  String? activeConversationId;
+  /// Открытые экраны чатов, верхний — последний. Пуши о верхнем не
+  /// показываются: человек и так его видит. Стек, а не одно поле: один и тот
+  /// же чат бывает открыт дважды (чат → профиль → «Написать»), и закрытие
+  /// верхнего раньше обнуляло отметку, хотя нижний оставался на экране.
+  final _openChats = <String>[];
+
+  String? get activeConversationId => _openChats.isEmpty ? null : _openChats.last;
+
+  void enterChat(String conversationId) => _openChats.add(conversationId);
+
+  void leaveChat(String conversationId) {
+    final i = _openChats.lastIndexOf(conversationId);
+    if (i >= 0) _openChats.removeAt(i);
+  }
 
   static const _messages = AndroidNotificationChannel(
     'messages',
