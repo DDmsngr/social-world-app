@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Звуки чатов подключаются к каналам уведомлений по имени (строкой), а не по
+     ссылке из кода — без этого сжатие ресурсов в релизной сборке их вырежет. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/ding,@raw/pop,@raw/chime,@raw/drop,@raw/knock" />

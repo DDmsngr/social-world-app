@@ -26,6 +26,11 @@ import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
 import 'providers/hidden_messages_provider.dart';
 import 'widgets/bookmarks_sheet.dart';
+import '../../../core/errors/friendly_error.dart';
+import 'chat_looks.dart';
+import 'providers/chat_settings_providers.dart';
+import 'providers/chat_typing_providers.dart';
+import 'widgets/chat_look_sheets.dart';
 import 'widgets/chat_composer.dart';
 import 'widgets/chat_notify_sheet.dart';
 import 'widgets/message_bubble.dart';
@@ -267,6 +272,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final myId = ref.watch(currentUserProvider)?.id ?? 'local-user';
     final isDirect = info?.isDirect ?? true;
     final hidden = ref.watch(hiddenMessagesProvider);
+    final settings = chatSettingsOf(ref, widget.conversationId);
 
     // Пока экран открыт, входящие сразу считаются прочитанными.
     ref.listen(messagesProvider(widget.conversationId), (previous, next) {
@@ -291,7 +297,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final presence = isDirect
         ? ref.watch(peerPresenceProvider(widget.conversationId)).value
         : null;
-    final subtitle = info != null && !isDirect
+    // Кто-то пишет — вместо «в сети» смешная фраза («подбирает слова…»).
+    final typing = ref.watch(typingEntriesProvider(widget.conversationId)).value ?? const <TypingEntry>[];
+    final typingText = typingLabel(typing, direct: isDirect);
+    final subtitle = typingText.isNotEmpty
+        ? typingText
+        : info != null && !isDirect
         ? membersLabel(info.memberCount)
         : presence?.label(DateTime.now());
 
@@ -338,7 +349,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
-                          color: presence?.online ?? false
+                          color: typingText.isNotEmpty || (presence?.online ?? false)
                               ? AppColors.primaryTint
                               : AppColors.textDim,
                         ),
@@ -390,32 +401,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               tooltip: 'О группе',
               icon: const Icon(Icons.info_outline),
             ),
-          if (HomeShortcut.supported)
-            PopupMenuButton<String>(
-              tooltip: 'Ещё',
-              color: AppColors.ink2,
-              onSelected: (_) async {
-                final pinned = await HomeShortcut.pinChat(
-                  conversationId: widget.conversationId,
-                  title: info?.displayName ?? widget.peerName,
-                  avatarUrl: isDirect ? info?.peerAvatarUrl : null,
-                );
-                if (!pinned && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Этот телефон не даёт добавлять ярлыки на рабочий стол'),
-                    ),
-                  );
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'shortcut', child: Text('Ярлык на рабочий стол')),
-              ],
-            ),
-        ],
+          PopupMenuButton<String>(
+            tooltip: 'Ещё',
+            color: AppColors.ink2,
+            onSelected: (value) => _onMenu(value, info?.displayName ?? widget.peerName, isDirect, info?.peerAvatarUrl, settings),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'sound', child: Text('Звук чата')),
+              const PopupMenuItem(value: 'wallpaper', child: Text('Фон чата')),
+              if (HomeShortcut.supported)
+                const PopupMenuItem(value: 'shortcut', child: Text('Ярлык на рабочий стол')),
+              PopupMenuItem(
+                value: 'archive',
+                child: Text(settings.archivedAt != null ? 'Вернуть из архива' : 'В архив'),
+              ),
+              const PopupMenuItem(value: 'delete', child: Text('Удалить чат')),
+            ],
+          ),        ],
       ),
-      body: Column(
+      body: ChatBackground(
+        wallpaper: settings.wallpaper,
+        child: Column(
         children: [
+          if (isDirect)
+            WallpaperOfferBar(
+              conversationId: widget.conversationId,
+              peerName: info?.displayName ?? widget.peerName,
+            ),
           if (pinned.isNotEmpty)
             PinnedBar(
               pins: pinned,
@@ -456,11 +467,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     ref.invalidate(messagesProvider(widget.conversationId)),
               ),
               data: (all) {
-                final items = hidden.isEmpty
+                final cleared = settings.clearedAt;
+                final items = hidden.isEmpty && cleared == null
                     ? all
                     : [
                         for (final m in all)
-                          if (!hidden.contains(m.id)) m,
+                          if (!hidden.contains(m.id) && (cleared == null || m.sentAt.isAfter(cleared))) m,
                       ];
                 if (items.isEmpty) {
                   return Center(
@@ -593,9 +605,88 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
         ],
       ),
+      ),
     );
   }
 
+  Future<void> _onMenu(
+    String value,
+    String title,
+    bool isDirect,
+    String? avatarUrl,
+    ChatSettings settings,
+  ) async {
+    switch (value) {
+      case 'sound':
+        await showChatSoundSheet(context, widget.conversationId);
+      case 'wallpaper':
+        await showChatWallpaperSheet(
+          context,
+          widget.conversationId,
+          direct: isDirect,
+          peerName: title,
+        );
+      case 'shortcut':
+        final pinned = await HomeShortcut.pinChat(
+          conversationId: widget.conversationId,
+          title: title,
+          avatarUrl: isDirect ? avatarUrl : null,
+        );
+        if (!pinned && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Этот телефон не даёт добавлять ярлыки на рабочий стол')),
+          );
+        }
+      case 'archive':
+        final archive = settings.archivedAt == null;
+        try {
+          await setChatArchived(ref, widget.conversationId, archive);
+        } catch (error) {
+          AppLog.add('Архив чата: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось выполнить'))),
+            );
+          }
+          return;
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(archive ? 'Чат в архиве' : 'Чат возвращён из архива')),
+        );
+        if (archive) context.canPop() ? context.pop() : context.go(Routes.chats);
+      case 'delete':
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Удалить чат?'),
+            content: Text(
+              isDirect
+                  ? 'Переписка исчезнет только у вас. У $title всё останется, а новое '
+                        'сообщение вернёт чат в список — уже без старой истории.'
+                  : 'История исчезнет только у вас. Из группы вы не выходите.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить')),
+            ],
+          ),
+        );
+        if (ok != true || !mounted) return;
+        try {
+          await clearChatForMe(ref, widget.conversationId);
+        } catch (error) {
+          AppLog.add('Удаление чата: $error');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось удалить'))),
+            );
+          }
+          return;
+        }
+        if (mounted) context.canPop() ? context.pop() : context.go(Routes.chats);
+    }
+  }
   Future<void> _showSecurityCode() async {
     final code = ref
         .read(chatRepositoryProvider)

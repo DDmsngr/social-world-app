@@ -14,6 +14,7 @@ import '../domain/entities/chat_message.dart';
 import '../domain/entities/conversation.dart';
 import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
+import 'providers/chat_settings_providers.dart';
 import 'widgets/chat_notify_sheet.dart';
 
 enum _Tab { direct, groups, channels }
@@ -53,7 +54,12 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
     final encryptionEnabled = ref
         .watch(chatRepositoryProvider)
         .endToEndEncryptionEnabled;
-    final all = conversations.value ?? const <Conversation>[];
+    final settings = ref.watch(chatSettingsProvider).asData?.value ?? const <String, ChatSettings>{};
+    ChatSettings settingsOf(Conversation c) => settings[c.id] ?? ChatSettings.none;
+    final everything = conversations.value ?? const <Conversation>[];
+    // Архивные и «удалённые у меня» в общий список не попадают; новое сообщение вернёт чат.
+    final all = [for (final c in everything) if (!hiddenFromList(c, settingsOf(c))) c];
+    final archived = [for (final c in everything) if (inArchive(c, settingsOf(c))) c];
 
     // Непрочитанные по вкладке: заглушённые чаты не считаем, они не должны
     // звать внимание и через бейдж.
@@ -106,6 +112,18 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
       appBar: AppBar(
         title: const Text('Чаты'),
         actions: [
+          if (archived.isNotEmpty)
+            IconButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const _ArchivedScreen()),
+              ),
+              tooltip: 'Архив',
+              icon: Badge(
+                isLabelVisible: archived.any((c) => c.unreadCount > 0),
+                smallSize: 8,
+                child: const Icon(Icons.archive_outlined),
+              ),
+            ),
           // Лупа ищет то, что относится к текущей вкладке: людей и чаты на
           // «Личных» и «Группах», каналы — на «Каналах».
           IconButton(
@@ -139,7 +157,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
           title: 'Не удалось загрузить чаты',
           onAction: () => ref.invalidate(conversationsProvider),
         ),
-        data: (items) => TabBarView(
+        data: (_) => TabBarView(
           controller: _tabs,
           children: [
             for (final tab in _Tab.values)
@@ -147,7 +165,7 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
                 onRefresh: () => ref.refresh(conversationsProvider.future),
                 child: _list(
                   context,
-                  [for (final c in items) if (_tabOf(c) == tab) c],
+                  [for (final c in all) if (_tabOf(c) == tab) c],
                   tab,
                   showEncryptionNotice: tab == _Tab.direct && !encryptionEnabled,
                 ),
@@ -233,6 +251,51 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
   }
 }
 
+/// Архив: чаты, убранные из списка. Нажатие открывает чат, долгое нажатие
+/// возвращает его в список.
+class _ArchivedScreen extends ConsumerWidget {
+  const _ArchivedScreen();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(chatSettingsProvider).asData?.value ?? const <String, ChatSettings>{};
+    final myId = ref.watch(currentUserProvider)?.id;
+    final items = [
+      for (final c in ref.watch(conversationsProvider).value ?? const <Conversation>[])
+        if (inArchive(c, settings[c.id] ?? ChatSettings.none)) c,
+    ];
+    return Scaffold(
+      appBar: AppBar(title: const Text('Архив')),
+      body: items.isEmpty
+          ? const StateMessage(
+              title: 'В архиве пусто',
+              text: 'Архивировать чат можно в меню ⋮ внутри него.',
+              icon: Icons.archive_outlined,
+            )
+          : ListView(
+              padding: EdgeInsets.fromLTRB(AppSpacing.gutter, 12, AppSpacing.gutter, 24 + MediaQuery.paddingOf(context).bottom),
+              children: [
+                for (final c in items) ...[
+                  _ConversationTile(
+                    conversation: c,
+                    myId: myId,
+                    notify: chatNotifyOf(ref, c.id),
+                    onLongPress: () async {
+                      await setChatArchived(ref, c.id, false);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Чат возвращён в список')),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
+    );
+  }
+}
 class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.conversation,

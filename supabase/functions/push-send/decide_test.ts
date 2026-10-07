@@ -30,3 +30,16 @@ Deno.test("«без звука» от отправителя — тихий ка
 Deno.test("таймер при режиме «вибрация» тоже глушит", () => {
   assertEquals(decide({ mode: "vibrate", muted_until: "2026-10-01T12:30:00Z" }, false, now), null);
 });
+
+Deno.test("свой звук чата — канал с этим звуком, но не пробивает вибрацию, тишину и «выключено»", () => {
+  assertEquals(decide(undefined, false, now, "pop"), "messages_pop");
+  assertEquals(decide({ mode: "vibrate", muted_until: null }, false, now, "pop"), "messages_vibrate");
+  assertEquals(decide({ mode: "silent", muted_until: null }, false, now, "pop"), "messages_silent");
+  assertEquals(decide(undefined, true, now, "pop"), "messages_silent");
+  assertEquals(decide({ mode: "off", muted_until: null }, false, now, "pop"), null);
+});
+
+Deno.test("неизвестный звук игнорируется: канал обычный", () => {
+  assertEquals(decide(undefined, false, now, "dubstep"), "messages");
+  assertEquals(decide(undefined, false, now, null), "messages");
+});

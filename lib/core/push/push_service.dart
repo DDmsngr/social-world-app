@@ -14,6 +14,7 @@ import '../../features/notifications/notifications.dart';
 import '../audio/incoming_click.dart';
 import '../config/env.dart';
 import '../debug/app_log.dart';
+import '../../features/chat/presentation/chat_looks.dart';
 import '../links/deep_links.dart';
 import '../router/app_router.dart';
 
@@ -107,6 +108,19 @@ class PushService {
       await android?.createNotificationChannel(_messagesSilent);
       await android?.createNotificationChannel(_messagesVibrate);
       await android?.createNotificationChannel(_messagesInApp);
+      // Свой звук чата — отдельный канал со звуком из res/raw. Сервер выбирает канал
+      // по настройке получателя (push-send), так что система сама играет нужный звук.
+      for (final sound in chatSounds) {
+        await android?.createNotificationChannel(
+          AndroidNotificationChannel(
+            'messages_${sound.id}',
+            'Сообщения — ${sound.label}',
+            description: 'Чаты со звуком «${sound.label}»',
+            importance: Importance.high,
+            sound: RawResourceAndroidNotificationSound(sound.id),
+          ),
+        );
+      }
       await android?.createNotificationChannel(_activity);
       _localReady = true;
 

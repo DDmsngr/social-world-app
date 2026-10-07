@@ -20,7 +20,7 @@ const db = createClient(
 type Push = {
   title: string;
   body: string;
-  channel: "messages" | "messages_vibrate" | "messages_silent" | "activity";
+  channel: string;
   // Одинаковый tag заменяет прошлое уведомление, а не копит стопку.
   tag: string;
   data: Record<string, string>;
@@ -167,10 +167,22 @@ async function forMessage(messageId: string): Promise<Job[]> {
     (prefRows ?? []).map((p) => [p.profile_id as string, p as Prefs]),
   );
 
+  // Свой звук чата у каждого получателя (0057). Таблицы может ещё не быть — тогда без него.
+  const { data: soundRows } = recipients.length === 0
+    ? { data: [] }
+    : await db
+      .from("chat_settings")
+      .select("profile_id, sound")
+      .eq("conversation_id", conversation.id)
+      .in("profile_id", recipients);
+  const sounds = new Map<string, string | null>(
+    (soundRows ?? []).map((s) => [s.profile_id as string, s.sound as string | null]),
+  );
+
   const now = new Date();
-  const byChannel = new Map<Push["channel"], string[]>();
+  const byChannel = new Map<string, string[]>();
   for (const id of recipients) {
-    const picked = decide(prefs.get(id), silent, now);
+    const picked = decide(prefs.get(id), silent, now, sounds.get(id));
     if (!picked) continue;
     byChannel.set(picked, [...(byChannel.get(picked) ?? []), id]);
   }
@@ -217,7 +229,13 @@ async function forReaction(messageId: string, reactorId: string): Promise<Job[]>
     .eq("conversation_id", conversation.id)
     .eq("profile_id", message.sender_id)
     .maybeSingle();
-  const picked = decide((pref ?? undefined) as Prefs, false, new Date());
+  const { data: look } = await db
+    .from("chat_settings")
+    .select("sound")
+    .eq("conversation_id", conversation.id)
+    .eq("profile_id", message.sender_id)
+    .maybeSingle();
+  const picked = decide((pref ?? undefined) as Prefs, false, new Date(), look?.sound as string | undefined);
   if (!picked) return [];
 
   const direct = !!conversation.direct_key;

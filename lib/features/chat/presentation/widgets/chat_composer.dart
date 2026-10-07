@@ -22,6 +22,7 @@ import '../../domain/entities/chat_meta.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../domain/schedule_format.dart';
 import '../providers/chat_providers.dart';
+import '../providers/chat_typing_providers.dart';
 import 'attachment_views.dart';
 import 'emoji_panel.dart';
 import 'scheduled_sheet.dart';
@@ -149,6 +150,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           )
           .timeout(sendTimeout);
       _controller.clear();
+      ref.read(typingHubProvider(widget.conversationId))?.stop();
       widget.onReplyCleared?.call();
       _afterSend();
     } on TimeoutException catch (error) {
@@ -618,7 +620,16 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             child: TextField(
               controller: _controller,
               focusNode: _focus,
-              onChanged: (_) => setState(() {}),
+              onChanged: (value) {
+                setState(() {});
+                // «Печатает…» у собеседника: только пока в поле есть текст.
+                final hub = ref.read(typingHubProvider(widget.conversationId));
+                if (value.trim().isNotEmpty) {
+                  hub?.ping();
+                } else {
+                  hub?.stop();
+                }
+              },
               onTap: () {
                 if (_emojiOpen) setState(() => _emojiOpen = false);
                 _syncActive();
