@@ -202,7 +202,11 @@ jobs:
         env:
           # Оставляет в APK только arm64-библиотеки — см. build.gradle.kts.
           ARM64_ONLY: "1"
-        run: flutter build apk --release --target-platform android-arm64 --build-number=$((5000 + ${{ github.run_number }})) --dart-define=FEATURE_CHAT=true
+        run: |
+          flutter build apk --release --target-platform android-arm64 --android-project-arg=arm64Only=true --build-number=$((5000 + ${{ github.run_number }})) --dart-define=FEATURE_CHAT=true
+          # Страховка: arm64-файл не должен нести чужие архитектуры (5151 вышел 180 МБ).
+          unzip -l build/app/outputs/flutter-apk/app-release.apk | grep -E 'lib/(x86_64|armeabi-v7a)/' && { echo "лишние ABI в arm64 APK"; exit 1; } || true
+          ls -la build/app/outputs/flutter-apk/app-release.apk
 
       - name: Upload APK artifact (arm64)
         uses: actions/upload-artifact@v5
