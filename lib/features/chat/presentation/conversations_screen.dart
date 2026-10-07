@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +19,7 @@ import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
 import 'providers/chat_settings_providers.dart';
 import 'providers/chat_typing_providers.dart';
+import 'providers/pinned_chats.dart';
 import 'widgets/chat_notify_sheet.dart';
 
 enum _Tab { direct, groups, channels }
@@ -38,8 +41,22 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
       if (!_tabs.indexIsChanging) setState(() {});
     });
 
+  // Новые посты каналов пушей не дают — список освежаем сами раз в минуту и
+  // при возврате в приложение, чтобы канал с новым постом поднимался наверх.
+  Timer? _refresh;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh = Timer.periodic(const Duration(minutes: 1), (_) => ref.invalidate(conversationsProvider));
+    _lifecycle = AppLifecycleListener(onResume: () => ref.invalidate(conversationsProvider));
+  }
+
   @override
   void dispose() {
+    _refresh?.cancel();
+    _lifecycle.dispose();
     _tabs.dispose();
     super.dispose();
   }
@@ -193,10 +210,10 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
                 onRefresh: () => ref.refresh(conversationsProvider.future),
                 child: _list(
                   context,
-                  [
+                  sortChats([
                     for (final c in all)
                       if (_tabOf(c) == tab) c,
-                  ],
+                  ], ref.watch(pinnedChatsProvider)),
                   tab,
                   showEncryptionNotice:
                       tab == _Tab.direct && !encryptionEnabled,
@@ -274,16 +291,48 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
             conversation: conversation,
             myId: myId,
             notify: chatNotifyOf(ref, conversation.id),
-            onLongPress: () => showChatNotifySheet(
-              context,
-              conversation.id,
-              conversation.displayName,
-            ),
+            pinned: ref.watch(pinnedChatsProvider).contains(conversation.id),
+            onLongPress: () => _chatMenu(context, conversation),
           ),
           const SizedBox(height: 8),
         ],
       ],
     );
+  }
+
+  /// Долгое нажатие: закрепить наверху и уведомления.
+  Future<void> _chatMenu(BuildContext context, Conversation conversation) async {
+    final pinned = ref.read(pinnedChatsProvider).contains(conversation.id);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: AppColors.ink2,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(pinned ? Icons.push_pin_outlined : Icons.push_pin, color: AppColors.textDim),
+              title: Text(pinned ? 'Открепить' : 'Закрепить наверху'),
+              onTap: () => Navigator.of(context).pop('pin'),
+            ),
+            ListTile(
+              leading: Icon(Icons.notifications_none, color: AppColors.textDim),
+              title: const Text('Уведомления'),
+              onTap: () => Navigator.of(context).pop('notify'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    switch (choice) {
+      case 'pin':
+        await ref.read(pinnedChatsProvider.notifier).toggle(conversation.id);
+      case 'notify':
+        await showChatNotifySheet(context, conversation.id, conversation.displayName);
+    }
   }
 }
 
@@ -349,12 +398,14 @@ class _ConversationTile extends StatelessWidget {
     required this.myId,
     required this.notify,
     required this.onLongPress,
+    this.pinned = false,
   });
 
   final Conversation conversation;
   final String? myId;
   final ChatNotify notify;
   final VoidCallback onLongPress;
+  final bool pinned;
 
   @override
   Widget build(BuildContext context) {
@@ -535,6 +586,10 @@ class _ConversationTile extends StatelessWidget {
       );
 
   List<Widget> _trailing() => [
+    if (pinned) ...[
+      const SizedBox(width: 8),
+      Icon(Icons.push_pin, size: 15, color: AppColors.textFaint),
+    ],
     if (notify.isCustom) ...[
       const SizedBox(width: 8),
       Icon(

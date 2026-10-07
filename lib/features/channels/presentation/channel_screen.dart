@@ -45,7 +45,31 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 600) {
         ref.read(channelPostsProvider(widget.channelId).notifier).loadMore();
       }
+      final away = _scroll.position.pixels > _scroll.position.minScrollExtent + 300;
+      if (away != _showDown) setState(() => _showDown = away);
     });
+  }
+
+  /// Кнопка «вниз»: видна, когда отмотали от самого свежего поста.
+  var _showDown = false;
+
+  /// Сколько новых (непрочитанных при входе) постов лежит ниже места, где
+  /// остановились в прошлый раз.
+  var _newerCount = 0;
+
+  /// Отмотали выше непрочитанных — к первому непрочитанному (самому старому
+  /// из новых); уже среди новых — к самому свежему. Ноль прокрутки — это
+  /// нижняя кромка прежнего места: всё, что ниже (отрицательное смещение), —
+  /// новые посты.
+  void _scrollDown() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final aboveUnread = _newerCount > 0 && position.pixels > 0;
+    final target = aboveUnread
+        // Первое непрочитанное — у верхнего края экрана.
+        ? (-position.viewportDimension + 80).clamp(position.minScrollExtent, 0.0)
+        : position.minScrollExtent;
+    _scroll.animateTo(target, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
   }
 
   final _probes = <_SeenProbeState>{};
@@ -298,6 +322,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         final older = anchor == null
             ? items
             : [for (final p in items) if (!p.message.sentAt.isAfter(anchor)) p];
+        _newerCount = newer.length;
 
         SliverList list(List<ChannelPost> posts) => SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -343,7 +368,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         }
 
         _scheduleSeen();
-        return RefreshIndicator(
+        final feed = RefreshIndicator(
           onRefresh: () => ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop(),
           child: NotificationListener<ScrollNotification>(
             onNotification: (_) {
@@ -376,6 +401,32 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               ),
             ),
           ),
+        );
+        return Stack(
+          children: [
+            Positioned.fill(child: feed),
+            Positioned(
+              right: 16,
+              bottom: 16 + _bottomInset,
+              child: AnimatedScale(
+                scale: _showDown ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Badge(
+                  isLabelVisible: _newerCount > 0 && _scroll.hasClients && _scroll.position.pixels > 0,
+                  label: Text('$_newerCount'),
+                  backgroundColor: AppColors.primaryTint,
+                  child: FloatingActionButton.small(
+                    heroTag: null,
+                    onPressed: _scrollDown,
+                    tooltip: 'Вниз',
+                    backgroundColor: AppColors.card,
+                    foregroundColor: AppColors.text,
+                    child: const Icon(Icons.keyboard_arrow_down),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
