@@ -16,6 +16,8 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../calls/call_controller.dart';
+import '../../calls/call_kit.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
@@ -373,27 +375,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               tooltip: 'Закладки',
               icon: const Icon(Icons.bookmarks_outlined),
             ),
-          IconButton(
-            onPressed: () => showChatNotifySheet(
-              context,
-              widget.conversationId,
-              info?.displayName ?? widget.peerName,
-            ),
-            tooltip: 'Уведомления',
-            icon: Icon(switch (chatNotifyOf(ref, widget.conversationId)) {
-              final n when n.isMuted => Icons.notifications_off_outlined,
-              final n when n.mode == NotifyMode.vibrate => Icons.vibration,
-              final n when n.mode == NotifyMode.silent => Icons.notifications_none,
-              _ => Icons.notifications_active_outlined,
-            }),
-          ),
-          if (info != null && isDirect)
+          // В личном чате место в шапке — звонкам; уведомления и код
+          // безопасности там в меню «Ещё».
+          if (!isDirect)
             IconButton(
-              onPressed: _showSecurityCode,
-              tooltip: 'Код безопасности',
-              icon: const Icon(Icons.verified_user_outlined),
-            )
-          else if (info != null)
+              onPressed: () => showChatNotifySheet(
+                context,
+                widget.conversationId,
+                info?.displayName ?? widget.peerName,
+              ),
+              tooltip: 'Уведомления',
+              icon: Icon(_notifyIcon(chatNotifyOf(ref, widget.conversationId))),
+            ),
+          if (info != null && isDirect && info.peerId != null && CallKit.supported) ...[
+            IconButton(
+              onPressed: () => _call(info, video: true),
+              tooltip: 'Видеозвонок',
+              icon: const Icon(Icons.videocam_outlined),
+            ),
+            IconButton(
+              onPressed: () => _call(info, video: false),
+              tooltip: 'Позвонить',
+              icon: const Icon(Icons.call_outlined),
+            ),
+          ] else if (info != null && !isDirect)
             IconButton(
               onPressed: () => context.push(
                 '${Routes.chats}/${widget.conversationId}/info',
@@ -406,6 +411,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             color: AppColors.ink2,
             onSelected: (value) => _onMenu(value, info?.displayName ?? widget.peerName, isDirect, info?.peerAvatarUrl, settings),
             itemBuilder: (_) => [
+              if (isDirect) ...[
+                PopupMenuItem(
+                  value: 'notify',
+                  child: Row(
+                    children: [
+                      Expanded(child: Text('Уведомления')),
+                      Icon(_notifyIcon(chatNotifyOf(ref, widget.conversationId)), size: 20),
+                    ],
+                  ),
+                ),
+                if (info != null) const PopupMenuItem(value: 'security', child: Text('Код безопасности')),
+              ],
               const PopupMenuItem(value: 'sound', child: Text('Звук чата')),
               const PopupMenuItem(value: 'wallpaper', child: Text('Фон чата')),
               if (HomeShortcut.supported)
@@ -609,6 +626,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
+  IconData _notifyIcon(ChatNotify notify) => switch (notify) {
+    final n when n.isMuted => Icons.notifications_off_outlined,
+    final n when n.mode == NotifyMode.vibrate => Icons.vibration,
+    final n when n.mode == NotifyMode.silent => Icons.notifications_none,
+    _ => Icons.notifications_active_outlined,
+  };
+
+  void _call(Conversation info, {required bool video}) {
+    final calls = ref.read(callControllerProvider);
+    if (calls.busy) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Уже идёт звонок')),
+      );
+      return;
+    }
+    unawaited(
+      calls.dial(
+        conversationId: widget.conversationId,
+        peerId: info.peerId!,
+        peerName: info.displayName,
+        peerAvatarUrl: info.peerAvatarUrl,
+        video: video,
+      ),
+    );
+  }
+
   Future<void> _onMenu(
     String value,
     String title,
@@ -617,6 +660,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     ChatSettings settings,
   ) async {
     switch (value) {
+      case 'notify':
+        await showChatNotifySheet(context, widget.conversationId, title);
+      case 'security':
+        _showSecurityCode();
       case 'sound':
         await showChatSoundSheet(context, widget.conversationId);
       case 'wallpaper':

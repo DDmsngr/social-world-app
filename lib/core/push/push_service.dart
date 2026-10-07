@@ -9,6 +9,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../features/calls/call_background.dart';
+import '../../features/calls/call_controller.dart';
 import '../../features/chat/presentation/providers/chat_providers.dart';
 import '../../features/notifications/notifications.dart';
 import '../audio/incoming_click.dart';
@@ -126,6 +128,8 @@ class PushService {
 
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission();
+      // Data-пуши о звонках при свёрнутом или закрытом приложении.
+      FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
 
       _subscriptions
         ..add(FirebaseMessaging.onMessage.listen(_onForeground))
@@ -196,6 +200,10 @@ class PushService {
 
   void _onForeground(RemoteMessage message) {
     final data = message.data;
+    if (data['type'] == 'call' || data['type'] == 'call_update') {
+      _ref.read(callControllerProvider).onPush(data);
+      return;
+    }
     final isMessage = data['type'] == 'message';
     if (isMessage) {
       _ref.invalidate(conversationsProvider);

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,6 +17,8 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_choice.dart';
 import 'features/discover/presentation/providers/city_provider.dart';
 import 'features/discover/presentation/providers/presence_publisher.dart';
+import 'features/calls/call_background.dart';
+import 'features/calls/call_kit.dart';
 
 Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +64,15 @@ Future<void> main() async {
     } on TimeoutException {
       AppLog.add('Supabase.initialize не уложился в 10 с — идём дальше');
     }
+  }
+
+  // «Отклонить» в звонилке доходит до сервера и без открытого приложения
+  // (lib/features/calls). Пуш о звонке ловит PushService.
+  if (CallKit.supported) {
+    unawaited(
+      FlutterCallkitIncoming.onBackgroundMessage(callkitBackgroundHandler)
+          .catchError((Object error) => AppLog.add('Фон звонилки: $error')),
+    );
   }
 
   // Ключ карты задаётся до runApp и только в Dart: в официальном плагине

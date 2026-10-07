@@ -36,6 +36,9 @@ Deno.serve(async (req) => {
 
   const payload = await req.json().catch(() => null);
   try {
+    if (payload?.type === "call" || payload?.type === "call_update") {
+      return json(await forCall(payload.call_id, payload.type));
+    }
     const jobs = payload?.type === "message"
       ? await forMessage(payload.message_id)
       : payload?.type === "notification"
@@ -52,7 +55,7 @@ Deno.serve(async (req) => {
       total += tokens.length;
       // Цифра на значке приложения у каждого своя — общее число непрочитанных.
       // Только для сообщений: реакции и уведомления число не меняют.
-      const counts = new Map<string, number>();
+      const counts = new Map<string, number | undefined>();
       if (job.push.data.type === "message") {
         for (const [profile] of tokens) {
           if (counts.has(profile)) continue;
@@ -288,6 +291,71 @@ async function forNotification(notificationId: string): Promise<Job[]> {
       },
     },
   }];
+}
+
+// Звонок (0058). Только data-пуш без notification: его ловит приложение даже
+// закрытым и само показывает экран входящего (flutter_callkit_incoming).
+// 'call' — начал звонить; 'call_update' — звонок принят, сброшен или не
+// дождался: телефоны получателя гасят звонилку, непринятый становится
+// «пропущенным».
+async function forCall(callId: string, type: "call" | "call_update") {
+  const { data: call } = await db
+    .from("calls")
+    .select("id, conversation_id, caller_id, callee_id, video, status, created_at")
+    .eq("id", callId)
+    .maybeSingle();
+  if (!call) return { sent: 0, tokens: 0 };
+  if (type === "call" && call.status !== "ringing") return { sent: 0, tokens: 0 };
+
+  const { data: caller } = await db
+    .from("profiles")
+    .select("display_name, avatar_url")
+    .eq("id", call.caller_id)
+    .maybeSingle();
+
+  const data: Record<string, string> = {
+    type,
+    call_id: call.id,
+    conversation_id: call.conversation_id,
+    caller_id: call.caller_id,
+    caller_name: caller?.display_name ?? "ChaWo",
+    caller_avatar: caller?.avatar_url ?? "",
+    video: call.video ? "1" : "0",
+    status: call.status,
+    created_at: call.created_at,
+  };
+
+  const tokens = await tokensFor([call.callee_id as string]);
+  let sent = 0;
+  for (const [, token] of tokens) {
+    // Звонок старше полуминуты будить уже не должен; итог звонка доставляем
+    // и позже — он станет «пропущенным».
+    if (await sendData(token, data, type === "call" ? "30s" : "86400s")) sent++;
+  }
+  return { sent, tokens: tokens.length };
+}
+
+async function sendData(token: string, data: Record<string, string>, ttl: string): Promise<boolean> {
+  const response = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${SERVICE_ACCOUNT.project_id}/messages:send`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${await accessToken()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message: { token, data, android: { priority: "high", ttl } } }),
+    },
+  );
+  if (response.ok) return true;
+  const error = await response.json().catch(() => ({}));
+  const code = error?.error?.details?.find((d: { errorCode?: string }) => d.errorCode)?.errorCode;
+  if (response.status === 404 || code === "UNREGISTERED" || code === "SENDER_ID_MISMATCH") {
+    await db.from("push_tokens").delete().eq("token", token);
+  } else {
+    console.error("fcm call", response.status, JSON.stringify(error));
+  }
+  return false;
 }
 
 // Те же подписи, что в списке чатов (MessageKind.preview).

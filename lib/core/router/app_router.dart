@@ -9,6 +9,7 @@ import '../config/feature_flags.dart';
 import '../session/session_reset.dart';
 
 import '../../features/auth/domain/entities/app_user.dart';
+import '../../features/calls/call_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/chat/presentation/chats_soon_screen.dart';
 import '../../features/chat/presentation/conversations_screen.dart';
@@ -74,6 +75,9 @@ abstract final class Routes {
   static const events = '/events';
   static const create = '/create';
   static const chats = '/chats';
+
+  /// Экран звонка поверх всего; открывает его CallController.
+  static const call = '/call';
   static const channels = '/chats/channels';
   static const chatSearch = '/chats/search';
   static const newChannel = '/chats/new-channel';
@@ -221,6 +225,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.splash,
         builder: (_, _) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: Routes.call,
+        builder: (_, _) => const CallScreen(),
       ),
       GoRoute(
         path: Routes.signIn,

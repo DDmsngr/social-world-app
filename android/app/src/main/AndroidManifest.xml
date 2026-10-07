@@ -8,6 +8,14 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Голосовые и звук кружков в чатах. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Звонки (flutter_webrtc): динамик/наушник, гарнитура, смена сети
+         посреди разговора. Звонилка (flutter_callkit_incoming) свои
+         разрешения — полноэкранный входящий, службу звонка — приносит сама. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Приложение раздаётся APK мимо Google Play, поэтому обновляет себя само:
          скачивает новый файл и отдаёт его системному установщику. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

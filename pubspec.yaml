@@ -89,6 +89,10 @@ dependencies:
   archive: ^4.0.7
   get_thumbnail_video: ^0.7.3
   video_compress: ^3.1.4
+  # Звонки: связь (WebRTC) и системный экран входящего, который будит телефон
+  # даже при закрытом приложении.
+  flutter_webrtc: ^1.2.0
+  flutter_callkit_incoming: ^3.1.6
 dev_dependencies:
   flutter_test:
     sdk: flutter
