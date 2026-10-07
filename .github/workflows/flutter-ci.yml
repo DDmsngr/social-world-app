@@ -381,3 +381,14 @@ jobs:
           sftp -i "$RUNNER_TEMP/swupd_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
             -b "$RUNNER_TEMP/sftp.batch" "swupd@${HOST}"
           curl --fail --silent --show-error --max-time 30 "${BASE}/manifest.json" | jq -e ".versionCode == ${VERSION_CODE}"
+          # Старые сборки (до 5148) читают только манифест на GitHub — кладём
+          # туда те же ссылки на свой сервер: маленький манифест с GitHub
+          # иногда доходит, а тяжёлый APK с GitHub в РФ — почти никогда.
+          if [ -d /tmp/sw-releases/.git ]; then
+            cp manifest.own.json /tmp/sw-releases/manifest.json
+            cd /tmp/sw-releases
+            git add manifest.json
+            git diff --staged --quiet || git commit -m "chore: манифест ${VERSION_CODE} со ссылками на свой сервер"
+            git push
+            cd "${GITHUB_WORKSPACE}"
+          fi

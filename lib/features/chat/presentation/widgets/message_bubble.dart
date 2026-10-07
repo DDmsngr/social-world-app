@@ -15,6 +15,7 @@ class MessageBubble extends StatelessWidget {
     required this.mine,
     this.showSender = false,
     this.onMediaMore,
+    this.onQuoteTap,
   });
 
   final ChatMessage message;
@@ -25,6 +26,9 @@ class MessageBubble extends StatelessWidget {
 
   /// Меню из полноэкранного просмотра фото.
   final Future<bool> Function(BuildContext context)? onMediaMore;
+
+  /// Тап по цитате — к сообщению, на которое ответили.
+  final VoidCallback? onQuoteTap;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +74,11 @@ class MessageBubble extends StatelessWidget {
         if (message.forwardedFrom != null)
           _ForwardedLabel(name: message.forwardedFrom!, mine: mine),
         if (message.replyTo != null)
-          _QuoteBlock(reply: message.replyTo!, mine: mine),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onQuoteTap,
+            child: _QuoteBlock(reply: message.replyTo!, mine: mine),
+          ),
         if (bigEmoji)
           Text(
             caption,

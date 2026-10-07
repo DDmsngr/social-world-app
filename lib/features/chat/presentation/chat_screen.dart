@@ -595,6 +595,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                 showSender: !isDirect && !mine,
                                 onMediaMore: (viewerContext) =>
                                     _openMenu(viewerContext, message, myId),
+                                onQuoteTap: message.replyTo == null
+                                    ? null
+                                    : () => _jumpTo(message.replyTo!.messageId, items),
                               ),
                               ReactionChips(
                                 reactions: reactions[message.id] ?? const [],

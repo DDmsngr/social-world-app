@@ -372,10 +372,30 @@ class _BodyState extends ConsumerState<_Body> {
           Text(profile.bio!, style: theme.textTheme.bodyLarge),
         ],
         const SizedBox(height: 4),
-        Text(
-          'Activity Points: ${profile.socialScore}',
-          style: TextStyle(fontSize: 12, color: AppColors.textDim),
-        ),
+        if (isMe)
+          // Свои баллы открываются: сколько и за что, плюс справка.
+          InkWell(
+            onTap: () => context.push(Routes.activityPoints),
+            borderRadius: BorderRadius.circular(AppRadius.chip),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Activity Points: ${profile.socialScore}',
+                    style: TextStyle(fontSize: 13, color: AppColors.primaryTint),
+                  ),
+                  Icon(Icons.chevron_right, size: 18, color: AppColors.primaryTint),
+                ],
+              ),
+            ),
+          )
+        else
+          Text(
+            'Activity Points: ${profile.socialScore}',
+            style: TextStyle(fontSize: 12, color: AppColors.textDim),
+          ),
         const SizedBox(height: 14),
         // Правка своего профиля — в настройках (шестерёнка сверху).
         if (isMe)
@@ -630,9 +650,16 @@ class _Stat extends StatelessWidget {
             children: [
               Text('$value', style: AppTypography.serif(24)),
               const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(fontSize: 12, color: AppColors.textDim),
+              // При крупном системном шрифте подпись ужимается, а не рвётся
+              // посреди слова («публикаци/и»).
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(fontSize: 12, color: AppColors.textDim),
+                ),
               ),
             ],
           ),

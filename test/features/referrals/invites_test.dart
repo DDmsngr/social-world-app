@@ -47,7 +47,7 @@ void main() {
       title: '50:2',
     );
     expect(deep.text, contains('Ваш реферал пригласил'));
-    expect(reward.location, '/profile/share-app');
+    expect(reward.location, '/profile/points');
   });
 
   test('история: подписи статусов и заголовки', () {

@@ -203,6 +203,6 @@ abstract final class DeepLinks {
             : '${Routes.questDetail}/$id?arrive=$arrivalCode',
         LinkTarget.need => '${Routes.needDetail}/$id',
         LinkTarget.chat => '${Routes.chats}/$id',
-        LinkTarget.points => Routes.shareApp,
+        LinkTarget.points => Routes.activityPoints,
       };
 }
