@@ -38,7 +38,8 @@ class PeerPresence {
   }
 }
 
-/// Раз в минуту, пока шапка на экране: присутствие меняется не чаще.
+/// Раз в 20 секунд, пока шапка на экране (раньше раз в минуту — статус
+/// заметно отставал).
 final peerPresenceProvider = StreamProvider.autoDispose
     .family<PeerPresence?, String>((ref, conversationId) async* {
       if (!Env.isConfigured) {
@@ -66,7 +67,7 @@ final peerPresenceProvider = StreamProvider.autoDispose
         } catch (error) {
           AppLog.add('Присутствие собеседника: $error');
         }
-        await Future<void>.delayed(const Duration(seconds: 60));
+        await Future<void>.delayed(const Duration(seconds: 20));
       }
     });
 

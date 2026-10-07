@@ -21,6 +21,8 @@ import '../../calls/call_kit.dart';
 import '../../calls/call_log.dart';
 import '../domain/day_label.dart';
 import '../domain/timeline.dart';
+import '../live_location/live_location.dart';
+import '../live_location/live_location_screen.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
@@ -317,15 +319,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // Кто-то пишет — вместо «в сети» смешная фраза («подбирает слова…»).
     final typing = ref.watch(typingEntriesProvider(widget.conversationId)).value ?? const <TypingEntry>[];
     final typingText = typingLabel(typing, direct: isDirect);
+    final liveShares = ref.watch(liveSharesProvider(widget.conversationId)).value ?? const <LiveShare>[];
     // Звонки бывают только в личных переписках.
     final calls = isDirect
         ? ref.watch(chatCallsProvider(widget.conversationId)).value ?? const <CallLogEntry>[]
         : const <CallLogEntry>[];
+    // Собеседник только что писал или печатал — он в сети, даже если отметка
+    // присутствия на сервере ещё не догнала (обновляется раз в минуту):
+    // раньше Вика писала, а в шапке висело «был(а) 13 мин назад».
+    final now = DateTime.now();
+    final peerLastMessage = isDirect
+        ? messages.value?.lastWhere((m) => m.senderId != myId, orElse: () => _noMessage).sentAt
+        : null;
+    final peerActive = typing.isNotEmpty ||
+        (peerLastMessage != null && now.difference(peerLastMessage) < const Duration(minutes: 2));
     final subtitle = typingText.isNotEmpty
         ? typingText
         : info != null && !isDirect
         ? membersLabel(info.memberCount)
-        : presence?.label(DateTime.now());
+        : peerActive
+        ? 'в сети'
+        : presence?.label(now);
 
     return Scaffold(
       appBar: AppBar(
@@ -470,6 +484,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             WallpaperOfferBar(
               conversationId: widget.conversationId,
               peerName: info?.displayName ?? widget.peerName,
+            ),
+          if (liveShares.isNotEmpty)
+            _LiveBar(
+              shares: liveShares,
+              myId: myId,
+              peerName: info?.displayName,
+              onTap: () => Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => LiveLocationScreen(conversationId: widget.conversationId),
+                ),
+              ),
             ),
           if (pinned.isNotEmpty)
             PinnedBar(
@@ -1095,6 +1120,47 @@ class _ConnectionBanner extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: AppColors.textDim),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final _noMessage = ChatMessage(id: '', conversationId: '', senderId: '', sentAt: DateTime(2000));
+
+/// Плашка под шапкой, пока кто-то в чате транслирует геопозицию. Тап — карта.
+class _LiveBar extends StatelessWidget {
+  const _LiveBar({required this.shares, required this.myId, required this.onTap, this.peerName});
+
+  final List<LiveShare> shares;
+  final String myId;
+  final String? peerName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final mine = shares.where((s) => s.userId == myId).firstOrNull;
+    final others = shares.where((s) => s.userId != myId).toList();
+    final text = switch ((mine, others.length)) {
+      (final m?, 0) => 'Вы транслируете геопозицию · ${liveRemainingLabel(m, now)}',
+      (null, 1) => '${peerName ?? 'Собеседник'} делится геопозицией · ${liveRemainingLabel(others.first, now)}',
+      (_, final n) => mine != null ? 'Геопозицией делятся: вы и ещё $n' : 'Геопозицией делятся $n',
+    };
+    return Material(
+      color: AppColors.geo.withValues(alpha: 0.14),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.share_location, color: AppColors.geo, size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              Text('Карта', style: TextStyle(color: AppColors.geo, fontWeight: FontWeight.w600)),
             ],
           ),
         ),

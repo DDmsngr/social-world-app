@@ -24,6 +24,7 @@ import '../../domain/schedule_format.dart';
 import '../providers/chat_providers.dart';
 import '../providers/chat_typing_providers.dart';
 import 'attachment_views.dart';
+import '../../live_location/live_location_screen.dart';
 import 'emoji_panel.dart';
 import 'photo_send_screen.dart';
 import 'scheduled_sheet.dart';
@@ -352,6 +353,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               ('video', Icons.video_library_outlined, 'Видео из галереи'),
               ('file', Icons.attach_file, 'Файл'),
               ('videonote', Icons.radio_button_checked, 'Видеосообщение (кружок)'),
+              ('live', Icons.share_location, 'Геопозиция (трансляция)'),
             ])
               ListTile(
                 leading: Icon(icon, color: AppColors.textDim),
@@ -411,6 +413,16 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           }
         case 'videonote':
           await _recordVideoNote();
+        case 'live':
+          if (!mounted) return;
+          final started = await startLiveSharing(context, ref, widget.conversationId);
+          if (started && mounted) {
+            await Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LiveLocationScreen(conversationId: widget.conversationId),
+              ),
+            );
+          }
         case 'file':
           final file = await FilePicker.pickFile();
           final path = file?.path;

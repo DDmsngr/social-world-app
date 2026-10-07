@@ -4,6 +4,12 @@
     <!-- Запись маршрута идёт только при открытом приложении: фоновой службы
          нет, поэтому ACCESS_BACKGROUND_LOCATION намеренно не запрашиваем. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Трансляция геопозиции в чате (0060) идёт и при свёрнутом приложении:
+         служба геолокатора с уведомлением «ChaWo транслирует геопозицию».
+         Служба стартует из открытого приложения, поэтому фонового доступа к
+         геолокации по-прежнему не нужно. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Фото-метки на маршруте снимаются камерой прямо во время прогулки. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Голосовые и звук кружков в чатах. -->

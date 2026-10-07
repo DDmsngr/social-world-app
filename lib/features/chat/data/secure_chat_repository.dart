@@ -181,6 +181,54 @@ class SecureChatRepository implements ChatRepository {
   Future<ConversationKind> _kind(String conversationId) async =>
       _kinds[conversationId] ?? (await loadConversation(conversationId)).kind;
 
+  /// Точка трансляции геопозиции (0060). В личном чате — шифротекст тем же
+  /// ключом пары, что и сообщения (поля ciphertext/nonce/mac/signature), в
+  /// группе — null: там точка уходит открыто, как и сами сообщения.
+  Future<Map<String, String>?> sealLiveLocation(String conversationId, String shareId, String json) async {
+    if (await _kind(conversationId) != ConversationKind.direct) return null;
+    final crypto = await _ready;
+    final keys = await _loadPublicKeys(await _peerId(conversationId));
+    if (keys == null) throw StateError('Собеседник ещё не опубликовал ключи шифрования');
+    final payload = await crypto.encrypt(
+      conversationId: conversationId,
+      messageId: shareId,
+      senderId: currentUserId,
+      recipientExchangeKey: keys.exchangeKey,
+      text: json,
+    );
+    return {
+      'ciphertext': payload.ciphertext,
+      'nonce': payload.nonce,
+      'mac': payload.mac,
+      'signature': payload.signature,
+    };
+  }
+
+  /// Расшифровать точку трансляции из строки live_locations личного чата.
+  Future<String?> openLiveLocation(String conversationId, Map<String, dynamic> row) async {
+    final ciphertext = row['ciphertext'] as String?;
+    if (ciphertext == null) return null;
+    final crypto = await _ready;
+    final peerKeys = await _loadPublicKeys(await _peerId(conversationId));
+    if (peerKeys == null) return null;
+    final senderId = row['user_id'] as String;
+    final senderKeys = senderId == currentUserId ? await crypto.publicKeys : peerKeys;
+    final decrypted = await crypto.decrypt(
+      conversationId: conversationId,
+      messageId: row['id'] as String,
+      senderId: senderId,
+      peerExchangeKey: peerKeys.exchangeKey,
+      senderSigningKey: senderKeys.signingKey,
+      payload: EncryptedChatPayload(
+        ciphertext: ciphertext,
+        nonce: row['nonce'] as String,
+        mac: row['mac'] as String,
+        signature: row['signature'] as String,
+      ),
+    );
+    return decrypted.text;
+  }
+
   /// Сколько ждём ответа сети, прежде чем считать запрос зависшим. Без
   /// предела запрос на «мёртвом» после смены сети соединении висел минутами, и
   /// переписка стояла на спиннере, пока человек не выйдет и не зайдёт снова.
@@ -918,6 +966,8 @@ class SecureChatRepository implements ChatRepository {
   }
 
   Future<String> _peerId(String conversationId) async {
+    final cached = _peerIds[conversationId];
+    if (cached != null) return cached;
     final row = await _client
         .from('chat_members')
         .select('profile_id')
@@ -926,8 +976,12 @@ class SecureChatRepository implements ChatRepository {
         .limit(1)
         .maybeSingle();
     if (row == null) throw StateError('Собеседник не найден');
-    return row['profile_id'] as String;
+    // Собеседник личного чата не меняется — точки трансляции геопозиции
+    // приходят каждые секунды и не должны каждый раз спрашивать сервер.
+    return _peerIds[conversationId] = row['profile_id'] as String;
   }
+
+  final _peerIds = <String, String>{};
 
   Future<DateTime?> _peerLastReadAt(String conversationId) async {
     final row = await _client

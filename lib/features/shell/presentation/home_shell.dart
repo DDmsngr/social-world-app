@@ -16,6 +16,7 @@ import '../../../core/update/update_dot.dart';
 import '../../../core/widgets/glass_surface.dart';
 import '../../calls/call_controller.dart';
 import '../../referrals/invite_claimer.dart';
+import '../../chat/live_location/live_location.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../notifications/notifications.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
@@ -94,6 +95,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
       ref.read(pushServiceProvider).start();
       ref.read(callControllerProvider).start();
       ref.read(inviteClaimerProvider).run();
+      // Своя трансляция геопозиции переживает перезапуск приложения.
+      ref.read(liveLocationSharerProvider).resumeMine();
       _touchPresence();
     });
     _presence = Timer.periodic(
