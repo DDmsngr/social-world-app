@@ -20,7 +20,7 @@ abstract final class IncomingClick {
           AudioContext(
             android: const AudioContextAndroid(
               audioFocus: AndroidAudioFocus.none,
-              usageType: AndroidUsageType.assistanceSonification,
+              usageType: AndroidUsageType.notificationCommunicationInstant,
               contentType: AndroidContentType.sonification,
             ),
             iOS: AudioContextIOS(
