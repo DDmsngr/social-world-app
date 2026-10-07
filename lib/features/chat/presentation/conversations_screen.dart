@@ -12,9 +12,11 @@ import '../../auth/presentation/providers/auth_providers.dart';
 import '../../channels/presentation/widgets/channel_avatar.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/conversation.dart';
+import 'providers/chat_extras_providers.dart';
 import 'providers/chat_notify_providers.dart';
 import 'providers/chat_providers.dart';
 import 'providers/chat_settings_providers.dart';
+import 'providers/chat_typing_providers.dart';
 import 'widgets/chat_notify_sheet.dart';
 
 enum _Tab { direct, groups, channels }
@@ -54,17 +56,31 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
     final encryptionEnabled = ref
         .watch(chatRepositoryProvider)
         .endToEndEncryptionEnabled;
-    final settings = ref.watch(chatSettingsProvider).asData?.value ?? const <String, ChatSettings>{};
-    ChatSettings settingsOf(Conversation c) => settings[c.id] ?? ChatSettings.none;
+    final settings =
+        ref.watch(chatSettingsProvider).asData?.value ??
+        const <String, ChatSettings>{};
+    ChatSettings settingsOf(Conversation c) =>
+        settings[c.id] ?? ChatSettings.none;
     final everything = conversations.value ?? const <Conversation>[];
     // Архивные и «удалённые у меня» в общий список не попадают; новое сообщение вернёт чат.
-    final all = [for (final c in everything) if (!hiddenFromList(c, settingsOf(c))) c];
-    final archived = [for (final c in everything) if (inArchive(c, settingsOf(c))) c];
+    final all = [
+      for (final c in everything)
+        if (!hiddenFromList(c, settingsOf(c))) c,
+    ];
+    final archived = [
+      for (final c in everything)
+        if (inArchive(c, settingsOf(c))) c,
+    ];
 
     // Непрочитанные по вкладке: заглушённые чаты не считаем, они не должны
     // звать внимание и через бейдж.
     int unread(_Tab tab) => all
-        .where((c) => _tabOf(c) == tab && c.unreadCount > 0 && !chatNotifyOf(ref, c.id).isMuted)
+        .where(
+          (c) =>
+              _tabOf(c) == tab &&
+              c.unreadCount > 0 &&
+              !chatNotifyOf(ref, c.id).isMuted,
+        )
         .length;
 
     Widget tabLabel(String text, _Tab tab) {
@@ -84,7 +100,11 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
                 ),
                 child: Text(
                   '$n',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.onPrimary),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onPrimary,
+                  ),
                 ),
               ),
             ],
@@ -115,7 +135,9 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
           if (archived.isNotEmpty)
             IconButton(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const _ArchivedScreen()),
+                MaterialPageRoute<void>(
+                  builder: (_) => const _ArchivedScreen(),
+                ),
               ),
               tooltip: 'Архив',
               icon: Badge(
@@ -130,8 +152,12 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
             onPressed: () => context.push(
               current == _Tab.channels ? Routes.channels : Routes.chatSearch,
             ),
-            tooltip: current == _Tab.channels ? 'Найти каналы' : 'Найти человека',
-            icon: Icon(current == _Tab.channels ? Icons.travel_explore : Icons.search),
+            tooltip: current == _Tab.channels
+                ? 'Найти каналы'
+                : 'Найти человека',
+            icon: Icon(
+              current == _Tab.channels ? Icons.travel_explore : Icons.search,
+            ),
           ),
         ],
         bottom: TabBar(
@@ -148,7 +174,9 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
       floatingActionButton: fab == null
           ? null
           : Padding(
-              padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.paddingOf(context).bottom,
+              ),
               child: fab,
             ),
       body: conversations.when(
@@ -165,9 +193,13 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
                 onRefresh: () => ref.refresh(conversationsProvider.future),
                 child: _list(
                   context,
-                  [for (final c in all) if (_tabOf(c) == tab) c],
+                  [
+                    for (final c in all)
+                      if (_tabOf(c) == tab) c,
+                  ],
                   tab,
-                  showEncryptionNotice: tab == _Tab.direct && !encryptionEnabled,
+                  showEncryptionNotice:
+                      tab == _Tab.direct && !encryptionEnabled,
                 ),
               ),
           ],
@@ -205,7 +237,9 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
               children: [
                 Icon(Icons.travel_explore, color: AppColors.primaryTint),
                 const SizedBox(width: 14),
-                const Expanded(child: Text('Найти каналы: новости, наука, еда, мемы…')),
+                const Expanded(
+                  child: Text('Найти каналы: новости, наука, еда, мемы…'),
+                ),
                 Icon(Icons.chevron_right, color: AppColors.textFaint),
               ],
             ),
@@ -222,9 +256,11 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
                 _Tab.channels => 'Вы ни на что не подписаны',
               },
               text: switch (tab) {
-                _Tab.direct => 'Откройте профиль человека и нажмите «Написать».',
+                _Tab.direct =>
+                  'Откройте профиль человека и нажмите «Написать».',
                 _Tab.groups => 'Создайте группу кнопкой внизу.',
-                _Tab.channels => 'Загляните в каталог — подписка в одно касание.',
+                _Tab.channels =>
+                  'Загляните в каталог — подписка в одно касание.',
               },
               icon: switch (tab) {
                 _Tab.direct => Icons.forum_outlined,
@@ -258,10 +294,13 @@ class _ArchivedScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(chatSettingsProvider).asData?.value ?? const <String, ChatSettings>{};
+    final settings =
+        ref.watch(chatSettingsProvider).asData?.value ??
+        const <String, ChatSettings>{};
     final myId = ref.watch(currentUserProvider)?.id;
     final items = [
-      for (final c in ref.watch(conversationsProvider).value ?? const <Conversation>[])
+      for (final c
+          in ref.watch(conversationsProvider).value ?? const <Conversation>[])
         if (inArchive(c, settings[c.id] ?? ChatSettings.none)) c,
     ];
     return Scaffold(
@@ -273,7 +312,12 @@ class _ArchivedScreen extends ConsumerWidget {
               icon: Icons.archive_outlined,
             )
           : ListView(
-              padding: EdgeInsets.fromLTRB(AppSpacing.gutter, 12, AppSpacing.gutter, 24 + MediaQuery.paddingOf(context).bottom),
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.gutter,
+                12,
+                AppSpacing.gutter,
+                24 + MediaQuery.paddingOf(context).bottom,
+              ),
               children: [
                 for (final c in items) ...[
                   _ConversationTile(
@@ -284,7 +328,9 @@ class _ArchivedScreen extends ConsumerWidget {
                       await setChatArchived(ref, c.id, false);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Чат возвращён в список')),
+                          const SnackBar(
+                            content: Text('Чат возвращён в список'),
+                          ),
                         );
                       }
                     },
@@ -296,6 +342,7 @@ class _ArchivedScreen extends ConsumerWidget {
     );
   }
 }
+
 class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.conversation,
@@ -314,7 +361,9 @@ class _ConversationTile extends StatelessWidget {
     final last = conversation.lastMessage;
     final preview = last == null
         ? (conversation.isChannel ? 'Постов пока нет' : 'Нет сообщений')
-        : conversation.isDirect || conversation.isChannel || last.senderName == null
+        : conversation.isDirect ||
+              conversation.isChannel ||
+              last.senderName == null
         ? last.preview
         : '${last.senderName}: ${last.preview}';
 
@@ -330,10 +379,40 @@ class _ConversationTile extends StatelessWidget {
       child: Row(
         children: [
           if (conversation.isDirect)
-            UserAvatar(
-              name: conversation.displayName,
-              url: conversation.peerAvatarUrl,
-              radius: 22,
+            Consumer(
+              builder: (context, ref, child) {
+                final online =
+                    ref
+                        .watch(peerPresenceProvider(conversation.id))
+                        .value
+                        ?.online ??
+                    false;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    child!,
+                    if (online)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: AppColors.success,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.card, width: 2),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+              child: UserAvatar(
+                name: conversation.displayName,
+                url: conversation.peerAvatarUrl,
+                radius: 22,
+              ),
             )
           else if (conversation.isChannel)
             ChannelAvatar(url: conversation.peerAvatarUrl, radius: 22)
@@ -356,78 +435,138 @@ class _ConversationTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  conversation.displayName,
-                  style: Theme.of(context).textTheme.titleLarge,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
                 Row(
                   children: [
-                    // Своё последнее сообщение — с галочками, как в переписке.
-                    if (last != null && last.senderId == myId) ...[
-                      Icon(
-                        last.status == MessageStatus.read
-                            ? Icons.done_all
-                            : Icons.done,
-                        size: 15,
-                        color: last.status == MessageStatus.read
-                            ? AppColors.primaryTint
-                            : AppColors.textFaint,
-                      ),
-                      const SizedBox(width: 4),
-                    ],
-                    Expanded(
+                    Flexible(
                       child: Text(
-                        preview,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(fontSize: 13),
+                        conversation.displayName,
+                        style: Theme.of(context).textTheme.titleLarge,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (conversation.isDirect)
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final presence = ref
+                              .watch(peerPresenceProvider(conversation.id))
+                              .value;
+                          final label = presence?.label(DateTime.now());
+                          if (label == null) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: presence!.online
+                                    ? AppColors.success
+                                    : AppColors.textFaint,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
+                const SizedBox(height: 2),
+                if (!conversation.isChannel)
+                  Consumer(
+                    builder: (context, ref, previewRow) {
+                      final typing =
+                          ref
+                              .watch(typingEntriesProvider(conversation.id))
+                              .value ??
+                          const <TypingEntry>[];
+                      final text = typingLabel(
+                        typing,
+                        direct: conversation.isDirect,
+                      );
+                      if (text.isEmpty) return previewRow!;
+                      return Text(
+                        text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.primaryTint,
+                        ),
+                      );
+                    },
+                    child: _previewRow(context, last, preview),
+                  )
+                else
+                  _previewRow(context, last, preview),
               ],
             ),
           ),
-          if (notify.isCustom) ...[
-            const SizedBox(width: 8),
-            Icon(
-              notify.isMuted
-                  ? Icons.notifications_off_outlined
-                  : notify.mode == NotifyMode.vibrate
-                  ? Icons.vibration
-                  : Icons.notifications_none,
-              size: 16,
-              color: AppColors.textFaint,
-            ),
-          ],
-          if (conversation.unreadCount > 0) ...[
-            const SizedBox(width: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                // У заглушённого чата счётчик серый: он не должен кричать.
-                color: notify.isMuted ? AppColors.hairStrong : AppColors.primaryTint,
-                borderRadius: BorderRadius.circular(AppRadius.chip),
-              ),
-              child: Text(
-                '${conversation.unreadCount}',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: notify.isMuted ? AppColors.text : AppColors.onPrimary,
-                ),
-              ),
-            ),
-          ],
+          ..._trailing(),
         ],
       ),
     );
   }
+
+  Widget _previewRow(BuildContext context, ChatMessage? last, String preview) =>
+      Row(
+        children: [
+          // Своё последнее сообщение — с галочками, как в переписке.
+          if (last != null && last.senderId == myId) ...[
+            Icon(
+              last.status == MessageStatus.read ? Icons.done_all : Icons.done,
+              size: 15,
+              color: last.status == MessageStatus.read
+                  ? AppColors.primaryTint
+                  : AppColors.textFaint,
+            ),
+            const SizedBox(width: 4),
+          ],
+          Expanded(
+            child: Text(
+              preview,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 13),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      );
+
+  List<Widget> _trailing() => [
+    if (notify.isCustom) ...[
+      const SizedBox(width: 8),
+      Icon(
+        notify.isMuted
+            ? Icons.notifications_off_outlined
+            : notify.mode == NotifyMode.vibrate
+            ? Icons.vibration
+            : Icons.notifications_none,
+        size: 16,
+        color: AppColors.textFaint,
+      ),
+    ],
+    if (conversation.unreadCount > 0) ...[
+      const SizedBox(width: 10),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          // У заглушённого чата счётчик серый: он не должен кричать.
+          color: notify.isMuted ? AppColors.hairStrong : AppColors.primaryTint,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
+        child: Text(
+          '${conversation.unreadCount}',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: notify.isMuted ? AppColors.text : AppColors.onPrimary,
+          ),
+        ),
+      ),
+    ],
+  ];
 }
 
 /// В режиме заглушек шифрования нет, и об этом сказано прямо. Мессенджер,

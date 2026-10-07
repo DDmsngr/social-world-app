@@ -508,15 +508,21 @@ class _BodyState extends ConsumerState<_Body> {
                     ),
                   ];
                 }
+                // В своём профиле плашка всегда целиком — все виды публикаций,
+                // даже пустые: так видно, что вообще можно выложить. У чужого
+                // — только те, что у человека есть.
                 final available = [
                   for (final f in _PostFilter.values)
-                    if (f == _PostFilter.all ||
+                    if (isMe ||
+                        f == _PostFilter.all ||
                         (f == _PostFilter.stories ? storyGroup != null : items.any(f.matches)))
                       f,
                 ];
                 final filter = available.contains(_filter) ? _filter : _PostFilter.all;
+                final shown = [for (final p in items) if (filter.matches(p)) p];
+                final emptyStories = filter == _PostFilter.stories && storyGroup == null;
                 return [
-                  if (available.length > 2)
+                  if (isMe || available.length > 2)
                     SliverToBoxAdapter(
                       child: _FilterBar(
                         filters: available,
@@ -524,10 +530,17 @@ class _BodyState extends ConsumerState<_Body> {
                         onSelected: (f) => setState(() => _filter = f),
                       ),
                     ),
-                  if (filter == _PostFilter.stories)
+                  if (emptyStories || (filter != _PostFilter.stories && shown.isEmpty))
+                    message(
+                      Text(
+                        '${filter.label ?? 'Публикаций'}: пока нет.',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    )
+                  else if (filter == _PostFilter.stories)
                     _StoriesGrid(group: storyGroup!)
                   else
-                    ProfilePostGrid(posts: [for (final p in items) if (filter.matches(p)) p]),
+                    ProfilePostGrid(posts: shown),
                   SliverToBoxAdapter(child: SizedBox(height: bottom)),
                 ];
               },

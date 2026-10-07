@@ -56,21 +56,28 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     if (widget.post == null) _fetchIfMissing();
   }
 
+  /// По ссылке или уведомлению пост всегда берём свежим с сервера: копия в
+  /// ленте могла устареть (07.10: Вике пришёл пуш о лайке, она открыла пост —
+  /// а лайка нет, пока не перезапустит приложение). Свежая версия заменяет и
+  /// копию в ленте.
   Future<void> _fetchIfMissing() async {
-    final inFeed = ref.read(feedProvider).value?.any((p) => p.id == widget.postId);
-    if (inFeed ?? false) return;
+    final inFeed = ref.read(feedProvider).value?.any((p) => p.id == widget.postId) ?? false;
 
-    setState(() => _fetching = true);
+    if (!inFeed) setState(() => _fetching = true);
     try {
       final post = await ref.read(feedRepositoryProvider).loadPost(widget.postId);
       if (!mounted) return;
+      if (inFeed) {
+        if (post != null) ref.read(feedProvider.notifier).replacePost(post);
+        return;
+      }
       setState(() {
         _fetched = post;
         _notFound = post == null;
         _fetching = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || inFeed) return;
       setState(() {
         _notFound = true;
         _fetching = false;

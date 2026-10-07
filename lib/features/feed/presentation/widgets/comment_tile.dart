@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../chat/presentation/widgets/emoji_panel.dart';
 import '../../domain/entities/comment.dart';
 
 /// Узел ветки: отступ по глубине, слева направляющая линия ветки — так же,
@@ -119,7 +120,13 @@ class CommentTile extends StatelessWidget {
                         color: AppColors.textFaint,
                         fontStyle: FontStyle.italic,
                       )
-                    : Theme.of(context).textTheme.bodyLarge,
+                    // 1–3 эмодзи без текста — крупно, как стикер в чате.
+                    : switch (emojiOnlyCount(comment.body)) {
+                        1 => const TextStyle(fontSize: 48, height: 1.1),
+                        2 => const TextStyle(fontSize: 40, height: 1.1),
+                        3 => const TextStyle(fontSize: 32, height: 1.1),
+                        _ => Theme.of(context).textTheme.bodyLarge,
+                      },
               ),
               // Фото и гифки в комментариях появятся позже — разбор и показ
               // уже готовы, кнопки прикрепления ещё нет.
