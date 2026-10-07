@@ -93,6 +93,7 @@ dependencies:
   # даже при закрытом приложении.
   flutter_webrtc: ^1.2.0
   flutter_callkit_incoming: ^3.1.6
+  pro_image_editor: ^14.10.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

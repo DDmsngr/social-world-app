@@ -176,6 +176,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
+    // Чат остался открытым, пока приложение было свёрнуто: пришедшее за это
+    // время уведомление уже прочитано здесь — убираем его из шторки (раньше
+    // оно уходило, только если войти через само уведомление).
+    _push.clearConversation(widget.conversationId);
     ref.invalidate(messagesProvider(widget.conversationId));
     ref.invalidate(conversationProvider(widget.conversationId));
     ref.invalidate(scheduledMessagesProvider(widget.conversationId));

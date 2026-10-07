@@ -181,6 +181,8 @@ class PushService {
     if (!_localReady) return;
     try {
       await _local.cancel(id: 0, tag: conversationId);
+      // Реакции этого чата приходят отдельным уведомлением (push-send).
+      await _local.cancel(id: 0, tag: '$conversationId:reaction');
     } catch (error) {
       AppLog.add('Не удалось убрать уведомление: $error');
     }

@@ -25,6 +25,7 @@ import '../providers/chat_providers.dart';
 import '../providers/chat_typing_providers.dart';
 import 'attachment_views.dart';
 import 'emoji_panel.dart';
+import 'photo_send_screen.dart';
 import 'scheduled_sheet.dart';
 import 'video_note_recorder.dart';
 
@@ -370,11 +371,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             maxWidth: 2560,
             maxHeight: 2560,
           );
-          for (final image in images) {
+          if (images.isEmpty || !mounted) return;
+          // Перед отправкой — просмотр и правка (рисовать, обрезать, повернуть).
+          final chosen = await showPhotoSendScreen(context, [for (final i in images) i.path]);
+          for (final path in chosen ?? const <String>[]) {
             await _upload(
               kind: MessageKind.image,
-              path: image.path,
-              name: image.name,
+              path: path,
+              name: path.split(Platform.pathSeparator).last,
               mime: 'image/jpeg',
             );
           }
@@ -385,11 +389,13 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             maxWidth: 2560,
             maxHeight: 2560,
           );
-          if (image != null) {
+          if (image == null || !mounted) return;
+          final chosen = await showPhotoSendScreen(context, [image.path]);
+          for (final path in chosen ?? const <String>[]) {
             await _upload(
               kind: MessageKind.image,
-              path: image.path,
-              name: image.name,
+              path: path,
+              name: path.split(Platform.pathSeparator).last,
               mime: 'image/jpeg',
             );
           }
