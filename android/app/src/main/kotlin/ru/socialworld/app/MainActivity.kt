@@ -8,6 +8,8 @@ import android.graphics.drawable.Icon
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.telecom.CallAudioState
+import com.hiennv.flutter_callkit_incoming.CallkitConnection
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -38,6 +40,25 @@ class MainActivity : FlutterActivity() {
                                     caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
                                 ),
                         )
+                    }
+                    // Громкая связь в звонке (lib/features/calls). Звонок живёт в
+                    // системном Telecom (self-managed), и маршрут звука держит
+                    // он: AudioManager.setSpeakerphoneOn от приложения Telecom
+                    // перебивает своим «к уху» (лог 07.10: route EARPIECE весь
+                    // разговор). Поэтому маршрут меняем через сам Connection.
+                    "callAudioRoute" -> {
+                        val callId = call.argument<String>("callId")
+                        val speaker = call.argument<Boolean>("speaker") == true
+                        val connection = callId?.let { CallkitConnection.find(it) }
+                        if (connection == null) {
+                            result.success(false)
+                        } else {
+                            @Suppress("DEPRECATION")
+                            connection.setAudioRoute(
+                                if (speaker) CallAudioState.ROUTE_SPEAKER else CallAudioState.ROUTE_WIRED_OR_EARPIECE,
+                            )
+                            result.success(true)
+                        }
                     }
                     else -> result.notImplemented()
                 }

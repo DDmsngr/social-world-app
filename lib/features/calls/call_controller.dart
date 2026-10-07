@@ -501,8 +501,22 @@ class CallController extends ChangeNotifier {
     }
   }
 
+  static const _device = MethodChannel('chawo/device');
+
+  /// Сначала через системный Telecom (он держит маршрут звука звонка и
+  /// перебивает обычный AudioManager), затем WebRTC-способом — на случай,
+  /// если звонок идёт без Telecom.
   Future<void> _applySpeaker() async {
     if (kIsWeb) return;
+    final id = call?.id;
+    try {
+      if (id != null) {
+        final routed = await _device.invokeMethod<bool>('callAudioRoute', {'callId': id, 'speaker': speaker});
+        if (routed == true) return;
+      }
+    } catch (error) {
+      AppLog.add('Telecom: динамик не переключился: $error');
+    }
     try {
       await Helper.setSpeakerphoneOn(speaker);
     } catch (error) {
