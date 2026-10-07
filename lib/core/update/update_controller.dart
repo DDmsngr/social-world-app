@@ -114,7 +114,7 @@ class UpdateController extends Notifier<UpdateState> {
       // «готовое» обновление перекрывало проверку, и человек застревал на нём.
       try {
         final latest = await _service.fetchManifest();
-        if (latest != null && latest.versionCode > pending.info.versionCode) {
+        if (latest.versionCode > pending.info.versionCode) {
           await _discardPending(pending.path);
           pending = null;
         }
@@ -135,8 +135,7 @@ class UpdateController extends Notifier<UpdateState> {
     state = const UpdateState(stage: UpdateStage.checking);
     try {
       final manifest = await _service.fetchManifest();
-      if (manifest == null ||
-          manifest.versionCode <= await _currentVersionCode()) {
+      if (manifest.versionCode <= await _currentVersionCode()) {
         state = const UpdateState(stage: UpdateStage.upToDate);
         return;
       }
@@ -169,7 +168,9 @@ class UpdateController extends Notifier<UpdateState> {
         '${directory.path}/social-world-${info.versionCode}.apk',
       );
 
-      final url = info.urlFor();
+      final primary = info.urlFor();
+      final fallback = info.fallbackUrlFor();
+      var url = primary;
       // Обрыв на мобильной сети — обычное дело, а не повод сдаваться. Каждая
       // новая попытка докачивает с того места, где остановилась предыдущая
       // (см. UpdateService.downloadTo), так что повторы дёшевы.
@@ -190,6 +191,12 @@ class UpdateController extends Notifier<UpdateState> {
             'Скачивание: попытка $attempt из $_maxDownloadAttempts — $error',
           );
           if (attempt >= _maxDownloadAttempts) rethrow;
+          // Два захода на наш сервер, дальше — GitHub. Частичный файл с другого
+          // адреса не докачиваем: начинаем заново.
+          if (attempt == 2 && fallback != null && fallback != url) {
+            url = fallback;
+            if (file.existsSync()) await file.delete();
+          }
           await Future<void>.delayed(Duration(seconds: 2 * attempt));
         }
       }
@@ -267,6 +274,8 @@ class UpdateController extends Notifier<UpdateState> {
         'versionName': info.versionName,
         'apkUrl': info.apkUrl,
         'apkUrlArm64': info.apkUrlArm64,
+        'apkUrlFallback': info.apkUrlFallback,
+        'apkUrlArm64Fallback': info.apkUrlArm64Fallback,
         'notes': info.notes,
       }),
     );

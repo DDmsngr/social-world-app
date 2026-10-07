@@ -338,3 +338,45 @@ jobs:
             -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
             -H "Content-Type: application/json" \
             --data-binary @- > /dev/null
+
+      # Копия на своём сервере: GitHub с телефонов в РФ открывается через раз,
+      # а наш домен — всегда. Приложение сначала смотрит сюда, GitHub остаётся
+      # запасным путём. Отдельный ключ умеет только передавать файлы (sftp).
+      # Сбой этого шага релиз не ломает.
+      - name: Upload update files to own server
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+        continue-on-error: true
+        env:
+          SW_UPDATES_SSH_KEY: ${{ secrets.SW_UPDATES_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SW_UPDATES_SSH_KEY}" ]; then
+            echo "::warning::SW_UPDATES_SSH_KEY не задан — копия обновления на свой сервер не загружена"
+            exit 0
+          fi
+          HOST=89.169.148.47
+          BASE="https://api-socialworld.deepdrift.tech/updates"
+          VERSION_CODE=$((5000 + GITHUB_RUN_NUMBER))
+          apk_name="social-world-${VERSION_CODE}.apk"
+          arm64_name="social-world-${VERSION_CODE}-arm64.apk"
+
+          # Манифест для нашего домена: ссылки на свой сервер, GitHub — запасные.
+          jq --arg b "$BASE" --arg a "$apk_name" --arg r "$arm64_name" \
+            '. + {apkUrlFallback: .apkUrl, apkUrlArm64Fallback: .apkUrlArm64, apkUrl: ($b + "/" + $a), apkUrlArm64: ($b + "/" + $r)}' \
+            /tmp/sw-releases/manifest.json > manifest.own.json
+
+          install -m 600 /dev/null "$RUNNER_TEMP/swupd_key"
+          printf '%s\n' "${SW_UPDATES_SSH_KEY}" > "$RUNNER_TEMP/swupd_key"
+          {
+            echo "put ${apk_name} ${apk_name}"
+            echo "put ${arm64_name} ${arm64_name}"
+            echo "-rm chawo.apk"
+            echo "symlink ${arm64_name} chawo.apk"
+            echo "put manifest.own.json manifest.json.new"
+            echo "-rm manifest.json"
+            echo "rename manifest.json.new manifest.json"
+          } > "$RUNNER_TEMP/sftp.batch"
+          sftp -i "$RUNNER_TEMP/swupd_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+            -b "$RUNNER_TEMP/sftp.batch" "swupd@${HOST}"
+          curl --fail --silent --show-error --max-time 30 "${BASE}/manifest.json" | jq -e ".versionCode == ${VERSION_CODE}"

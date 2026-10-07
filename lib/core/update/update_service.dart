@@ -17,8 +17,10 @@ class UpdateService {
 
   final http.Client _client;
 
-  static const _manifestUrl =
-      'https://raw.githubusercontent.com/DDmsngr/social-world-releases/main/manifest.json';
+  static const _manifestUrls = [
+    'https://api-socialworld.deepdrift.tech/updates/manifest.json',
+    'https://raw.githubusercontent.com/DDmsngr/social-world-releases/main/manifest.json',
+  ];
 
   /// Целый ли это APK: читаем оглавление zip и ищем манифест приложения.
   /// Оборванная, склеенная из кусков или обрезанная закачка сюда не пройдёт.
@@ -37,13 +39,24 @@ class UpdateService {
     }
   }
 
-  Future<UpdateInfo?> fetchManifest() async {
-    final uri = Uri.parse(_manifestUrl);
-    final response = await _client.get(uri).timeout(const Duration(seconds: 8));
-    if (response.statusCode != 200) return null;
-    return UpdateInfo.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
-    );
+  /// Сначала наш сервер (открывается из РФ всегда), потом GitHub. Если не
+  /// открылось ни то, ни другое — ошибка, а не «обновлений нет»: иначе сбой
+  /// связи выглядел бы как «вы на последней версии».
+  Future<UpdateInfo> fetchManifest() async {
+    Object? lastError;
+    for (final url in _manifestUrls) {
+      try {
+        final response = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 7));
+        if (response.statusCode != 200) {
+          lastError = Exception('Манифест: ${response.statusCode}');
+          continue;
+        }
+        return UpdateInfo.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError ?? Exception('Манифест недоступен');
   }
 
   /// Качает APK в [destination], отдавая прогресс 0..1. Пишет потоково —

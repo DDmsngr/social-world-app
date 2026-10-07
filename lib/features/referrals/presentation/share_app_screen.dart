@@ -9,7 +9,7 @@ import '../../../core/theme/app_typography.dart';
 /// Прямая ссылка на последнюю сборку: открыл — пошло скачивание.
 /// Позже сюда встанет персональная ссылка человека (реферальная программа).
 const appDownloadUrl =
-    'https://github.com/DDmsngr/social-world-releases/releases/latest/download/chawo.apk';
+    'https://api-socialworld.deepdrift.tech/updates/chawo.apk';
 
 /// «Поделиться приложением»: ссылка для отправки и QR, который друг
 /// наводит камерой телефона, не вводя ничего руками.

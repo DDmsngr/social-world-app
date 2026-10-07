@@ -8,6 +8,8 @@ class UpdateInfo {
     required this.apkUrl,
     required this.notes,
     this.apkUrlArm64,
+    this.apkUrlFallback,
+    this.apkUrlArm64Fallback,
   });
 
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
@@ -18,6 +20,8 @@ class UpdateInfo {
       notes: json['notes'] as String? ?? '',
       // Необязательное поле: старые манифесты его не знают.
       apkUrlArm64: json['apkUrlArm64'] as String?,
+      apkUrlFallback: json['apkUrlFallback'] as String?,
+      apkUrlArm64Fallback: json['apkUrlArm64Fallback'] as String?,
     );
   }
 
@@ -32,6 +36,18 @@ class UpdateInfo {
   /// файл втрое меньшего размера доходит заметно чаще.
   final String? apkUrlArm64;
   final String notes;
+
+  /// Те же файлы на GitHub: запасной путь, если наш сервер недоступен.
+  final String? apkUrlFallback;
+  final String? apkUrlArm64Fallback;
+
+  /// Запасная ссылка на тот же файл, что и [urlFor]. null — запасной нет.
+  String? fallbackUrlFor({String? platformVersion}) {
+    final arm64 = apkUrlArm64;
+    if (arm64 == null) return apkUrlFallback;
+    final version = platformVersion ?? Platform.version;
+    return version.contains('android_arm64') ? apkUrlArm64Fallback : apkUrlFallback;
+  }
 
   /// Какой файл качать этому телефону. Архитектуру берём из строки версии
   /// Dart (`... on "android_arm64"`) — отдельный пакет ради этого не нужен.

@@ -19,7 +19,7 @@ import '../data/contacts_match.dart';
 
 /// Прямая ссылка на файл последней сборки: открыл — пошло скачивание.
 const _downloadUrl =
-    'https://github.com/DDmsngr/social-world-releases/releases/latest/download/chawo.apk';
+    'https://api-socialworld.deepdrift.tech/updates/chawo.apk';
 
 enum _Phase { intro, loading, ready, denied, failed }
 

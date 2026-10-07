@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,9 @@ class CallScreen extends ConsumerStatefulWidget {
 class _CallScreenState extends ConsumerState<CallScreen> {
   late final CallController _call = ref.read(callControllerProvider);
   bool _closing = false;
+  bool _controlsVisible = true;
+  Timer? _hideTimer;
+  CallPhase? _lastPhase;
 
   @override
   void initState() {
@@ -29,6 +34,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
   @override
   void dispose() {
     _call.removeListener(_onChange);
+    _hideTimer?.cancel();
     super.dispose();
   }
 
@@ -39,7 +45,27 @@ class _CallScreenState extends ConsumerState<CallScreen> {
       Navigator.of(context).maybePop();
       return;
     }
+    // Разговор пошёл — через 3 секунды кнопки уходят, остаётся картинка.
+    if (_call.phase == CallPhase.active && _lastPhase != CallPhase.active) _scheduleHide();
+    if (_call.phase != CallPhase.active) {
+      _hideTimer?.cancel();
+      _controlsVisible = true;
+    }
+    _lastPhase = _call.phase;
     setState(() {});
+  }
+
+  void _scheduleHide() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _call.phase == CallPhase.active) setState(() => _controlsVisible = false);
+    });
+  }
+
+  void _toggleControls() {
+    if (_call.phase != CallPhase.active) return;
+    setState(() => _controlsVisible = !_controlsVisible);
+    if (_controlsVisible) _scheduleHide();
   }
 
   @override
@@ -58,7 +84,10 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         value: SystemUiOverlayStyle.light,
         child: Scaffold(
         backgroundColor: const Color(0xFF120E11),
-        body: Stack(
+        body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: _toggleControls,
+          child: Stack(
           fit: StackFit.expand,
           children: [
             if (showRemote)
@@ -112,7 +141,14 @@ class _CallScreenState extends ConsumerState<CallScreen> {
                     ),
                   ],
                   const Spacer(),
-                  _Controls(call: _call, video: video),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 250),
+                    opacity: _controlsVisible ? 1 : 0,
+                    child: IgnorePointer(
+                      ignoring: !_controlsVisible,
+                      child: _Controls(call: _call, video: video, onTouch: _scheduleHide),
+                    ),
+                  ),
                   const SizedBox(height: 28),
                 ],
               ),
@@ -137,6 +173,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
               ),
           ],
         ),
+        ),
       ),
       ),
     );
@@ -144,10 +181,11 @@ class _CallScreenState extends ConsumerState<CallScreen> {
 }
 
 class _Controls extends StatelessWidget {
-  const _Controls({required this.call, required this.video});
+  const _Controls({required this.call, required this.video, required this.onTouch});
 
   final CallController call;
   final bool video;
+  final VoidCallback onTouch;
 
   @override
   Widget build(BuildContext context) {
@@ -165,25 +203,25 @@ class _Controls extends StatelessWidget {
                 icon: call.muted ? Icons.mic_off_rounded : Icons.mic_rounded,
                 label: call.muted ? 'Микрофон выкл.' : 'Микрофон',
                 active: call.muted,
-                onTap: ended ? null : call.toggleMute,
+                onTap: ended ? null : () { call.toggleMute(); onTouch(); },
               ),
               _RoundButton(
                 icon: call.speaker ? Icons.volume_up_rounded : Icons.hearing_rounded,
                 label: call.speaker ? 'Динамик' : 'У уха',
                 active: call.speaker,
-                onTap: ended ? null : call.toggleSpeaker,
+                onTap: ended ? null : () { call.toggleSpeaker(); onTouch(); },
               ),
               if (video) ...[
                 _RoundButton(
                   icon: call.cameraOn ? Icons.videocam_rounded : Icons.videocam_off_rounded,
                   label: call.cameraOn ? 'Камера' : 'Камера выкл.',
                   active: !call.cameraOn,
-                  onTap: ended ? null : call.toggleCamera,
+                  onTap: ended ? null : () { call.toggleCamera(); onTouch(); },
                 ),
                 _RoundButton(
                   icon: Icons.cameraswitch_rounded,
                   label: 'Сменить',
-                  onTap: ended || !call.cameraOn ? null : call.switchCamera,
+                  onTap: ended || !call.cameraOn ? null : () { call.switchCamera(); onTouch(); },
                 ),
               ],
             ],

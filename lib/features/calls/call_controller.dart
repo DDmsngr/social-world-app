@@ -362,6 +362,13 @@ class CallController extends ChangeNotifier {
           unawaited(_stopRingback());
           final id = call?.id;
           if (id != null && id.isNotEmpty) unawaited(CallKit.connected(id));
+          // Системная звонилка при соединении сама переключает звук на разговорный
+          // динамик; выбранный человеком маршрут возвращаем после неё.
+          for (final delay in const [0, 600, 1800]) {
+            Timer(Duration(milliseconds: delay), () {
+              if (phase == CallPhase.active) unawaited(_applySpeaker());
+            });
+          }
           _ticker ??= Timer.periodic(const Duration(seconds: 1), (_) => notifyListeners());
           notifyListeners();
         }
@@ -613,8 +620,8 @@ class CallController extends ChangeNotifier {
           AudioContext(
             android: const AudioContextAndroid(
               audioFocus: AndroidAudioFocus.gainTransient,
-              usageType: AndroidUsageType.voiceCommunicationSignalling,
-              contentType: AndroidContentType.sonification,
+              usageType: AndroidUsageType.voiceCommunication,
+              contentType: AndroidContentType.speech,
             ),
           ),
         )
