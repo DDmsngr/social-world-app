@@ -95,6 +95,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 12),
           GlassCard(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            onTap: () => context.push(Routes.shareApp),
+            child: Row(
+              children: [
+                Icon(Icons.qr_code_2, color: AppColors.primaryTint),
+                const SizedBox(width: 14),
+                const Expanded(child: Text('Поделиться приложением')),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             onTap: () => context.push(Routes.inviteContacts),
             child: Row(
               children: [

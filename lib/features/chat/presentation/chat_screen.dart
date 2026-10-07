@@ -390,11 +390,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           if (info != null && isDirect && info.peerId != null && CallKit.supported) ...[
             IconButton(
               onPressed: () => _call(info, video: true),
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 38, height: 40),
+              iconSize: 22,
               tooltip: 'Видеозвонок',
               icon: const Icon(Icons.videocam_outlined),
             ),
             IconButton(
               onPressed: () => _call(info, video: false),
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 38, height: 40),
+              iconSize: 22,
               tooltip: 'Позвонить',
               icon: const Icon(Icons.call_outlined),
             ),
@@ -408,6 +414,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
           PopupMenuButton<String>(
             tooltip: 'Ещё',
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            iconSize: 22,
             color: AppColors.ink2,
             onSelected: (value) => _onMenu(value, info?.displayName ?? widget.peerName, isDirect, info?.peerAvatarUrl, settings),
             itemBuilder: (_) => [
