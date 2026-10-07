@@ -41,6 +41,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     NotificationKind.questRemoved ||
     NotificationKind.questCancelled => Icons.flag_circle_outlined,
     NotificationKind.needResponse => Icons.volunteer_activism_outlined,
+    NotificationKind.referralJoined => Icons.person_add_alt_1_outlined,
+    NotificationKind.referralReward || NotificationKind.referralConfirmed => Icons.stars_outlined,
+    NotificationKind.referralCancelled => Icons.remove_circle_outline,
   };
 
   @override

@@ -6,6 +6,8 @@ import 'package:flutter/widgets.dart' show RouterDelegate;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/presentation/providers/auth_providers.dart';
+import '../../features/referrals/invite_claimer.dart';
+import '../../features/referrals/invites.dart';
 import '../../features/referrals/presentation/providers/referrals_providers.dart';
 import '../debug/app_log.dart';
 import '../router/app_router.dart';
@@ -80,6 +82,14 @@ class DeepLinkService {
     }
     _lastUri = uri.toString();
     _lastAt = now;
+
+    // Личное приглашение …/r/<код>: запоминаем до входа (регистрация может
+    // занять время), связываем с пригласившим, когда человек уже внутри.
+    final invite = InviteLinks.parse(uri);
+    if (invite != null) {
+      unawaited(PendingInvite.save(invite, 'link').then((_) => _ref.read(inviteClaimerProvider).run()));
+      return;
+    }
 
     final referral = DeepLinks.parseReferralCode(uri);
     if (referral != null) _pendingReferral = referral;

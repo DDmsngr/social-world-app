@@ -13,6 +13,22 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Отпечаток устройства для антифрода приглашений (lib/features/referrals):
+        // Android ID переживает переустановку приложения, на сервер уходит
+        // только его хеш.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "chawo/device")
+            .setMethodCallHandler { call, result ->
+                if (call.method == "androidId") {
+                    result.success(
+                        android.provider.Settings.Secure.getString(
+                            contentResolver,
+                            android.provider.Settings.Secure.ANDROID_ID,
+                        ),
+                    )
+                } else {
+                    result.notImplemented()
+                }
+            }
         // Ярлык чата на рабочем столе (lib/core/shortcuts/home_shortcut.dart).
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "chawo/shortcuts")
             .setMethodCallHandler { call, result ->

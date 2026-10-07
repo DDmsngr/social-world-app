@@ -25,7 +25,11 @@ enum NotificationKind {
   questRejected('quest_rejected'),
   questRemoved('quest_removed'),
   questCancelled('quest_cancelled'),
-  needResponse('need_response');
+  needResponse('need_response'),
+  referralJoined('referral_joined'),
+  referralReward('referral_reward'),
+  referralConfirmed('referral_confirmed'),
+  referralCancelled('referral_cancelled');
 
   const NotificationKind([this._wire]);
 
@@ -90,7 +94,21 @@ class AppNotification {
       NotificationKind.questRemoved => 'Вас исключили из квеста$about',
       NotificationKind.questCancelled => 'Квест отменён$about',
       NotificationKind.needResponse => '$who готов помочь с вашей просьбой$about',
+      NotificationKind.referralJoined => '$who зарегистрировался по вашему приглашению',
+      NotificationKind.referralReward => _rewardText(who),
+      NotificationKind.referralConfirmed => '+${title ?? ''} баллов подтверждено',
+      NotificationKind.referralCancelled => 'Начисление ${title ?? ''} баллов отменено',
     };
+  }
+
+  /// title — «сумма:уровень» (миграция 0059).
+  String _rewardText(String who) {
+    final parts = (title ?? '').split(':');
+    final amount = parts.first;
+    final level = parts.length > 1 ? parts[1] : '1';
+    return level == '1'
+        ? '$who выполнил условия приглашения: +$amount баллов, ожидают подтверждения'
+        : 'Ваш реферал пригласил нового пользователя: +$amount баллов, ожидают подтверждения';
   }
 
   AppNotification asRead() => AppNotification(

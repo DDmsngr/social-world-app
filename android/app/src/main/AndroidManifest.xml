@@ -81,6 +81,15 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="ddmsngr.github.io" android:pathPrefix="/social-world/o"/>
             </intent-filter>
+            <!-- Личные приглашения https://api-socialworld.deepdrift.tech/r/<код>:
+                 стоит приложение — открывается сразу в нём, нет — страница
+                 с кнопкой «Скачать». -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="api-socialworld.deepdrift.tech" android:pathPrefix="/r/"/>
+            </intent-filter>
         </activity>
         <!-- Пуши, пришедшие в фоне, рисует система: ей нужны монохромная иконка
              и канал по умолчанию (каналы создаёт приложение, lib/core/push). -->

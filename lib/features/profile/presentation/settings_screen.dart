@@ -100,7 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Icon(Icons.qr_code_2, color: AppColors.primaryTint),
                 const SizedBox(width: 14),
-                const Expanded(child: Text('Поделиться приложением')),
+                const Expanded(child: Text('Пригласить в ChaWo')),
                 Icon(Icons.chevron_right, color: AppColors.textFaint),
               ],
             ),

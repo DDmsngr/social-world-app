@@ -391,6 +391,15 @@ function notificationText(kind: string, who: string, title: string | null): stri
     case "quest_removed": return `Вас исключили из квеста${about}`;
     case "quest_cancelled": return `Квест отменён${about}`;
     case "need_response": return `${who} готов помочь с вашей просьбой${about}`;
+    case "referral_joined": return `${who} зарегистрировался по вашему приглашению`;
+    case "referral_reward": {
+      const [amount, level] = (title ?? "").split(":");
+      return level === "1"
+        ? `${who} выполнил условия приглашения: +${amount} баллов, ожидают подтверждения`
+        : `Ваш реферал пригласил нового пользователя: +${amount} баллов, ожидают подтверждения`;
+    }
+    case "referral_confirmed": return `+${title ?? ""} баллов подтверждено`;
+    case "referral_cancelled": return `Начисление ${title ?? ""} баллов отменено`;
     default: return "Новое уведомление";
   }
 }

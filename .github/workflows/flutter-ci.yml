@@ -376,6 +376,7 @@ jobs:
             echo "put manifest.own.json manifest.json.new"
             echo "-rm manifest.json"
             echo "rename manifest.json.new manifest.json"
+            echo "put tools/invite-page/r.html r.html"
           } > "$RUNNER_TEMP/sftp.batch"
           sftp -i "$RUNNER_TEMP/swupd_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
             -b "$RUNNER_TEMP/sftp.batch" "swupd@${HOST}"
