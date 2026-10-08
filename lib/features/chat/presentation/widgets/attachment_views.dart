@@ -391,7 +391,8 @@ class VideoNotePlayer extends ConsumerStatefulWidget {
 }
 
 class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
-  static const _size = 200.0;
+  // Со звуком кружок вырастает: смотрят его обычно уже вблизи.
+  double get _size => _ready && _controller.value.volume > 0 ? 280.0 : 200.0;
   late final VideoPlayerController _controller;
   bool _ready = false;
 
@@ -441,7 +442,7 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
   }
 
   double _fractionAt(Offset local) {
-    const r = _size / 2;
+    final r = _size / 2;
     final dx = local.dx - r;
     final dy = local.dy - r;
     var angle = math.atan2(dx, -dy); // от верха по часовой, -π..π
@@ -528,7 +529,11 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
           },
         ),
       },
-      child: SizedBox.square(
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: SizedBox.square(
         dimension: _size,
         child: Stack(
           alignment: Alignment.center,
@@ -550,7 +555,7 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
             ),
             if (withSound)
               CustomPaint(
-                size: const Size.square(_size),
+                size: Size.square(_size),
                 painter: _RingPainter(
                   progress: (_scrubbing ? _scrubFraction : progress).clamp(0.0, 1.0),
                   color: AppColors.primaryTint,
@@ -587,6 +592,7 @@ class _VideoNotePlayerState extends ConsumerState<VideoNotePlayer> {
                 ),
               ),
           ],
+        ),
         ),
       ),
     );

@@ -94,7 +94,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   /// исчезли: они ещё мгновение остаются на своём месте и растворяются.
   List<ChatMessage> _lastItems = const [];
   final _ghosts = <String, ({ChatMessage message, String? after})>{};
-  static const _vanishFor = Duration(milliseconds: 420);
+  static const _vanishFor = Duration(milliseconds: 600);
 
   /// Сколько моих сообщений собеседник уже прочитал и когда это число выросло
   /// в последний раз: по этому узнаём, что он прямо сейчас в чате.
@@ -718,6 +718,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     if (_ghosts.containsKey(message.id)) {
                       return _Vanish(
                         key: ValueKey('vanish-${message.id}'),
+                        mine: mine,
                         child: IgnorePointer(
                           child: MessageBubble(
                             message: message,
@@ -1415,9 +1416,10 @@ class _Arrive extends StatelessWidget {
 /// Исчезновение удалённого сообщения: тает, слегка уменьшается, а место под
 /// ним схлопывается, и соседи плавно съезжаются.
 class _Vanish extends StatefulWidget {
-  const _Vanish({super.key, required this.child});
+  const _Vanish({super.key, required this.child, required this.mine});
 
   final Widget child;
+  final bool mine;
 
   @override
   State<_Vanish> createState() => _VanishState();
@@ -1437,15 +1439,22 @@ class _VanishState extends State<_Vanish> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final fade = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
-    final collapse = CurvedAnimation(parent: _controller, curve: const Interval(0.35, 1, curve: Curves.easeInOut));
+    final fade = CurvedAnimation(parent: _controller, curve: const Interval(0, 0.7, curve: Curves.easeIn));
+    final collapse = CurvedAnimation(parent: _controller, curve: const Interval(0.45, 1, curve: Curves.easeInOut));
+    // Сообщение сжимается и уезжает к своему краю, а соседние сдвигаются следом.
     return SizeTransition(
       sizeFactor: ReverseAnimation(collapse),
-      child: FadeTransition(
-        opacity: ReverseAnimation(fade),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 1, end: 0.88).animate(fade),
-          child: widget.child,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset.zero,
+          end: Offset(widget.mine ? 0.5 : -0.5, 0),
+        ).animate(fade),
+        child: FadeTransition(
+          opacity: ReverseAnimation(fade),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 1, end: 0.5).animate(fade),
+            child: widget.child,
+          ),
         ),
       ),
     );

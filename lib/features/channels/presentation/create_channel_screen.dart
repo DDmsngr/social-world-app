@@ -1,10 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../profile/presentation/avatar_crop_screen.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../data/channels_repository.dart';
 import 'providers/channel_providers.dart';
@@ -25,6 +31,7 @@ class _CreateChannelScreenState extends ConsumerState<CreateChannelScreen> {
   var _public = true;
   var _topic = ChannelTopic.other;
   var _busy = false;
+  String? _avatarPath;
 
   static final _handleRe = RegExp(r'^[a-z0-9_]{4,32}$');
 
@@ -40,6 +47,13 @@ class _CreateChannelScreenState extends ConsumerState<CreateChannelScreen> {
       _title.text.trim().isNotEmpty &&
       (!_public || _handleRe.hasMatch(_handle.text.trim().toLowerCase()));
 
+  Future<void> _pickAvatar() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked == null || !mounted) return;
+    final path = await openAvatarCrop(context, source: picked.path);
+    if (path != null && mounted) setState(() => _avatarPath = path);
+  }
+
   Future<void> _create() async {
     setState(() => _busy = true);
     try {
@@ -50,6 +64,15 @@ class _CreateChannelScreenState extends ConsumerState<CreateChannelScreen> {
         topic: _topic,
         handle: _public ? _handle.text.trim().toLowerCase() : null,
       );
+      final avatar = _avatarPath;
+      if (avatar != null) {
+        // Канал уже создан: если фото не загрузилось, это не повод терять его.
+        try {
+          await ref.read(channelsRepositoryProvider).setAvatar(id, avatar);
+        } catch (error) {
+          AppLog.add('Аватар нового канала: $error');
+        }
+      }
       ref.invalidate(conversationsProvider);
       if (!mounted) return;
       context.pushReplacement(Routes.channel(id));
@@ -76,6 +99,35 @@ class _CreateChannelScreenState extends ConsumerState<CreateChannelScreen> {
       body: ListView(
         padding: AppSpacing.page(context, top: 16),
         children: [
+          Center(
+            child: Semantics(
+              button: true,
+              label: 'Фото канала',
+              child: GestureDetector(
+                onTap: _busy ? null : _pickAvatar,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 44,
+                      backgroundColor: AppColors.ink,
+                      foregroundImage: _avatarPath == null ? null : FileImage(File(_avatarPath!)),
+                      child: Icon(Icons.campaign_outlined, size: 38, color: AppColors.primaryTint),
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: AppColors.primary,
+                        child: const Icon(Icons.camera_alt_outlined, size: 16, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
           TextField(
             controller: _title,
             maxLength: 80,
