@@ -90,7 +90,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// Самый новый из постов, которые сейчас на экране, запоминается как место,
   /// где остановились: при возвращении лента откроется на нём, даже если
   /// новых постов набежало сотня.
-  void _saveSeen() {
+  void _saveSeen({bool updateCounter = true}) {
     final box = _viewKey.currentContext?.findRenderObject();
     if (box is! RenderBox || !box.attached || !box.hasSize) return;
     final top = box.localToGlobal(Offset.zero).dy;
@@ -107,14 +107,25 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         if (newest == null || at.isAfter(newest)) newest = at;
       }
     }
-    if (newest != null) ChannelSeen.save(widget.channelId, newest);
+    if (newest != null) {
+      ChannelSeen.save(widget.channelId, newest);
+      // Счётчик у кнопки «вниз»: сколько постов ниже самого свежего из тех,
+      // что сейчас на экране, — ещё не виденные. Уменьшается по мере прокрутки.
+      final below = _items.where((p) => p.message.sentAt.isAfter(newest!)).length;
+      if (updateCounter && below != _unreadBelow && mounted) setState(() => _unreadBelow = below);
+    }
   }
+
+  /// Посты ленты (от новых к старым) — для счётчика непрочитанных ниже.
+  List<ChannelPost> _items = const [];
+  var _unreadBelow = 0;
 
   @override
   void deactivate() {
     // Уходим с экрана: фиксируем место, пока карточки ещё в дереве.
     _seenTimer?.cancel();
-    _saveSeen();
+    // Дерево уже разбирается — перерисовывать счётчик нельзя.
+    _saveSeen(updateCounter: false);
     super.deactivate();
   }
 
@@ -325,6 +336,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
             ? items
             : [for (final p in items) if (!p.message.sentAt.isAfter(anchor)) p];
         _newerCount = newer.length;
+        _items = items;
 
         SliverList list(List<ChannelPost> posts) => SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -414,9 +426,10 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                 scale: _showDown ? 1 : 0,
                 duration: const Duration(milliseconds: 180),
                 child: Badge(
-                  isLabelVisible: _newerCount > 0 && _scroll.hasClients && _scroll.position.pixels > 0,
-                  label: Text('$_newerCount'),
+                  isLabelVisible: _unreadBelow > 0,
+                  label: Text(_unreadBelow > 99 ? '99+' : '$_unreadBelow'),
                   backgroundColor: AppColors.primaryTint,
+                  offset: const Offset(-4, -6),
                   child: FloatingActionButton.small(
                     heroTag: null,
                     onPressed: _scrollDown,
