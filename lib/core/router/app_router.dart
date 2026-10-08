@@ -19,6 +19,7 @@ import '../../features/chat/presentation/group_screens.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
+import '../../features/create/presentation/compose_screen.dart';
 import '../../features/create/presentation/create_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
 import '../../features/discover/presentation/place_screen.dart';
@@ -79,6 +80,9 @@ abstract final class Routes {
   /// Список событий открывается с карты («Пульс города»), вкладки у него нет.
   static const events = '/events';
   static const create = '/create';
+
+  /// Форма создания момента, статьи или события: `/compose/<вид>`.
+  static const compose = '/compose';
   static const chats = '/chats';
 
   /// Экран звонка поверх всего; открывает его CallController.
@@ -388,6 +392,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.security,
         builder: (_, _) => const SecurityScreen(),
+      ),
+      GoRoute(
+        path: '${Routes.compose}/:kind',
+        builder: (_, state) => ComposeScreen(
+          kind: ComposeKind.fromSegment(state.pathParameters['kind']),
+        ),
       ),
       GoRoute(
         path: Routes.events,

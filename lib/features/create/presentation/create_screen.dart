@@ -1,529 +1,198 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
-import '../../../core/debug/app_log.dart';
-import '../../../core/errors/friendly_error.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
-import '../../../core/widgets/sw_widgets.dart';
-import '../../discover/domain/entities/place.dart';
-import '../../discover/presentation/providers/discover_providers.dart';
-import '../../events/data/address_resolver.dart';
-import '../../events/domain/entities/event_route.dart';
-import '../../events/presentation/providers/events_providers.dart';
-import '../../events/presentation/widgets/event_route_editor.dart';
-import '../../feed/domain/entities/post.dart';
-import '../../feed/presentation/providers/feed_providers.dart';
-import '../../feed/presentation/providers/publish_settings_provider.dart';
-import '../../feed/presentation/widgets/publish_settings_panel.dart';
-import '../../feed/domain/repositories/feed_repository.dart';
 import '../../routes/presentation/providers/route_recorder.dart';
-import 'widgets/article_editor.dart';
-import 'widgets/article_media.dart';
-import 'widgets/composer_parts.dart';
-import 'widgets/post_body_editor.dart';
+import 'compose_screen.dart';
 
-enum _CreateKind {
-  moment('Момент'),
-  article('Статья'),
-  event('Событие'),
-  route('Маршрут');
-
-  const _CreateKind(this.label);
-
-  final String label;
-
-  bool get isPost => this == moment || this == article;
-}
-
-String _formatStartsAt(DateTime time) {
-  final dd = time.day.toString().padLeft(2, '0');
-  final mm = time.month.toString().padLeft(2, '0');
-  final hh = time.hour.toString().padLeft(2, '0');
-  final min = time.minute.toString().padLeft(2, '0');
-  return '$dd.$mm, $hh:$min';
-}
-
-class CreateScreen extends ConsumerStatefulWidget {
+/// Вкладка «+»: только выбор, что создать. Каждая карточка ведёт на свой
+/// сфокусированный экран, где нет ничего лишнего. Раньше здесь была одна
+/// длинная форма с переключателем видов, местом, настройками и кнопкой в
+/// самом низу, и человек терялся, не успев начать.
+class CreateScreen extends ConsumerWidget {
   const CreateScreen({super.key});
 
   @override
-  ConsumerState<CreateScreen> createState() => _CreateScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recording = ref.watch(routeRecorderProvider).isActive;
 
-class _CreateScreenState extends ConsumerState<CreateScreen> {
-  var _kind = _CreateKind.moment;
+    void open(String location) => context.push(location);
 
-  final _bodyController = TextEditingController();
-  final _titleController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _picker = ImagePicker();
-  final _geocoder = NominatimGeocoder();
-  final _attachments = <XFile>[];
-  final _article = ArticleController();
-  var _markdown = false;
-
-  // Место храним целиком, а не только название: у places title не уникален
-  // (тем более при краудсорсинге), резолвить id обратно по строке нельзя.
-  Place? _selectedPlace;
-  DateTime? _startsAt;
-  var _routePoints = <EventRoutePoint>[];
-  bool _busy = false;
-
-  /// Больше четырёх карточка в ленте всё равно не покажет внятно, а вес
-  /// публикации растёт линейно.
-  static const _maxAttachments = 4;
-
-  @override
-  void initState() {
-    super.initState();
-    _article.addListener(() {
-      if (mounted) setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _article.dispose();
-    _bodyController.dispose();
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  void _resetForm() {
-    _bodyController.clear();
-    _article.clear();
-    _titleController.clear();
-    _descriptionController.clear();
-    _attachments.clear();
-    _routePoints = [];
-    _selectedPlace = null;
-    _startsAt = null;
-    _markdown = false;
-  }
-
-  Future<void> _publish() async {
-    setState(() => _busy = true);
-    try {
-      if (_kind.isPost) {
-        await _publishPost();
-      } else {
-        await _publishEvent();
-      }
-      if (!mounted) return;
-      setState(() {
-        _resetForm();
-        _busy = false;
-      });
-    } catch (error) {
-      // Загрузка вложений — самое частое место реального падения здесь, а
-      // snackbar не говорит, что именно отказало (сеть, RLS, лимит размера
-      // на прокси). Без adb это единственный способ увидеть причину.
-      AppLog.add('Публикация не удалась: $error');
-      if (!mounted) return;
-      setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(friendlyError(error, fallback: 'Не удалось опубликовать')),
-        ),
-      );
-    }
-  }
-
-  Future<void> _publishPost() async {
-    final isArticle = _kind == _CreateKind.article;
-    final settings = ref.read(publishSettingsProvider).current;
-
-    final post = await ref.read(feedRepositoryProvider).createPost(
-      body: isArticle ? _article.markdown : _bodyController.text,
-      postType: isArticle ? PostType.article : PostType.moment,
-      title: isArticle ? _titleController.text : null,
-      bodyFormat: isArticle || _markdown ? BodyFormat.markdown : BodyFormat.plain,
-      settings: settings,
-      mediaPaths: [for (final file in _attachments) file.path],
-      placeId: _selectedPlace?.id,
-      placeTitle: _selectedPlace?.title,
-      placeLatitude: _selectedPlace?.latitude,
-      placeLongitude: _selectedPlace?.longitude,
-    );
-
-    // Выбранное в этой публикации становится настройкой по умолчанию для
-    // следующей. Сбой записи на диск не должен портить уже сделанный пост.
-    try {
-      await ref.read(publishSettingsProvider.notifier).rememberAsDefault();
-    } catch (error) {
-      AppLog.add('Настройки публикации не запомнились: $error');
-    }
-
-    ref.read(feedProvider.notifier).prepend(post);
-    ref.invalidate(myPostsProvider);
-    if (mounted) context.go(Routes.feed);
-  }
-
-  Future<void> _publishEvent() async {
-    final event = await ref.read(eventsRepositoryProvider).createEvent(
-      title: _titleController.text,
-      description: _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text,
-      startsAt: _startsAt!,
-      placeId: _selectedPlace?.id,
-      placeTitle: _selectedPlace?.title,
-      routePoints: _routePoints,
-    );
-
-    // Координаты места сервер отдаёт только в city_events — подставляем
-    // их из выбранного места, чтобы метка встала на карту сразу.
-    final placed = event.copyWith(
-      latitude: _selectedPlace?.latitude,
-      longitude: _selectedPlace?.longitude,
-    );
-    ref.read(eventsProvider.notifier).append(placed);
-
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    final router = GoRouter.of(context);
-    context.go(Routes.home);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(placed.hasLocation ? 'Событие на карте' : 'Событие создано'),
-        action: SnackBarAction(
-          label: 'Открыть',
-          onPressed: () =>
-              router.push('${Routes.eventDetail}/${placed.id}', extra: placed),
-        ),
+    final options = [
+      _Option(
+        icon: Icons.bolt_outlined,
+        title: 'Момент',
+        text: 'Пара слов, фото или видео о том, что рядом прямо сейчас',
+        onTap: () => open('${Routes.compose}/${ComposeKind.moment.segment}'),
+        primary: true,
       ),
-    );
-  }
-
-  int get _freeSlots => _maxAttachments - _attachments.length;
-
-  Future<void> _addPhotos() async {
-    final picked = await _picker.pickMultiImage(imageQuality: 85);
-    if (picked.isEmpty) return;
-    setState(() => _attachments.addAll(picked.take(_freeSlots)));
-  }
-
-  Future<void> _shootPhoto() async {
-    final shot = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (shot == null) return;
-    setState(() => _attachments.add(shot));
-  }
-
-  Future<void> _addVideo() async {
-    // Минута — осознанный потолок: длинное видео на мобильном интернете не
-    // загрузится, а пост с вечным индикатором хуже, чем пост без видео.
-    final video = await _picker.pickVideo(
-      source: ImageSource.gallery,
-      maxDuration: const Duration(minutes: 1),
-    );
-    if (video == null) return;
-    setState(() => _attachments.add(video));
-  }
-
-  FeedRepository get _feedRepo => ref.read(feedRepositoryProvider);
-
-  void _uploadFailed(Object error) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(friendlyError(error, fallback: 'Не загрузилось'))),
-    );
-  }
-
-  /// Фото и видео в тексте статьи нужны в хранилище ещё до публикации, чтобы
-  /// получить ссылку для Markdown.
-  Future<List<String>> _pickArticleImages(int limit, UploadProgress onProgress) =>
-      pickArticleImages(
-        picker: _picker,
-        repository: _feedRepo,
-        limit: limit,
-        onError: _uploadFailed,
-        onProgress: onProgress,
-      );
-
-  Future<String?> _pickArticleVideo(UploadProgress onProgress) => pickArticleVideo(
-    picker: _picker,
-    repository: _feedRepo,
-    onError: _uploadFailed,
-    onProgress: onProgress,
-  );
-
-  Future<void> _pickStartsAt() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _startsAt ?? now.add(const Duration(days: 1)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-    );
-    if (date == null || !mounted) return;
-
-    final time = await showTimePicker(
-      context: context,
-      initialTime: _startsAt == null
-          ? const TimeOfDay(hour: 19, minute: 0)
-          : TimeOfDay.fromDateTime(_startsAt!),
-    );
-    if (time == null) return;
-
-    setState(() {
-      _startsAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    });
-  }
-
-  bool get _canPublish {
-    if (_busy) return false;
-    return switch (_kind) {
-      _CreateKind.moment =>
-        _bodyController.text.trim().length >= 3 || _attachments.isNotEmpty,
-      _CreateKind.article =>
-        _titleController.text.trim().length >= 3 &&
-            _article.markdown.trim().length >= 20 &&
-            _article.markdown.length <= ArticleController.maxLength,
-      _CreateKind.event =>
-        _titleController.text.trim().length >= 3 && _startsAt != null,
-      _CreateKind.route => false,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final places = ref.watch(discoverDataProvider).value?.places ?? const <Place>[];
-    final center = ref.watch(discoverCenterProvider).value;
-    final theme = Theme.of(context);
+      _Option(
+        icon: Icons.article_outlined,
+        title: 'Статья',
+        text: 'Длинный текст с фото: обзор места, история, маршрут выходных',
+        onTap: () => open('${Routes.compose}/${ComposeKind.article.segment}'),
+      ),
+      _Option(
+        icon: Icons.timeline,
+        title: 'Маршрут',
+        text: 'Запишите путь по городу и поделитесь им с фото на карте',
+        onTap: () => open(Routes.routeRecorder),
+      ),
+      _Option(
+        icon: Icons.event_outlined,
+        title: 'Событие',
+        text: 'Соберите людей: дата, место, при желании маршрут',
+        onTap: () => open('${Routes.compose}/${ComposeKind.event.segment}'),
+      ),
+      _Option(
+        icon: Icons.flag_outlined,
+        title: 'Квест',
+        text: 'Задание или встреча со своими правилами и заявками',
+        onTap: () => open(Routes.createQuest),
+      ),
+      _Option(
+        icon: Icons.volunteer_activism_outlined,
+        title: 'Мне надо',
+        text: 'Попросите помощи у тех, кто рядом',
+        onTap: () => open(Routes.createNeed),
+      ),
+    ];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Создать')),
       body: ListView(
         padding: AppSpacing.page(context, top: AppSpacing.gutter),
         children: [
-          const SectionLabel('Что публикуем'),
-          const SizedBox(height: 14),
-          SegmentedButton<_CreateKind>(
-            showSelectedIcon: false,
-            segments: [
-              for (final kind in _CreateKind.values)
-                ButtonSegment(
-                  value: kind,
-                  label: Text(kind.label, style: const TextStyle(fontSize: 13)),
-                ),
-            ],
-            selected: {_kind},
-            onSelectionChanged: (selected) =>
-                setState(() => _kind = selected.first),
+          Semantics(
+            header: true,
+            child: Text('Что создаём?', style: AppTypography.serif(32)),
           ),
-          const SizedBox(height: 10),
-          // Квест и «Мне надо» — со своими формами и правилами (п. 48), а не
-          // пятым-шестым сегментом: в одну строку они уже не помещаются.
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push(Routes.createQuest),
-                  icon: const Icon(Icons.flag_outlined, size: 18),
-                  label: const Text('Квест'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push(Routes.createNeed),
-                  icon: const Icon(Icons.volunteer_activism_outlined, size: 18),
-                  label: const Text('Мне надо'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          // Маршрут не пишется формой: его записывает отдельный экран, пока
-          // человек идёт по городу.
-          if (_kind == _CreateKind.route) ...[
-            Text('Пройдите город\nи покажите путь', style: AppTypography.serif(32)),
-            const SizedBox(height: 14),
-            Text(
-              'Приложение запишет ваш путь, даже если его свернуть: идёт, пока '
-              'вы не остановите или не выйдет выбранное время. По дороге можно '
-              'снимать фото — они встанут метками прямо на маршруте. '
-              'Опубликуется только то, что вы сами отправите в ленту.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 22),
-            // Запись уже идёт (в том числе свёрнутая): вторая кнопка «Начать»
-            // не нужна, вместо неё — переход к текущей записи.
-            if (ref.watch(routeRecorderProvider).isActive) ...[
-              Text(
-                'Запись маршрута идёт. Остановить или сохранить её можно на '
-                'экране записи.',
-                style: theme.textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => context.push(Routes.routeRecorder),
-                icon: const Icon(Icons.timeline),
-                label: const Text('К записи маршрута'),
-              ),
-            ] else
-              FilledButton.icon(
-                onPressed: () => context.push(Routes.routeRecorder),
-                icon: const Icon(Icons.timeline),
-                label: const Text('Начать запись'),
-              ),
-          ],
-          if (_kind == _CreateKind.moment) ...[
-            Text('Что происходит\nв городе?', style: AppTypography.serif(32)),
-            const SizedBox(height: 18),
-            PostBodyEditor(
-              controller: _bodyController,
-              markdown: _markdown,
-              onMarkdownChanged: (value) => setState(() => _markdown = value),
-              maxLength: 500,
-              onChanged: () => setState(() {}),
-            ),
-          ],
-          if (_kind == _CreateKind.article) ...[
-            Text('Расскажите\nподробно', style: AppTypography.serif(32)),
-            const SizedBox(height: 8),
-            Text(
-              'Заголовок, текст и до 10 фото между абзацами: маршрут выходных, '
-              'обзор места, история.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 18),
-            TextField(
-              controller: _titleController,
-              maxLength: 160,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(hintText: 'Заголовок'),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 10),
-            ArticleEditor(
-              controller: _article,
-              onPickImages: _pickArticleImages,
-              onPickVideo: _pickArticleVideo,
-            ),
-          ],
-          if (_kind == _CreateKind.moment) ...[
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                AttachButton(
-                  icon: Icons.photo_library_outlined,
-                  label: 'Фото',
-                  onTap: _freeSlots == 0 ? null : _addPhotos,
-                ),
-                const SizedBox(width: 8),
-                AttachButton(
-                  icon: Icons.photo_camera_outlined,
-                  label: 'Снять',
-                  onTap: _freeSlots == 0 ? null : _shootPhoto,
-                ),
-                const SizedBox(width: 8),
-                if (_kind == _CreateKind.moment)
-                  AttachButton(
-                    icon: Icons.videocam_outlined,
-                    label: 'Видео',
-                    onTap: _freeSlots == 0 ? null : _addVideo,
-                  ),
-              ],
-            ),
-            if (_attachments.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 92,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _attachments.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (_, index) => AttachmentThumb(
-                    file: _attachments[index],
-                    onRemove: () => setState(() => _attachments.removeAt(index)),
-                  ),
-                ),
-              ),
-            ],
-          ],
-          if (_kind == _CreateKind.event) ...[
-            Text('Соберите\nлюдей на событие', style: AppTypography.serif(32)),
-            const SizedBox(height: 18),
-            TextField(
-              controller: _titleController,
-              maxLength: 80,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(hintText: 'Название события'),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _descriptionController,
-              maxLines: 4,
-              maxLength: 500,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                hintText: 'О чём событие, что взять с собой',
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _pickStartsAt,
-              icon: const Icon(Icons.event_outlined),
-              label: Text(
-                _startsAt == null ? 'Выбрать дату и время' : _formatStartsAt(_startsAt!),
-              ),
-            ),
-            const SizedBox(height: 18),
-          ],
-          if (_kind != _CreateKind.route) ...[
-            const SizedBox(height: 10),
-            const SectionLabel('Место'),
+          const SizedBox(height: 16),
+          // Запись маршрута может идти свёрнутой: напоминаем о ней сверху, чтобы
+          // не начинать вторую.
+          if (recording) ...[
+            _RecordingCard(onTap: () => open(Routes.routeRecorder)),
             const SizedBox(height: 12),
-            Text(
-              'Необязательно. Указывается название места, а не ваши координаты.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 12),
-            PlacePicker(
-              places: places,
-              selectedId: _selectedPlace?.id,
-              onChanged: (place) => setState(() => _selectedPlace = place),
-            ),
           ],
-          if (_kind == _CreateKind.event) ...[
-            const SizedBox(height: 22),
-            EventRouteEditor(
-              points: _routePoints,
-              onChanged: (points) => setState(() => _routePoints = points),
-              resolver: AddressResolver(places: places, geocoder: _geocoder),
-              mapCenterLatitude: center?.latitude ?? discoverCenterLatitude,
-              mapCenterLongitude: center?.longitude ?? discoverCenterLongitude,
-            ),
-          ],
-          if (_kind.isPost) ...[
-            const SizedBox(height: 22),
-            const PublishSettingsPanel(),
-          ],
-          if (_kind != _CreateKind.route) ...[
-            const SizedBox(height: 26),
-            FilledButton(
-              onPressed: _canPublish ? _publish : null,
-              child: _busy
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Опубликовать'),
-            ),
+          for (final option in options) ...[
+            option,
+            const SizedBox(height: 10),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _Option extends StatelessWidget {
+  const _Option({
+    required this.icon,
+    required this.title,
+    required this.text,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+  final VoidCallback onTap;
+
+  /// Самое частое действие выделено цветом: оно же первое под рукой.
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = primary ? AppColors.primary : AppColors.card;
+    final foreground = primary ? AppColors.onPrimary : AppColors.text;
+    final secondary = primary ? AppColors.onPrimary.withValues(alpha: 0.82) : AppColors.textDim;
+    return Semantics(
+      button: true,
+      label: '$title. $text',
+      excludeSemantics: true,
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 76),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              border: primary ? null : Border.all(color: AppColors.hair),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: primary
+                        ? AppColors.onPrimary.withValues(alpha: 0.18)
+                        : AppColors.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: primary ? AppColors.onPrimary : AppColors.primaryTint),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: foreground),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(text, style: TextStyle(fontSize: 13, height: 1.3, color: secondary)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right, color: secondary),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecordingCard extends StatelessWidget {
+  const _RecordingCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primary.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(Icons.fiber_manual_record, size: 14, color: AppColors.primaryTint),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('Идёт запись маршрута')),
+              Text(
+                'К записи',
+                style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryTint),
+              ),
+              Icon(Icons.chevron_right, color: AppColors.primaryTint),
+            ],
+          ),
+        ),
       ),
     );
   }
