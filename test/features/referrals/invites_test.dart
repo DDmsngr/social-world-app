@@ -37,7 +37,7 @@ void main() {
       actorName: 'Аня',
       title: '100:1',
     );
-    expect(reward.text, 'Аня выполнил условия приглашения: +100 баллов, ожидают подтверждения');
+    expect(reward.text, 'Аня зарегистрировался по вашему приглашению: +100 баллов');
     final deep = AppNotification(
       id: 'n',
       kind: NotificationKind.referralReward,

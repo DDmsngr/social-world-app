@@ -15,7 +15,7 @@ class ChatSound {
 
 const chatSounds = [
   ChatSound('ding', 'Колокольчик'),
-  ChatSound('pop', 'Хлопок'),
+  ChatSound('pop', 'Пузырёк'),
   ChatSound('chime', 'Мелодия'),
   ChatSound('drop', 'Капля'),
   ChatSound('knock', 'Стук'),

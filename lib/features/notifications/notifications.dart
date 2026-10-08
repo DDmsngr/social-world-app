@@ -109,8 +109,8 @@ class AppNotification {
     final amount = parts.first;
     final level = parts.length > 1 ? parts[1] : '1';
     return level == '1'
-        ? '$who выполнил условия приглашения: +$amount баллов, ожидают подтверждения'
-        : 'Ваш реферал пригласил нового пользователя: +$amount баллов, ожидают подтверждения';
+        ? '$who зарегистрировался по вашему приглашению: +$amount баллов'
+        : 'Ваш реферал пригласил нового пользователя: +$amount баллов';
   }
 
   AppNotification asRead() => AppNotification(

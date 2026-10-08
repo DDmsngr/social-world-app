@@ -18,6 +18,15 @@ const _prefsKey = 'presence_enabled';
 /// чаще незачем будить GPS.
 const _interval = Duration(minutes: 15);
 
+/// Какую точность запрашивать у телефона для размытой точки присутствия.
+/// Размытие от километра — самый экономный режим (сети и вышки), от 500 м —
+/// средний, меньше — обычный.
+LocationAccuracy presenceAccuracyFor(int blurMeters) {
+  if (blurMeters >= 1000) return LocationAccuracy.low;
+  if (blurMeters >= 500) return LocationAccuracy.medium;
+  return LocationAccuracy.high;
+}
+
 /// Видно ли меня другим на карте «Рядом».
 ///
 /// Хранится на устройстве, а не в профиле: строка в `locations` существует
@@ -117,7 +126,16 @@ class PresencePublisher {
       }
       if (!await Geolocator.isLocationServiceEnabled()) return;
 
-      final position = await Geolocator.getCurrentPosition();
+      // Точку всё равно размываем на сотни метров и больше, поэтому точный GPS
+      // не нужен: хватает Wi-Fi и вышек, и датчик не греется. Чем крупнее
+      // размытие, тем грубее (и экономнее) определение.
+      final blurM = _ref.read(currentUserProvider)?.locationBlurM ?? 500;
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: LocationSettings(
+          accuracy: presenceAccuracyFor(blurM),
+          timeLimit: const Duration(seconds: 25),
+        ),
+      );
       if (_disposed) return;
 
       final point = blurredPresenceFor(
