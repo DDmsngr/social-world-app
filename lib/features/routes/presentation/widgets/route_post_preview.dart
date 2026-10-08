@@ -8,7 +8,7 @@ import '../providers/routes_providers.dart';
 import '../route_recorder_screen.dart'
     show formatRouteDistance, formatRouteDuration;
 import 'route_map_marker.dart';
-import 'route_sketch.dart';
+import 'route_tile_preview.dart';
 
 /// Карточка маршрута внутри поста ленты.
 class RoutePostPreview extends ConsumerWidget {
@@ -28,7 +28,7 @@ class RoutePostPreview extends ConsumerWidget {
           data: (data) => Stack(
             fit: StackFit.expand,
             children: [
-              RouteSketch(
+              RouteTilePreview(
                 path: data.path,
                 padding: 18,
                 markers: [
