@@ -1,235 +1,8 @@
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
-
-/// Эмодзи для поля ввода: вставляются в текст на место курсора и ничего не
-/// отправляют. Раньше на этом месте были «стикеры» — те же эмодзи, которые
-/// улетали отдельным сообщением, и человек терял то, что хотел написать.
-const emojiCategories = <(String, List<String>)>[
-  (
-    '😀',
-    [
-      '😀',
-      '😃',
-      '😄',
-      '😁',
-      '😆',
-      '😅',
-      '🤣',
-      '😂',
-      '🙂',
-      '😊',
-      '😇',
-      '🥰',
-      '😍',
-      '🤩',
-      '😘',
-      '😗',
-      '🤗',
-      '🤭',
-      '🤫',
-      '🤔',
-      '😏',
-      '😬',
-      '🤥',
-      '😌',
-      '😴',
-      '🥱',
-      '😎',
-      '🤓',
-      '🧐',
-      '🥳',
-      '🤯',
-      '😱',
-      '😤',
-      '😡',
-      '🤬',
-      '😈',
-      '👿',
-      '💀',
-      '👻',
-      '🤡',
-    ],
-  ),
-  (
-    '❤️',
-    [
-      '❤️',
-      '🧡',
-      '💛',
-      '💚',
-      '💙',
-      '💜',
-      '🖤',
-      '🤍',
-      '🤎',
-      '💔',
-      '❤️‍🔥',
-      '❤️‍🩹',
-      '💖',
-      '💗',
-      '💓',
-      '💞',
-      '💕',
-      '💘',
-      '💝',
-      '💟',
-      '🫶',
-      '🤟',
-      '🤙',
-      '💪',
-    ],
-  ),
-  (
-    '🐱',
-    [
-      '🐶',
-      '🐱',
-      '🐭',
-      '🐹',
-      '🐰',
-      '🦊',
-      '🐻',
-      '🐼',
-      '🐨',
-      '🐯',
-      '🦁',
-      '🐮',
-      '🐷',
-      '🐸',
-      '🐵',
-      '🐧',
-      '🦅',
-      '🦋',
-      '🐛',
-      '🐝',
-      '🐢',
-      '🐍',
-      '🦎',
-      '🐙',
-      '🦈',
-      '🐬',
-      '🐳',
-      '🐠',
-      '🦩',
-      '🦜',
-      '🐓',
-      '🦔',
-    ],
-  ),
-  (
-    '🍕',
-    [
-      '🍎',
-      '🍐',
-      '🍊',
-      '🍋',
-      '🍌',
-      '🍉',
-      '🍇',
-      '🍓',
-      '🍒',
-      '🍑',
-      '🥭',
-      '🍍',
-      '🍕',
-      '🍔',
-      '🌭',
-      '🍟',
-      '🌮',
-      '🌯',
-      '🍣',
-      '🍱',
-      '🍩',
-      '🎂',
-      '🧁',
-      '☕',
-      '🍺',
-      '🍷',
-      '🥂',
-      '🧋',
-      '🥤',
-      '🍵',
-      '🧃',
-      '🍾',
-    ],
-  ),
-  (
-    '✨',
-    [
-      '✨',
-      '⭐',
-      '🌟',
-      '💫',
-      '🔥',
-      '💥',
-      '🎉',
-      '🎊',
-      '🏆',
-      '🥇',
-      '🎯',
-      '🎁',
-      '🎈',
-      '🎀',
-      '🎮',
-      '🕹️',
-      '🎵',
-      '🎶',
-      '🎤',
-      '📱',
-      '💻',
-      '🔒',
-      '🔑',
-      '💡',
-      '⚡',
-      '🌈',
-      '☀️',
-      '🌙',
-      '⛈️',
-      '❄️',
-      '🌊',
-      '🍀',
-    ],
-  ),
-  (
-    '👋',
-    [
-      '👍',
-      '👎',
-      '👊',
-      '✊',
-      '🤛',
-      '🤜',
-      '👏',
-      '🙌',
-      '👐',
-      '🤲',
-      '🤝',
-      '🙏',
-      '✌️',
-      '🤞',
-      '🤟',
-      '🤘',
-      '🤙',
-      '👈',
-      '👉',
-      '👆',
-      '👇',
-      '☝️',
-      '👋',
-      '🤚',
-      '✋',
-      '🖖',
-      '👌',
-      '🤌',
-      '💪',
-      '🦾',
-      '✍️',
-      '🫡',
-    ],
-  ),
-];
 
 /// Вставляет [insert] вместо выделения (или в позицию курсора). Без курсора —
 /// в конец: поле могло ни разу не получить фокус.
@@ -265,152 +38,73 @@ TextEditingValue deleteBeforeSelection(TextEditingValue value) {
   );
 }
 
-/// Панель на месте клавиатуры: недавние, категории, кнопка «стереть».
-class EmojiPanel extends StatefulWidget {
+/// Панель эмодзи на месте клавиатуры: полный набор Unicode (около 3600
+/// эмодзи) по категориям, недавние, оттенки кожи, поиск по-русски и кнопка
+/// «стереть». Эмодзи вставляются в текст и ничего не отправляют.
+class EmojiPanel extends StatelessWidget {
   const EmojiPanel({
     super.key,
     required this.onPick,
     required this.onBackspace,
-    this.height = 280,
+    this.height = 300,
   });
 
   final ValueChanged<String> onPick;
   final VoidCallback onBackspace;
   final double height;
 
-  /// Недавние живут, пока запущено приложение, — этого хватает, чтобы
-  /// любимые эмодзи были под рукой без лишней записи на диск.
-  static final recent = <String>[];
-
-  @override
-  State<EmojiPanel> createState() => _EmojiPanelState();
-}
-
-class _EmojiPanelState extends State<EmojiPanel> {
-  late int _tab = EmojiPanel.recent.isEmpty ? 1 : 0;
-
-  void _pick(String emoji) {
-    HapticFeedback.selectionClick();
-    EmojiPanel.recent
-      ..remove(emoji)
-      ..insert(0, emoji);
-    if (EmojiPanel.recent.length > 32) EmojiPanel.recent.removeLast();
-    widget.onPick(emoji);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final emojis = _tab == 0 ? EmojiPanel.recent : emojiCategories[_tab - 1].$2;
-
     return Container(
-      height: widget.height,
+      height: height,
       color: AppColors.ink2,
-      child: Column(
-        children: [
-          SizedBox(
-            height: 44,
-            child: Row(
-              children: [
-                Expanded(
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    children: [
-                      _Tab(
-                        selected: _tab == 0,
-                        onTap: () => setState(() => _tab = 0),
-                        child: Icon(
-                          Icons.schedule,
-                          size: 20,
-                          color: _tab == 0
-                              ? AppColors.primaryTint
-                              : AppColors.textFaint,
-                        ),
-                      ),
-                      for (var i = 0; i < emojiCategories.length; i++)
-                        _Tab(
-                          selected: _tab == i + 1,
-                          onTap: () => setState(() => _tab = i + 1),
-                          child: Text(
-                            emojiCategories[i].$1,
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: widget.onBackspace,
-                  tooltip: 'Стереть',
-                  icon: Icon(
-                    Icons.backspace_outlined,
-                    color: AppColors.textDim,
-                    size: 20,
-                  ),
-                ),
-              ],
+      child: EmojiPicker(
+        onEmojiSelected: (category, emoji) {
+          HapticFeedback.selectionClick();
+          onPick(emoji.emoji);
+        },
+        onBackspacePressed: onBackspace,
+        config: Config(
+          height: height,
+          locale: const Locale('ru'),
+          // Эмодзи, которых нет в шрифте телефона, не показываем пустыми
+          // квадратами.
+          checkPlatformCompatibility: true,
+          emojiViewConfig: EmojiViewConfig(
+            columns: 8,
+            emojiSizeMax: 30,
+            backgroundColor: AppColors.ink2,
+            recentsLimit: 40,
+            gridPadding: const EdgeInsets.symmetric(horizontal: 6),
+            noRecents: Text(
+              'Здесь появятся недавние',
+              style: TextStyle(fontSize: 15, color: AppColors.textFaint),
+              textAlign: TextAlign.center,
             ),
           ),
-          Divider(height: 1, color: AppColors.hair),
-          Expanded(
-            child: emojis.isEmpty
-                ? Center(
-                    child: Text(
-                      'Здесь появятся недавние',
-                      style: TextStyle(color: AppColors.textFaint),
-                    ),
-                  )
-                : GridView.count(
-                    crossAxisCount: 8,
-                    padding: const EdgeInsets.all(8),
-                    children: [
-                      for (final emoji in emojis)
-                        InkResponse(
-                          onTap: () => _pick(emoji),
-                          child: Center(
-                            child: Text(
-                              emoji,
-                              style: const TextStyle(fontSize: 28),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+          categoryViewConfig: CategoryViewConfig(
+            backgroundColor: AppColors.ink2,
+            indicatorColor: AppColors.primaryTint,
+            iconColor: AppColors.textFaint,
+            iconColorSelected: AppColors.primaryTint,
+            backspaceColor: AppColors.primaryTint,
+            dividerColor: AppColors.hair,
+            tabBarHeight: 44,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Tab extends StatelessWidget {
-  const _Tab({
-    required this.selected,
-    required this.onTap,
-    required this.child,
-  });
-
-  final bool selected;
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: selected ? AppColors.primaryTint : Colors.transparent,
-              width: 2,
-            ),
+          skinToneConfig: const SkinToneConfig(),
+          bottomActionBarConfig: BottomActionBarConfig(
+            backgroundColor: AppColors.ink2,
+            buttonColor: AppColors.card,
+            buttonIconColor: AppColors.textDim,
+          ),
+          searchViewConfig: SearchViewConfig(
+            backgroundColor: AppColors.ink2,
+            buttonIconColor: AppColors.textDim,
+            hintText: 'Поиск эмодзи',
+            inputTextStyle: TextStyle(color: AppColors.text, fontSize: 16),
+            hintTextStyle: TextStyle(color: AppColors.textFaint, fontSize: 16),
           ),
         ),
-        child: child,
       ),
     );
   }

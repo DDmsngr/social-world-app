@@ -279,10 +279,44 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
                 ),
               const SizedBox(height: 10),
               Text(
-                'Если отметку или участие отменят, балл уходит обратно. Баллы за приглашение '
-                'начисляются, когда друг заполнит профиль (имя и фото) и сделает первое действие: '
-                'публикацию, сообщение или подписку. Сначала они ожидают проверки, потом '
-                'подтверждаются. За накрутку баллы снимаются.',
+                'Если отметку или участие отменят, балл уходит обратно.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 22),
+              Text('Как работает приглашение', style: AppTypography.serif(20)),
+              const SizedBox(height: 10),
+              _Step(
+                number: '1',
+                text: 'У каждого есть своя ссылка, код и QR. Они в «Пригласить друзей» '
+                    '(кнопка внизу этого экрана или Настройки → Пригласить в ChaWo). '
+                    'Отправьте ссылку другу или покажите QR.',
+              ),
+              _Step(
+                number: '2',
+                text: 'Друг ставит приложение и регистрируется. Ссылка сама подставится при '
+                    'первом запуске; если не подставилась, друг вводит ваш код вручную '
+                    '(Настройки → «Ввести код места»). Сделать это можно в течение недели '
+                    'после регистрации.',
+              ),
+              _Step(
+                number: '3',
+                text: 'Друг должен «освоиться»: заполнить профиль (имя и фото) и сделать '
+                    'первое действие — публикацию, сообщение или подписку. На это у него две '
+                    'недели.',
+              ),
+              _Step(
+                number: '4',
+                text: 'Тогда вам идут баллы: +${points.first} за друга, а выше по цепочке '
+                    'приглашений получают меньше (${points.skip(1).map((p) => '+$p').join(', ')}). '
+                    'Сначала они «ожидают подтверждения»: идёт проверка, что всё честно. '
+                    'Потом становятся обычными баллами.',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Пригласивший у человека один и навсегда. За одного приглашённого можно '
+                'получить не больше 200 баллов, в день — не больше 30 приглашений. '
+                'Приглашать самого себя, второй аккаунт или одно и то же устройство '
+                'бессмысленно: такие баллы снимаются.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -291,6 +325,33 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
       ),
     );
   }
+}
+
+class _Step extends StatelessWidget {
+  const _Step({required this.number, required this.text});
+
+  final String number;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 11,
+          backgroundColor: AppColors.primary.withValues(alpha: 0.18),
+          child: Text(
+            number,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryTint),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Text(text)),
+      ],
+    ),
+  );
 }
 
 class _Rule extends StatelessWidget {

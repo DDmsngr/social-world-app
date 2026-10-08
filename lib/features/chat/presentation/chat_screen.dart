@@ -95,6 +95,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final _ghosts = <String, ({ChatMessage message, String? after})>{};
   static const _vanishFor = Duration(milliseconds: 420);
 
+  /// Свои только что отправленные сообщения: они вылетают снизу, от поля ввода.
+  final _arriving = <String>{};
+
+  void _trackArrived(List<ChatMessage> items, String myId) {
+    if (_lastItems.isEmpty) return;
+    final before = {for (final m in _lastItems) m.id};
+    for (final m in items) {
+      if (before.contains(m.id) || m.senderId != myId || _arriving.contains(m.id)) continue;
+      // Только свежие: история, подгруженная при переподключении, не «вылетает».
+      if (DateTime.now().difference(m.sentAt).abs() > const Duration(seconds: 20)) continue;
+      _arriving.add(m.id);
+      Future<void>.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) setState(() => _arriving.remove(m.id));
+      });
+    }
+  }
+
   void _trackRemoved(List<ChatMessage> items) {
     final now = {for (final m in items) m.id};
     final gone = [
@@ -602,6 +619,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         for (final m in all)
                           if (!hidden.contains(m.id) && (cleared == null || m.sentAt.isAfter(cleared))) m,
                       ];
+                _trackArrived(items, myId);
                 _trackRemoved(items);
                 final entries = mergeCallsIntoTimeline(_withGhosts(items), [
                   for (final c in calls)
@@ -740,12 +758,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ),
                       ),
                     );
-                    if (!newDay) return item;
+                    final shown = _arriving.contains(message.id)
+                        ? _Arrive(key: ValueKey('arrive-${message.id}'), child: item)
+                        : item;
+                    if (!newDay) return shown;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Center(child: _DayChip(chatDayLabel(message.sentAt, DateTime.now()))),
-                        item,
+                        shown,
                       ],
                     );
                   },
@@ -1328,6 +1349,35 @@ class _CallLogTile extends StatelessWidget {
 }
 
 /// Подпись дня в ленте и плашка с датой при прокрутке.
+/// Появление своего сообщения: вылетает снизу от поля ввода, слегка
+/// «проседает» и встаёт на место, как с конвейера.
+class _Arrive extends StatelessWidget {
+  const _Arrive({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 460),
+      curve: Curves.easeOutBack,
+      child: child,
+      builder: (context, t, child) => Opacity(
+        opacity: t.clamp(0.0, 1.0),
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 70),
+          child: Transform.scale(
+            scale: 0.88 + 0.12 * t,
+            alignment: Alignment.bottomRight,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Исчезновение удалённого сообщения: тает, слегка уменьшается, а место под
 /// ним схлопывается, и соседи плавно съезжаются.
 class _Vanish extends StatefulWidget {

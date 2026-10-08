@@ -55,6 +55,7 @@ import '../text/hashtags.dart';
 import '../../features/profile/presentation/profile_menu_screen.dart';
 import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/profile/presentation/security_screen.dart';
 import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/quests/domain/entities/quest.dart';
 import '../../features/quests/presentation/create_quest_screen.dart';
@@ -105,6 +106,7 @@ abstract final class Routes {
   static const hashtag = '/tags';
   static const notifications = '/notifications';
   static const notificationSettings = '/profile/settings/notifications';
+  static const security = '/profile/settings/security';
   static const places = '/places';
 
   /// Запись и просмотр маршрутов живут вне вкладок: во время прогулки нижняя
@@ -381,6 +383,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.notificationSettings,
         builder: (_, _) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.security,
+        builder: (_, _) => const SecurityScreen(),
       ),
       GoRoute(
         path: Routes.events,

@@ -69,24 +69,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 12),
           const _MapStartPicker(),
           const SizedBox(height: 26),
-          const SectionLabel('Приватность геолокации'),
+          const SectionLabel('Безопасность'),
           const SizedBox(height: 12),
-          const _GeoPrivacy(),
-          const SizedBox(height: 10),
           GlassCard(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            onTap: () => context.push(Routes.blocked),
+            onTap: () => context.push(Routes.security),
             child: Row(
               children: [
-                Icon(Icons.block_outlined, color: AppColors.primaryTint),
+                Icon(Icons.shield_outlined, color: AppColors.primaryTint),
                 const SizedBox(width: 14),
-                const Expanded(child: Text('Заблокированные и скрытые')),
+                const Expanded(
+                  child: Text('Номер, вход, видимость и блокировки'),
+                ),
                 Icon(Icons.chevron_right, color: AppColors.textFaint),
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          const _LastSeenSwitch(),
           const SizedBox(height: 26),
           const SectionLabel('Уведомления'),
           const SizedBox(height: 12),
@@ -248,14 +246,14 @@ enum _GeoMode {
 
 /// «В сети / был(а) …» в шапке чата. Как в Telegram: кто скрыл своё время,
 /// тот и чужого не видит. Позже здесь же появится расписание (премиум).
-class _LastSeenSwitch extends StatefulWidget {
-  const _LastSeenSwitch();
+class LastSeenSwitch extends StatefulWidget {
+  const LastSeenSwitch({super.key});
 
   @override
-  State<_LastSeenSwitch> createState() => _LastSeenSwitchState();
+  State<LastSeenSwitch> createState() => _LastSeenSwitchState();
 }
 
-class _LastSeenSwitchState extends State<_LastSeenSwitch> {
+class _LastSeenSwitchState extends State<LastSeenSwitch> {
   bool? _show;
 
   @override
@@ -435,14 +433,14 @@ class _UpdateMobileSwitchState extends ConsumerState<_UpdateMobileSwitch> {
   }
 }
 
-class _GeoPrivacy extends ConsumerStatefulWidget {
-  const _GeoPrivacy();
+class GeoPrivacy extends ConsumerStatefulWidget {
+  const GeoPrivacy({super.key});
 
   @override
-  ConsumerState<_GeoPrivacy> createState() => _GeoPrivacyState();
+  ConsumerState<GeoPrivacy> createState() => _GeoPrivacyState();
 }
 
-class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
+class _GeoPrivacyState extends ConsumerState<GeoPrivacy> {
   _GeoMode? _pending;
   var _saving = false;
 
