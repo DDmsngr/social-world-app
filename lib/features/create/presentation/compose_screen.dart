@@ -74,7 +74,6 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   final _geocoder = NominatimGeocoder();
   final _attachments = <XFile>[];
   final _article = ArticleController();
-  var _markdown = false;
 
   // Место храним целиком, а не только название: у places title не уникален
   // (тем более при краудсорсинге), резолвить id обратно по строке нельзя.
@@ -144,7 +143,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       body: isArticle ? _article.markdown : _bodyController.text,
       postType: isArticle ? PostType.article : PostType.moment,
       title: isArticle ? _titleController.text : null,
-      bodyFormat: isArticle || _markdown ? BodyFormat.markdown : BodyFormat.plain,
+      bodyFormat: isArticle ? BodyFormat.markdown : BodyFormat.plain,
       settings: settings,
       mediaPaths: [for (final file in _attachments) file.path],
       placeId: _selectedPlace?.id,
@@ -447,8 +446,8 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
             if (_kind == ComposeKind.moment) ...[
               PostBodyEditor(
                 controller: _bodyController,
-                markdown: _markdown,
-                onMarkdownChanged: (value) => setState(() => _markdown = value),
+                markdown: false,
+                onMarkdownChanged: (_) {},
                 maxLength: 500,
                 onChanged: () => setState(() {}),
               ),

@@ -4,9 +4,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/markdown_view.dart';
 
-/// Поле текста поста с необязательным Markdown: панель вставки синтаксиса и
-/// предпросмотр. Для статьи Markdown включён всегда, для момента — по
-/// переключателю.
+/// Поле текста поста: простой текст, а при включённом Markdown (статья или
+/// старый момент с разметкой) ещё панель вставки синтаксиса и предпросмотр.
 class PostBodyEditor extends StatefulWidget {
   const PostBodyEditor({
     super.key,
@@ -145,22 +144,9 @@ class _PostBodyEditorState extends State<PostBodyEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (!widget.alwaysMarkdown)
-          SwitchListTile(
-            value: widget.markdown,
-            onChanged: (value) {
-              widget.onMarkdownChanged(value);
-              if (!value) setState(() => _preview = false);
-            },
-            contentPadding: EdgeInsets.zero,
-            activeThumbColor: AppColors.onPrimary,
-            activeTrackColor: AppColors.primary,
-            title: const Text('Форматирование Markdown'),
-            subtitle: Text(
-              'Заголовки, списки, ссылки, **жирный**',
-              style: TextStyle(color: AppColors.textDim, fontSize: 12.5),
-            ),
-          ),
+        // Переключателя Markdown у момента больше нет: момент — это пара слов
+        // простым текстом. Панель форматирования остаётся у статьи и у старых
+        // моментов, которые уже были написаны с разметкой.
         if (_markdownOn) ...[
           Row(
             children: [
