@@ -56,6 +56,7 @@ import '../../features/profile/presentation/profile_menu_screen.dart';
 import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/presentation/security_screen.dart';
+import '../../features/shell/presentation/animated_branches.dart';
 import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/quests/domain/entities/quest.dart';
 import '../../features/quests/presentation/create_quest_screen.dart';
@@ -392,7 +393,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.events,
         builder: (_, _) => const EventsScreen(),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
+        navigatorContainerBuilder: animatedBranchContainer,
         builder: (_, state, navigationShell) => HomeShell(
           navigationShell: navigationShell,
           location: state.uri.path,

@@ -56,24 +56,31 @@ class _SwipeBetweenTabsState extends State<SwipeBetweenTabs> {
 
   @override
   Widget build(BuildContext context) {
+    // Вкладка вне порядка свайпа (карта) или жест выключен: распознавателей
+    // нет совсем. С пустыми обработчиками (раньше стояла проверка внутри) они
+    // всё равно вступали в борьбу за касания и ломали движение карты.
+    final active = widget.enabled &&
+        (swipeTarget(widget.shell.currentIndex, forward: true) != null ||
+            swipeTarget(widget.shell.currentIndex, forward: false) != null);
     return SwipeTabsHandoff(
       onEdge: ({required bool forward}) {
         if (widget.enabled) _go(forward: forward);
       },
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onHorizontalDragStart: (_) => _dragged = 0,
-        onHorizontalDragUpdate: (details) => _dragged += details.delta.dx,
-        onHorizontalDragEnd: (details) {
-          if (!widget.enabled) return;
-          final speed = (details.primaryVelocity ?? 0).abs();
-          final distance = _dragged.abs();
-          final far = distance >= _farDistance && speed >= _farVelocity;
-          final flick = distance >= _flickDistance && speed >= _flickVelocity;
-          if (!far && !flick) return;
-          // Палец влево (отрицательное смещение) — следующая вкладка.
-          _go(forward: _dragged < 0);
-        },
+        onHorizontalDragStart: active ? (_) => _dragged = 0 : null,
+        onHorizontalDragUpdate: active ? (details) => _dragged += details.delta.dx : null,
+        onHorizontalDragEnd: active
+            ? (details) {
+                final speed = (details.primaryVelocity ?? 0).abs();
+                final distance = _dragged.abs();
+                final far = distance >= _farDistance && speed >= _farVelocity;
+                final flick = distance >= _flickDistance && speed >= _flickVelocity;
+                if (!far && !flick) return;
+                // Палец влево (отрицательное смещение) — следующая вкладка.
+                _go(forward: _dragged < 0);
+              }
+            : null,
         child: widget.child,
       ),
     );
