@@ -54,6 +54,13 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   void initState() {
     super.initState();
     if (widget.post == null) _fetchIfMissing();
+    // Ветка могла остаться в памяти от прошлого открытия этого же поста
+    // (например, тап по уведомлению поверх открытого поста): без обновления
+    // новые ответы не видны. Старые комментарии на экране остаются, пока
+    // грузятся свежие.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.invalidate(commentsProvider(widget.postId));
+    });
   }
 
   /// По ссылке или уведомлению пост всегда берём свежим с сервера: копия в
