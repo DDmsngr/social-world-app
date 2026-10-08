@@ -63,7 +63,7 @@ class RoutePostPreview extends ConsumerWidget {
                         ),
                         const SizedBox(width: 7),
                         Text(
-                          '${formatRouteDistance(data.distanceMeters)} · '
+                          'Маршрут · ${formatRouteDistance(data.distanceMeters)} · '
                           '${formatRouteDuration(data.duration)}'
                           '${data.photos.isEmpty ? '' : ' · ${data.photos.length} фото'}',
                           style: TextStyle(

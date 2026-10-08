@@ -36,6 +36,9 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   Timer? _ticker;
   String? _error;
   bool _finishing = false;
+  bool _switching = false;
+  bool _canFlip = false;
+  var _lens = CameraLensDirection.front;
 
   @override
   void initState() {
@@ -47,19 +50,27 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw StateError('Камеры нет');
-      final front = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
+      _canFlip =
+          cameras.any((c) => c.lensDirection == CameraLensDirection.front) &&
+          cameras.any((c) => c.lensDirection == CameraLensDirection.back);
+      final description = cameras.firstWhere(
+        (c) => c.lensDirection == _lens,
         orElse: () => cameras.first,
       );
-      final camera = CameraController(front, ResolutionPreset.medium);
+      final camera = CameraController(description, ResolutionPreset.medium);
       await camera.initialize();
-      // Лёгкий зум убирает «рыбий глаз» фронталки (приём из DDChat).
-      try {
-        final maxZoom = await camera.getMaxZoomLevel();
-        await camera.setZoomLevel(1.25.clamp(1.0, maxZoom));
-      } catch (_) {}
+      // Лёгкий зум убирает «рыбий глаз» фронталки (приём из DDChat); у
+      // основной камеры зум не нужен.
+      if (description.lensDirection == CameraLensDirection.front) {
+        try {
+          final maxZoom = await camera.getMaxZoomLevel();
+          await camera.setZoomLevel(1.25.clamp(1.0, maxZoom));
+        } catch (_) {}
+      }
       await camera.startVideoRecording();
-      _stopwatch.start();
+      _stopwatch
+        ..reset()
+        ..start();
       _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
         if (_stopwatch.elapsed >= _max) {
           _finish(send: true);
@@ -80,9 +91,35 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
     }
   }
 
+  /// Смена камеры начинает запись заново: две камеры в один файл не
+  /// склеить, поэтому снятое до переключения не сохраняется.
+  Future<void> _flip() async {
+    final camera = _camera;
+    if (_finishing || _switching || camera == null) return;
+    _switching = true;
+    _ticker?.cancel();
+    _stopwatch
+      ..stop()
+      ..reset();
+    try {
+      final file = await camera.stopVideoRecording();
+      await File(file.path).delete().catchError((_) => File(file.path));
+    } catch (error) {
+      AppLog.add('Камера кружка не остановилась при смене: $error');
+    }
+    await camera.dispose();
+    if (!mounted) return;
+    setState(() => _camera = null);
+    _lens = _lens == CameraLensDirection.front
+        ? CameraLensDirection.back
+        : CameraLensDirection.front;
+    await _start();
+    _switching = false;
+  }
+
   Future<void> _finish({required bool send}) async {
     final camera = _camera;
-    if (_finishing || camera == null) return;
+    if (_finishing || _switching || camera == null) return;
     _finishing = true;
     _ticker?.cancel();
     _stopwatch.stop();
@@ -131,15 +168,23 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => camera == null
-                      ? Navigator.of(context).pop()
-                      : _finish(send: false),
-                  tooltip: 'Отменить',
-                  icon: const Icon(Icons.close, color: Colors.white),
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => camera == null
+                        ? Navigator.of(context).pop()
+                        : _finish(send: false),
+                    tooltip: 'Отменить',
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                  const Spacer(),
+                  if (_canFlip)
+                    IconButton(
+                      onPressed: camera == null || _switching ? null : _flip,
+                      tooltip: 'Сменить камеру (запись начнётся заново)',
+                      icon: const Icon(Icons.cameraswitch_outlined, color: Colors.white),
+                    ),
+                ],
               ),
               Expanded(
                 child: Center(

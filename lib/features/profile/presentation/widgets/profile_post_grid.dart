@@ -89,6 +89,55 @@ class _TextTile extends StatelessWidget {
   }
 }
 
+/// Маршрут в сетке: тёмная плитка со значком пути и названием, чтобы его
+/// нельзя было принять за текстовый пост.
+class _RouteTile extends StatelessWidget {
+  const _RouteTile({required this.post});
+
+  final Post post;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (post.body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    return ColoredBox(
+      color: AppColors.ink2,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.route, size: 34, color: AppColors.primaryTint),
+            const SizedBox(height: 6),
+            Text(
+              'Маршрут',
+              style: TextStyle(
+                fontSize: 10.5,
+                letterSpacing: 0.6,
+                color: AppColors.textDim,
+              ),
+            ),
+            if (title.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Tile extends StatelessWidget {
   const _Tile({required this.post});
 
@@ -102,7 +151,9 @@ class _Tile extends StatelessWidget {
     final photo = media.where((u) => !isVideoUrl(u)).firstOrNull;
 
     Widget content;
-    if (photo != null && photo.startsWith('http')) {
+    if (post.isRoute) {
+      content = _RouteTile(post: post);
+    } else if (photo != null && photo.startsWith('http')) {
       content = CachedNetworkImage(
         imageUrl: photo,
         fit: BoxFit.cover,
@@ -116,7 +167,9 @@ class _Tile extends StatelessWidget {
       content = _TextTile(post: post);
     }
 
-    final badge = video
+    final badge = post.isRoute
+        ? Icons.route
+        : video
         ? Icons.videocam
         : media.length > 1
         ? Icons.collections
