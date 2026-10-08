@@ -17,7 +17,11 @@ class MessageBubble extends StatelessWidget {
     this.showSender = false,
     this.onMediaMore,
     this.onQuoteTap,
+    this.reactions,
   });
+
+  /// Плашки реакций живут внутри пузыря, над временем.
+  final Widget? reactions;
 
   final ChatMessage message;
   final bool mine;
@@ -130,6 +134,8 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+        if (reactions != null)
+          Align(alignment: Alignment.centerLeft, widthFactor: 1, child: reactions),
         const SizedBox(height: 4),
         _Meta(message: message, mine: mine, onBubble: !bare),
       ],

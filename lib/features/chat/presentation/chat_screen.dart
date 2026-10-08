@@ -318,6 +318,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _react(String messageId, String emoji) async {
     HapticFeedback.selectionClick();
+    unawaited(ReactionUsage.record(emoji));
     try {
       await toggleReaction(ref, widget.conversationId, messageId, emoji);
     } catch (error) {
@@ -747,9 +748,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         onTap: isDirect &&
                                 message.status != MessageStatus.failed &&
                                 message.status != MessageStatus.sending
-                            ? () => _quickReact(context, message, myId)
+                            ? () => _quickReact(_itemKeys[message.id]?.currentContext ?? context, message, myId)
                             : null,
-                        onLongPress: () => _openMenu(context, message, myId),
+                        onLongPress: () =>
+                            _openMenu(_itemKeys[message.id]?.currentContext ?? context, message, myId),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
                           decoration: BoxDecoration(
@@ -774,11 +776,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                 onQuoteTap: message.replyTo == null
                                     ? null
                                     : () => _jumpTo(message.replyTo!.messageId, items),
-                              ),
-                              ReactionChips(
-                                reactions: reactions[message.id] ?? const [],
-                                mine: mine,
-                                onTap: (emoji) => _react(message.id, emoji),
+                                reactions: (reactions[message.id] ?? const []).isEmpty
+                                    ? null
+                                    : ReactionChips(
+                                        reactions: reactions[message.id]!,
+                                        mine: false,
+                                        onTap: (emoji) => _react(message.id, emoji),
+                                      ),
                               ),
                             ],
                           ),
