@@ -159,9 +159,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
             child: const Text('Выйти'),
           ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _deleteAccount,
+            style: TextButton.styleFrom(foregroundColor: AppColors.textDim),
+            child: const Text('Удалить аккаунт'),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить аккаунт?'),
+        content: const Text(
+          'Профиль, посты, комментарии, ваши сообщения, баллы и подписки будут '
+          'удалены без возможности восстановления. Личные чаты останутся у '
+          'собеседников, но без ваших сообщений.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      try {
+        await ref.read(discoverRepositoryProvider).clearPresence();
+      } catch (_) {}
+      await ref.read(pushServiceProvider).stop();
+      await ref.read(authRepositoryProvider).deleteAccount();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(error))),
+      );
+    }
   }
 }
 

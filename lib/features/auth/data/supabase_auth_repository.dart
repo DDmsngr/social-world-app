@@ -127,6 +127,13 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<void> signOut() => _auth.signOut();
 
   @override
+  Future<void> deleteAccount() async {
+    await _client.rpc('delete_my_account');
+    // Пользователя в базе уже нет; локальную сессию просто стираем.
+    await _auth.signOut(scope: SignOutScope.local);
+  }
+
+  @override
   Future<AppUser> completeProfile({required String displayName}) async {
     final user = _auth.currentUser;
     if (user == null) {

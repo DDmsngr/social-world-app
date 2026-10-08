@@ -64,6 +64,9 @@ class LocalAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> deleteAccount() => signOut();
+
+  @override
   Future<void> signOut() async {
     _user = null;
     _issuedCode = null;

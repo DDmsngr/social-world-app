@@ -16,6 +16,9 @@ abstract interface class AuthRepository {
 
   Future<void> signOut();
 
+  /// Безвозвратно удаляет аккаунт и все данные профиля, затем выходит.
+  Future<void> deleteAccount();
+
   /// Заполнение публичного профиля после первого входа.
   Future<AppUser> completeProfile({required String displayName});
 
