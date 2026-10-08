@@ -120,7 +120,14 @@ class DeepLinkService {
     if (Routes.authFlow.contains(current)) return;
 
     _pending = null;
-    router.push(link.location);
+    // Переписка (ярлык чата на рабочем столе) живёт во вкладке «Чаты»: go
+    // переключает вкладку. push клал её поверх Pulse — подсветка внизу
+    // оставалась на карте, переключение вкладок путалось.
+    if (link.location.startsWith('${Routes.chats}/')) {
+      router.go(link.location);
+    } else {
+      router.push(link.location);
+    }
   }
 
   /// Сбой — не повод мешать человеку: он просто не попал в статистику этого

@@ -282,10 +282,13 @@ class PushService {
       case 'message':
         final id = data['conversation_id'] as String?;
         if (id == null) return;
+        // go, а не push: переписка живёт во вкладке «Чаты». push клал её
+        // поверх текущей вкладки (обычно Pulse) — подсветка внизу оставалась
+        // на карте, а «назад» и вкладки вели себя криво.
         if (data['channel'] == '1') {
-          router.push(Routes.channel(id));
+          router.go(Routes.channel(id));
         } else {
-          router.push('${Routes.chats}/$id', extra: data['title'] as String?);
+          router.go('${Routes.chats}/$id', extra: data['title'] as String?);
         }
       case 'notification':
         final target = LinkTarget.fromSegment(data['target_type'] as String? ?? '');
@@ -293,7 +296,10 @@ class PushService {
         if (target == null || id == null || id.isEmpty) {
           router.push(Routes.notifications);
         } else {
-          router.push(DeepLinks.locationFor(target, id));
+          final location = DeepLinks.locationFor(target, id);
+          location.startsWith('${Routes.chats}/')
+              ? router.go(location)
+              : router.push(location);
         }
     }
   }
