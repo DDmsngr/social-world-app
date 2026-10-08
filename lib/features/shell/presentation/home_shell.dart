@@ -20,6 +20,8 @@ import '../../chat/live_location/live_location.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../notifications/notifications.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
+import '../../routes/presentation/providers/route_recorder.dart';
+import '../../routes/presentation/route_recorder_screen.dart';
 import '../../saved/saved.dart';
 import 'app_tour.dart';
 
@@ -210,13 +212,16 @@ class _HomeShellState extends ConsumerState<HomeShell>
         body: Stack(
           children: [
             Positioned.fill(child: widget.navigationShell),
-            // В переписке плашка закрывала бы поле ввода.
+            // В переписке плашки закрывали бы поле ввода.
             if (!inChat)
               Positioned(
                 left: 16,
                 right: 16,
                 bottom: MediaQuery.paddingOf(context).bottom + 84,
-                child: const UpdateReadyBanner(),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [UpdateReadyBanner(), _RouteRecordingBar()],
+                ),
               ),
             if (_tourStep != null)
               Positioned.fill(
@@ -370,6 +375,53 @@ class GlassNavBar extends StatelessWidget {
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Плашка «идёт запись маршрута» над нижней панелью: запись продолжается,
+/// пока человек на других вкладках, и по плашке к ней можно вернуться.
+class _RouteRecordingBar extends ConsumerWidget {
+  const _RouteRecordingBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(routeRecorderProvider);
+    if (!state.isActive) return const SizedBox.shrink();
+    final paused = state.status == RecordingStatus.paused;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: AppColors.ink2,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => context.push(Routes.routeRecorder),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  paused ? Icons.pause_circle_outline : Icons.fiber_manual_record,
+                  size: 16,
+                  color: paused ? AppColors.textDim : AppColors.danger,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${paused ? 'Маршрут на паузе' : 'Идёт запись маршрута'} · '
+                    '${formatRouteDuration(state.elapsed)} · '
+                    '${formatRouteDistance(state.distanceMeters)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
         ),
       ),
     );

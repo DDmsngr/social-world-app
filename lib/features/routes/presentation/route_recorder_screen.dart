@@ -37,6 +37,7 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
   final _picker = ImagePicker();
   bool _publishing = false;
   bool _confirmingExit = false;
+  Duration? _limit;
 
   Future<void> _addPhoto() async {
     final recorder = ref.read(routeRecorderProvider.notifier);
@@ -168,7 +169,9 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
             child: _ControlPanel(
               state: state,
               publishing: _publishing,
-              onStart: recorder.start,
+              limit: _limit,
+              onLimit: (value) => setState(() => _limit = value),
+              onStart: () => recorder.start(limit: _limit),
               onPause: recorder.pause,
               onResume: recorder.resume,
               onPhoto: _addPhoto,
@@ -189,29 +192,33 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
     // ещё не закрыт (двойное нажатие) — не открываем второй поверх первого.
     if (_confirmingExit) return;
 
-    if (!state.isActive || state.path.isEmpty) {
+    if (!state.isActive) {
       ref.read(routeRecorderProvider.notifier).reset();
       _leave();
       return;
     }
 
     _confirmingExit = true;
-    final bool? drop;
+    final _ExitChoice? choice;
     try {
-      drop = await showDialog<bool>(
+      choice = await showDialog<_ExitChoice>(
         context: context,
         builder: (context) => AlertDialog(
           backgroundColor: AppColors.ink2,
-          title: const Text('Прервать запись?'),
-          content: const Text('Записанный путь не сохранится.'),
+          title: const Text('Запись маршрута'),
+          content: const Text(
+            'Можно свернуть: запись продолжится, пока вы пользуетесь другими '
+            'вкладками или приложениями. Вернуться — по плашке внизу экрана '
+            'или из уведомления.',
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Продолжить запись'),
+              onPressed: () => Navigator.of(context).pop(_ExitChoice.drop),
+              child: const Text('Прервать'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Прервать'),
+              onPressed: () => Navigator.of(context).pop(_ExitChoice.minimize),
+              child: const Text('Свернуть'),
             ),
           ],
         ),
@@ -220,8 +227,29 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
       _confirmingExit = false;
     }
 
-    if (drop != true || !mounted) return;
-    ref.read(routeRecorderProvider.notifier).reset();
+    if (choice == null || !mounted) return;
+    if (choice == _ExitChoice.drop) {
+      final sure = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.ink2,
+          title: const Text('Прервать запись?'),
+          content: const Text('Записанный путь не сохранится.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Нет'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Прервать'),
+            ),
+          ],
+        ),
+      );
+      if (sure != true || !mounted) return;
+      ref.read(routeRecorderProvider.notifier).reset();
+    }
     _leave();
   }
 
@@ -231,10 +259,14 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
   }
 }
 
+enum _ExitChoice { minimize, drop }
+
 class _ControlPanel extends StatelessWidget {
   const _ControlPanel({
     required this.state,
     required this.publishing,
+    required this.limit,
+    required this.onLimit,
     required this.onStart,
     required this.onPause,
     required this.onResume,
@@ -244,6 +276,8 @@ class _ControlPanel extends StatelessWidget {
 
   final RouteRecordingState state;
   final bool publishing;
+  final Duration? limit;
+  final ValueChanged<Duration?> onLimit;
   final VoidCallback onStart;
   final VoidCallback onPause;
   final VoidCallback onResume;
@@ -271,6 +305,37 @@ class _ControlPanel extends StatelessWidget {
               _Stat(label: 'Фото', value: '${state.photos.length}'),
             ],
           ),
+          if (state.isActive && state.limit != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Остановится сама через '
+              '${formatRouteDuration(state.limit! - state.elapsed)}',
+              style: TextStyle(color: AppColors.textDim, fontSize: 12),
+            ),
+          ],
+          if (!state.isActive && state.status != RecordingStatus.preparing) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Ограничение по времени',
+                style: TextStyle(color: AppColors.textDim, fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final option in routeLimitOptions)
+                  ChoiceChip(
+                    label: Text(routeLimitLabel(option)),
+                    selected: option == limit,
+                    onSelected: (_) => onLimit(option),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           if (publishing)
             Padding(
