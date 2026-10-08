@@ -43,6 +43,7 @@ class _SwipeBackToExitState extends State<SwipeBackToExit> {
   DateTime _startedAt = DateTime(0);
   int? _pointer;
   var _hint = false;
+  Timer? _hintStart;
   Timer? _hintTimer;
 
   @override
@@ -53,6 +54,7 @@ class _SwipeBackToExitState extends State<SwipeBackToExit> {
 
   @override
   void dispose() {
+    _hintStart?.cancel();
     _hintTimer?.cancel();
     super.dispose();
   }
@@ -63,11 +65,15 @@ class _SwipeBackToExitState extends State<SwipeBackToExit> {
       final shown = prefs.getInt(_hintKey) ?? 0;
       if (shown >= _hintTimes) return;
       await prefs.setInt(_hintKey, shown + 1);
-      await Future<void>.delayed(const Duration(milliseconds: 1400));
       if (!mounted) return;
-      setState(() => _hint = true);
-      _hintTimer = Timer(const Duration(milliseconds: 3200), () {
-        if (mounted) setState(() => _hint = false);
+      // Таймеры, а не Future.delayed: экран могут закрыть раньше, и они
+      // отменяются в dispose.
+      _hintStart = Timer(const Duration(milliseconds: 1400), () {
+        if (!mounted) return;
+        setState(() => _hint = true);
+        _hintTimer = Timer(const Duration(milliseconds: 3200), () {
+          if (mounted) setState(() => _hint = false);
+        });
       });
     } catch (error) {
       AppLog.add('Подсказка свайпа: $error');
