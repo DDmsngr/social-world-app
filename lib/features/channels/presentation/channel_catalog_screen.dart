@@ -74,7 +74,11 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final items = _items;
+    // Без поиска каталог предлагает новое: каналы, где я уже подписан, есть
+    // в списке чатов. Ищу по названию — показываю все, в том числе свои.
+    final searching = _search.text.trim().isNotEmpty;
+    final items = searching ? _items : _items?.where((c) => !c.joined).toList();
+    final allJoined = !searching && (_items?.isNotEmpty ?? false) && (items?.isEmpty ?? false);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Каналы'),
@@ -134,8 +138,9 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
                 : items == null
                 ? const LoadingView()
                 : items.isEmpty
-                ? const StateMessage(
-                    title: 'Ничего не нашлось',
+                ? StateMessage(
+                    title: allJoined ? 'Вы уже подписаны на всё здесь' : 'Ничего не нашлось',
+                    text: allJoined ? 'Свои каналы — во вкладке «Каналы» в чатах.' : null,
                     icon: Icons.campaign_outlined,
                   )
                 : RefreshIndicator(

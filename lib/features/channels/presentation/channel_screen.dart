@@ -109,6 +109,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     }
     if (newest != null) {
       ChannelSeen.save(widget.channelId, newest);
+      _markRead(newest);
       // Счётчик у кнопки «вниз»: сколько постов ниже самого свежего из тех,
       // что сейчас на экране, — ещё не виденные. Уменьшается по мере прокрутки.
       final below = _items.where((p) => p.message.sentAt.isAfter(newest!)).length;
@@ -136,11 +137,23 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     super.dispose();
   }
 
-  Future<void> _markRead() async {
+  DateTime? _markedUntil;
+
+  /// Прочитано на сервере до самого свежего поста, побывавшего на экране, —
+  /// тогда счётчик в списке каналов совпадает с непрочитанными внутри.
+  Future<void> _markRead(DateTime until) async {
+    if (!(ref.read(channelInfoProvider(widget.channelId)).value?.isMember ?? false)) return;
+    final marked = _markedUntil;
+    if (marked != null && !until.isAfter(marked)) return;
+    _markedUntil = until;
+    // Вызывается и при уходе с экрана: после await ref экрана уже мёртв,
+    // поэтому список чатов освежаем через контейнер, взятый заранее.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
-      await ref.read(channelsRepositoryProvider).markRead(widget.channelId);
-      ref.invalidate(conversationsProvider);
+      await container.read(channelsRepositoryProvider).markRead(widget.channelId, until);
+      container.invalidate(conversationsProvider);
     } catch (error) {
+      _markedUntil = marked;
       AppLog.add('Канал не отметился прочитанным: $error');
     }
   }
@@ -205,18 +218,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     final info = infoAsync.value;
 
     // Подписчик получает новые посты реалтаймом чатов: на каждое изменение
-    // ленты подтягиваем верх и сбрасываем счётчик непрочитанного.
+    // ленты подтягиваем верх. Прочитанным пост отмечается, только когда
+    // побывал на экране (_saveSeen).
     if (info?.isMember ?? false) {
       ref.listen(messagesProvider(widget.channelId), (_, next) {
         if (next.hasValue) {
           ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop();
-          _markRead();
         }
       });
     }
-    ref.listen(channelInfoProvider(widget.channelId), (_, next) {
-      if (next.value?.isMember ?? false) _markRead();
-    });
 
     final subtitle = info == null
         ? null

@@ -281,12 +281,18 @@ class ChannelsRepository {
       );
 
   /// Отметка «прочитано до сих пор» — сбрасывает счётчик в списке чатов.
-  Future<void> markRead(String channelId) async {
+  /// Прочитано до [until] — самого свежего поста, побывавшего на экране.
+  /// Только вперёд: прокрутка к старым постам прочитанное не откатывает.
+  /// Раньше при входе в канал прочитанным отмечалось всё сразу, и счётчик в
+  /// списке обнулялся, хотя внутри оставалось 30 непрочитанных.
+  Future<void> markRead(String channelId, DateTime until) async {
     final me = _client.auth.currentUser?.id;
     if (me == null) return;
+    final at = until.toUtc().toIso8601String();
     await _client
         .from('chat_members')
-        .update({'last_read_at': DateTime.now().toUtc().toIso8601String()})
-        .match({'conversation_id': channelId, 'profile_id': me});
+        .update({'last_read_at': at})
+        .match({'conversation_id': channelId, 'profile_id': me})
+        .or('last_read_at.is.null,last_read_at.lt.$at');
   }
 }
