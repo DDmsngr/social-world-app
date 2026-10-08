@@ -14,6 +14,7 @@ import '../domain/repositories/chat_repository.dart';
 import 'chat_media_cache.dart';
 import 'crypto/chat_crypto_service.dart';
 import 'crypto/chat_key_storage.dart';
+import 'crypto/peer_key_pins.dart';
 import 'live_feed.dart';
 import 'message_envelope.dart';
 
@@ -37,6 +38,7 @@ class SecureChatRepository implements ChatRepository {
     this._client, {
     required this.currentUserId,
     ChatKeyStorage? keyStorage,
+    this._pins = const PrefsPeerKeyPins(),
   }) : _keyStorage = keyStorage ?? SecureChatKeyStorage() {
     _ready = _initialize();
     // Ошибку публикации ключей получит тот, кто дождётся _ready; без
@@ -60,6 +62,11 @@ class SecureChatRepository implements ChatRepository {
   /// Опубликованные ключи не меняются без смены устройства; пустой ответ не
   /// кэшируется — собеседник может опубликовать ключи позже.
   final _keys = <String, ChatPublicKeys>{};
+
+  final PeerKeyPins _pins;
+
+  /// Собеседники, чей ключ на сервере не совпал с запомненным.
+  final _changedKeys = <String>{};
 
   @override
   bool get endToEndEncryptionEnabled => true;
@@ -187,8 +194,7 @@ class SecureChatRepository implements ChatRepository {
   Future<Map<String, String>?> sealLiveLocation(String conversationId, String shareId, String json) async {
     if (await _kind(conversationId) != ConversationKind.direct) return null;
     final crypto = await _ready;
-    final keys = await _loadPublicKeys(await _peerId(conversationId));
-    if (keys == null) throw StateError('Собеседник ещё не опубликовал ключи шифрования');
+    final keys = await _keysForSending(await _peerId(conversationId));
     final payload = await crypto.encrypt(
       conversationId: conversationId,
       messageId: shareId,
@@ -389,11 +395,7 @@ class SecureChatRepository implements ChatRepository {
     if (await _kind(message.conversationId) == ConversationKind.direct) {
       // Тот же конверт, что при отправке: вложение с ключом, цитата и
       // пересылка остаются, меняется только текст.
-      final peerId = await _peerId(message.conversationId);
-      final keys = await _loadPublicKeys(peerId);
-      if (keys == null) {
-        throw StateError('Собеседник ещё не опубликовал ключи шифрования');
-      }
+      final keys = await _keysForSending(await _peerId(message.conversationId));
       final payload = await crypto.encrypt(
         conversationId: message.conversationId,
         messageId: message.id,
@@ -622,11 +624,7 @@ class SecureChatRepository implements ChatRepository {
       if (attachment != null) row['media'] = attachment.toJson(withKey: false);
       if (!options.meta.isEmpty) row['meta'] = options.meta.toJson();
     } else {
-      final peerId = await _peerId(conversationId);
-      final keys = await _loadPublicKeys(peerId);
-      if (keys == null) {
-        throw StateError('Собеседник ещё не опубликовал ключи шифрования');
-      }
+      final keys = await _keysForSending(await _peerId(conversationId));
       final payload = await crypto.encrypt(
         conversationId: conversationId,
         messageId: id,
@@ -1006,10 +1004,58 @@ class SecureChatRepository implements ChatRepository {
         row['protocol_version'] != ChatCryptoService.protocolVersion) {
       return null;
     }
-    return _keys[profileId] = ChatPublicKeys(
+    final keys = ChatPublicKeys(
       exchangeKey: row['x25519_public_key'] as String,
       signingKey: row['ed25519_public_key'] as String,
     );
+    await _checkPin(profileId, keys);
+    return _keys[profileId] = keys;
+  }
+
+  Future<void> _checkPin(String profileId, ChatPublicKeys keys) async {
+    final fingerprint = peerKeyFingerprint(keys);
+    try {
+      final pinned = await _pins.read(profileId);
+      if (pinned == null) {
+        await _pins.write(profileId, fingerprint);
+      } else if (pinned != fingerprint) {
+        _changedKeys.add(profileId);
+        AppLog.add('Ключ собеседника $profileId сменился');
+      } else {
+        _changedKeys.remove(profileId);
+      }
+    } catch (error) {
+      // Настройки недоступны — проверка просто не сработает, чат не встанет.
+      AppLog.add('Закреплённый ключ не прочитан: $error');
+    }
+  }
+
+  /// Ключи для шифрования исходящего: со сменившимся непринятым ключом не
+  /// шифруем, иначе подменённый сервером ключ прочитал бы новые сообщения.
+  Future<ChatPublicKeys> _keysForSending(String peerId) async {
+    final keys = await _loadPublicKeys(peerId);
+    if (keys == null) {
+      throw StateError('Собеседник ещё не опубликовал ключи шифрования');
+    }
+    if (_changedKeys.contains(peerId)) throw const PeerKeyChangedException();
+    return keys;
+  }
+
+  @override
+  Future<bool> peerKeyChanged(String conversationId) async {
+    if (await _kind(conversationId) != ConversationKind.direct) return false;
+    final peerId = await _peerId(conversationId);
+    await _loadPublicKeys(peerId);
+    return _changedKeys.contains(peerId);
+  }
+
+  @override
+  Future<void> acceptPeerKey(String conversationId) async {
+    final peerId = await _peerId(conversationId);
+    final keys = await _loadPublicKeys(peerId);
+    if (keys == null) return;
+    await _pins.write(peerId, peerKeyFingerprint(keys));
+    _changedKeys.remove(peerId);
   }
 
   DateTime? _date(Object? value) =>

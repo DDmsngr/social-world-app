@@ -264,6 +264,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ..clearConversation(widget.conversationId);
     _pendingJump = widget.jumpToMessageId;
     _markRead();
+    unawaited(_warnIfPeerKeyChanged());
+  }
+
+  Future<void> _warnIfPeerKeyChanged() async {
+    try {
+      final changed = await ref
+          .read(chatRepositoryProvider)
+          .peerKeyChanged(widget.conversationId);
+      if (!changed || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 10),
+          content: const Text(
+            'Ключ шифрования собеседника сменился. Так бывает после '
+            'переустановки приложения, но может быть и подмена.',
+          ),
+          action: SnackBarAction(label: 'Проверить', onPressed: _showSecurityCode),
+        ),
+      );
+    } catch (error) {
+      AppLog.add('Проверка ключа собеседника: $error');
+    }
   }
 
   void _markRead() {
@@ -887,9 +909,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
   Future<void> _showSecurityCode() async {
-    final code = ref
-        .read(chatRepositoryProvider)
-        .securityCode(widget.conversationId);
+    final repository = ref.read(chatRepositoryProvider);
+    final code = repository.securityCode(widget.conversationId);
+    final changed = await repository
+        .peerKeyChanged(widget.conversationId)
+        .catchError((Object _) => false);
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context, useRootNavigator: true,
       backgroundColor: AppColors.ink2,
@@ -936,6 +961,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   },
                 ),
               ),
+              if (changed) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Ключ собеседника сменился, и сообщения ему пока не '
+                  'отправляются. Спросите, переустанавливал ли он приложение, '
+                  'и сверьте новый код. Если код совпал, примите ключ.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    await repository.acceptPeerKey(widget.conversationId);
+                    navigator.pop();
+                  },
+                  child: const Text('Код совпал, принять новый ключ'),
+                ),
+              ],
             ],
           ),
         ),

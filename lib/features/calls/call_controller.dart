@@ -529,7 +529,13 @@ class CallController extends ChangeNotifier {
   // ── сигналы ─────────────────────────────────────────────────────────────
 
   void _listen(String id) {
-    final signals = _client.channel('call:$id');
+    // Приватный канал: сервер пускает в него только участников звонка
+    // (политика на realtime.messages, миграция 0067). Открытый канал читал и
+    // подделывал любой, кто знает id звонка.
+    final signals = _client.channel(
+      'call:$id',
+      opts: const RealtimeChannelConfig(private: true),
+    );
     _signals = signals;
     signals
         .onBroadcast(event: 'sig', callback: _onSignal)

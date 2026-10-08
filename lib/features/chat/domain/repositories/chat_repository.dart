@@ -88,6 +88,13 @@ abstract interface class ChatRepository {
   /// чтобы исключить подмену ключей посередине. Только для личных диалогов.
   Future<String> securityCode(String conversationId);
 
+  /// Ключ собеседника не совпадает с тем, что телефон запомнил при первой
+  /// встрече. Пока новый ключ не принят, отправка в диалог не идёт.
+  Future<bool> peerKeyChanged(String conversationId);
+
+  /// Принять текущий ключ собеседника (после сверки кода безопасности).
+  Future<void> acceptPeerKey(String conversationId);
+
   /// Личный диалог с человеком: существующий или новый. Возвращает id чата.
   Future<String> openDirect(String peerId);
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../features/chat/data/crypto/peer_key_pins.dart';
 import '../media/file_too_large.dart';
 import '../permissions/content_permissions.dart';
 import 'rule_violation.dart';
@@ -9,6 +10,7 @@ import 'rule_violation.dart';
 String friendlyError(Object error, {String fallback = 'Что-то пошло не так'}) {
   if (error is PermissionDeniedException) return error.message;
   if (error is FileTooLargeException) return error.message;
+  if (error is PeerKeyChangedException) return error.message;
   if (error is TimeoutException) return 'Сервер долго не отвечает';
 
   final rule = ruleCodeIn(error);

@@ -70,7 +70,11 @@ String typingLabel(List<TypingEntry> entries, {required bool direct}) {
 /// мешает.
 class TypingHub {
   TypingHub(this._client, this._conversationId, this._myId, this._myName) {
-    final channel = _client.channel('typing:$_conversationId');
+    // Приватный канал: только участники чата (миграция 0067).
+    final channel = _client.channel(
+      'typing:$_conversationId',
+      opts: const RealtimeChannelConfig(private: true),
+    );
     _channel = channel;
     channel
         .onBroadcast(event: 'typing', callback: _onEvent)

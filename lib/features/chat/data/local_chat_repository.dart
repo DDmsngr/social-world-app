@@ -252,6 +252,12 @@ class LocalChatRepository implements ChatRepository {
       'Переписка ещё не шифруется';
 
   @override
+  Future<bool> peerKeyChanged(String conversationId) async => false;
+
+  @override
+  Future<void> acceptPeerKey(String conversationId) async {}
+
+  @override
   Future<String> openDirect(String peerId) async {
     for (final c in _conversations) {
       if (c.isDirect && c.peerId == peerId) return c.id;
