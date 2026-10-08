@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Ключи бэкенда лежат в `.env` (в гите его нет, есть только `.env.example`).
@@ -19,6 +20,15 @@ abstract final class Env {
       // Файла нет — работаем в offline-режиме, это штатный сценарий на старте.
       _loaded = false;
     }
+  }
+
+  /// Для тестов: задаёт значения без файла `.env`.
+  @visibleForTesting
+  static void loadForTest(Map<String, String> values) {
+    dotenv.loadFromString(
+      envString: values.entries.map((e) => '${e.key}=${e.value}').join('\n'),
+    );
+    _loaded = true;
   }
 
   static String get supabaseUrl => _read(_urlKey);

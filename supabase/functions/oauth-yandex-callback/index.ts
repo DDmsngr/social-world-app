@@ -4,10 +4,9 @@
 // штатный custom-провайдер GoTrue (жёстко шлёт Bearer) не пройти.
 import {
   PUBLIC_BASE_URL,
-  mintSession,
+  finishLogin,
   pkceConsume,
   redirectError,
-  redirectToApp,
   resolveProfile,
   saveVerifiedPhone,
 } from "../_shared/oauth.ts";
@@ -74,11 +73,7 @@ Deno.serve(async (req: Request) => {
     // или право не выдано, поля просто нет.
     await saveVerifiedPhone(profileId, info.default_phone?.number);
 
-    const session = await mintSession("yandex", externalId);
-    return redirectToApp({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    });
+    return await finishLogin("yandex", externalId, pkce.app_challenge);
   } catch (e) {
     console.error("yandex callback error", e);
     return redirectError("yandex:internal_error");

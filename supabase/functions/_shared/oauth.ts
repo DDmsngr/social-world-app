@@ -53,28 +53,56 @@ function restHeaders(extra?: Record<string, string>) {
   };
 }
 
-/** Кладёт code_verifier на 10 минут — этого достаточно на весь консент-экран. */
+/** Срок жизни записи входа: хватает на весь экран согласия у провайдера. */
+const PKCE_TTL_MS = 10 * 60 * 1000;
+
+/** Срок жизни одноразового кода, который приложение меняет на сессию. */
+export const LOGIN_CODE_TTL_MS = 2 * 60 * 1000;
+
+/**
+ * Принимать ли вход старых версий приложения, которые не присылают
+ * app_challenge и получают токены прямо в ссылке (небезопасно, см. 0065).
+ * Выключается переменной окружения OAUTH_ALLOW_LEGACY=false, когда все
+ * обновятся.
+ */
+export const ALLOW_LEGACY = Deno.env.get("OAUTH_ALLOW_LEGACY") !== "false";
+
+/** Хеш секрета приложения: base64url от SHA-256, ровно 43 знака. */
+export function validChallenge(value: string | null): value is string {
+  return value !== null && /^[A-Za-z0-9_-]{43}$/.test(value);
+}
+
+/** Кладёт code_verifier и хеш секрета приложения на время входа. */
 export async function pkceStore(
   state: string,
   provider: string,
   codeVerifier: string,
+  appChallenge: string | null = null,
 ): Promise<void> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/oauth_pkce_state`, {
     method: "POST",
     headers: restHeaders({ Prefer: "return=minimal" }),
-    body: JSON.stringify({ state, provider, code_verifier: codeVerifier }),
+    body: JSON.stringify({
+      state,
+      provider,
+      code_verifier: codeVerifier,
+      app_challenge: appChallenge,
+    }),
   });
   if (!res.ok) {
     throw new Error(`pkce store failed: ${res.status} ${await res.text()}`);
   }
 }
 
-/** Читает и сразу удаляет запись — код авторизации одноразовый. */
+/** Читает и сразу удаляет запись — код авторизации одноразовый. Запись
+ * старше 10 минут считается несуществующей. */
 export async function pkceConsume(
   state: string,
-): Promise<{ provider: string; code_verifier: string | null } | null> {
+): Promise<
+  { provider: string; code_verifier: string | null; app_challenge: string | null } | null
+> {
   const url =
-    `${SUPABASE_URL}/rest/v1/oauth_pkce_state?state=eq.${encodeURIComponent(state)}&select=provider,code_verifier`;
+    `${SUPABASE_URL}/rest/v1/oauth_pkce_state?state=eq.${encodeURIComponent(state)}&select=provider,code_verifier,app_challenge,created_at`;
   const res = await fetch(url, { headers: restHeaders() });
   if (!res.ok) return null;
   const rows = await res.json();
@@ -85,7 +113,57 @@ export async function pkceConsume(
     { method: "DELETE", headers: restHeaders() },
   );
 
+  const age = Date.now() - new Date(rows[0].created_at as string).getTime();
+  if (!(age >= 0 && age <= PKCE_TTL_MS)) return null;
   return rows[0];
+}
+
+/** Кладёт одноразовый код входа. Возвращает сам код для ссылки в приложение. */
+export async function loginCodeStore(
+  provider: string,
+  externalId: string,
+  challenge: string,
+): Promise<string> {
+  const code = randomUrlSafe(32);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/oauth_login_codes`, {
+    method: "POST",
+    headers: restHeaders({ Prefer: "return=minimal" }),
+    body: JSON.stringify({ code, provider, external_id: externalId, challenge }),
+  });
+  if (!res.ok) {
+    throw new Error(`login code store failed: ${res.status} ${await res.text()}`);
+  }
+  return code;
+}
+
+/** Забирает код: запись удаляется при любом исходе, второй попытки нет. Код
+ * старше двух минут считается несуществующим. */
+export async function loginCodeConsume(
+  code: string,
+): Promise<{ provider: string; external_id: string; challenge: string } | null> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/oauth_login_codes?code=eq.${encodeURIComponent(code)}`,
+    {
+      method: "DELETE",
+      headers: restHeaders({ Prefer: "return=representation" }),
+    },
+  );
+  if (!res.ok) return null;
+  const rows = await res.json();
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const age = Date.now() - new Date(rows[0].created_at as string).getTime();
+  if (!(age >= 0 && age <= LOGIN_CODE_TTL_MS)) return null;
+  return rows[0];
+}
+
+/** Сравнение строк за постоянное время. */
+export function safeEqual(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a);
+  const y = new TextEncoder().encode(b);
+  let diff = x.length ^ y.length;
+  const n = Math.max(x.length, y.length);
+  for (let i = 0; i < n; i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
 }
 
 export interface ExternalProfile {
@@ -237,6 +315,36 @@ export function redirectToApp(params: Record<string, string>): Response {
   return new Response(null, {
     status: 302,
     headers: { Location: `${APP_CALLBACK}#${fragment}` },
+  });
+}
+
+/** Редирект в приложение с одноразовым кодом. Токенов в ссылке нет: сессию
+ * приложение получит в oauth-exchange, предъявив секрет, хеш которого мы
+ * запомнили при старте входа. */
+export function redirectWithCode(code: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: `${APP_CALLBACK}?code=${encodeURIComponent(code)}` },
+  });
+}
+
+/**
+ * Конец входа: новое приложение (прислало app_challenge) получает код,
+ * старое — токены в ссылке, пока это разрешено (ALLOW_LEGACY).
+ */
+export async function finishLogin(
+  provider: string,
+  externalId: string,
+  appChallenge: string | null,
+): Promise<Response> {
+  if (appChallenge) {
+    return redirectWithCode(await loginCodeStore(provider, externalId, appChallenge));
+  }
+  if (!ALLOW_LEGACY) return redirectError(`${provider}:update_app`);
+  const session = await mintSession(provider, externalId);
+  return redirectToApp({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
   });
 }
 

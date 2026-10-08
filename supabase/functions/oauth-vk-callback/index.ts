@@ -4,10 +4,9 @@
 // весь этот мост вместо штатного custom-провайдера GoTrue) и выдаёт сессию.
 import {
   PUBLIC_BASE_URL,
-  mintSession,
+  finishLogin,
   pkceConsume,
   redirectError,
-  redirectToApp,
   resolveProfile,
   saveVerifiedPhone,
 } from "../_shared/oauth.ts";
@@ -91,11 +90,7 @@ Deno.serve(async (req: Request) => {
     // оно одобрено в кабинете VK ID. Без права поля нет — вход не страдает.
     await saveVerifiedPhone(profileId, vkUser.phone);
 
-    const session = await mintSession("vk", externalId);
-    return redirectToApp({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    });
+    return await finishLogin("vk", externalId, pkce.app_challenge);
   } catch (e) {
     console.error("vk callback error", e);
     return redirectError("vk:internal_error");
