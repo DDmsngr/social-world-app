@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 
 /// Проводник по вкладкам после знакомства: человек сразу видит, что где,
@@ -25,7 +26,9 @@ abstract final class AppTour {
 
   static const steps = <TourStep>[
     TourStep(
-      tab: null,
+      // Приветствие показываем на Pulse — главной вкладке: если приложение
+      // открыто ярлыком чата, проводник не должен висеть поверх переписки.
+      tab: 1,
       icon: Icons.waving_hand_outlined,
       title: 'Добро пожаловать в ChaWo',
       text: 'Это лента, карта города и мессенджер в одном приложении. '
@@ -146,6 +149,7 @@ class AppTourOverlay extends StatelessWidget {
                         TextButton(onPressed: onClose, child: const Text('Пропустить')),
                       const Spacer(),
                       FilledButton(
+                        style: AppButtons.compact,
                         onPressed: last ? onClose : onNext,
                         child: Text(last ? 'Начать' : 'Дальше'),
                       ),
