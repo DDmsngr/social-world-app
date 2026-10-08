@@ -23,6 +23,11 @@ const _downloadUrl =
 
 enum _Phase { intro, loading, ready, denied, failed }
 
+/// Отдаёт ли VK номер телефона при входе. Пока право `phone` не одобрено в
+/// кабинете VK ID (и не добавлено в scope в oauth-vk-start), кнопка «Подтвердить
+/// через VK» ничего не меняла бы, поэтому её нет. Одобрили — поставить true.
+const vkReturnsPhone = false;
+
 /// Приглашение из записной книжки: сверху те, кто уже в ChaWo, ниже — остальные
 /// контакты с кнопкой «Пригласить». Номера контактов на сервер не уходят,
 /// только их хеши.
@@ -317,8 +322,9 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
   Widget _phoneBanner() {
     final via = [
       if (_providers.contains('yandex')) (OAuthBridgeProvider.yandex, 'Яндекс'),
-      if (_providers.contains('vk')) (OAuthBridgeProvider.vk, 'VK'),
+      if (_providers.contains('vk') && vkReturnsPhone) (OAuthBridgeProvider.vk, 'VK'),
     ];
+    final vkOnly = _providers.contains('vk') && !vkReturnsPhone && via.isEmpty;
     final self = _phone == PhoneStatus.self;
     return GlassCard(
       padding: const EdgeInsets.all(14),
@@ -332,8 +338,12 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
               Expanded(
                 child: Text(
                   self
-                      ? 'Номер указан вручную и не подтверждён. Подтвердите '
-                            'его входом — тогда никто не сможет занять ваш номер.'
+                      ? (vkOnly
+                            ? 'Номер указан вручную. Через VK его пока подтвердить '
+                                  'нельзя: VK не передаёт номер приложению, пока не '
+                                  'одобрит доступ. Друзья вас находят и так.'
+                            : 'Номер указан вручную и не подтверждён. Подтвердите '
+                                  'его входом — тогда никто не сможет занять ваш номер.')
                       : 'Добавьте свой номер, чтобы друзья из их записных '
                             'книжек нашли вас в ChaWo.',
                 ),
