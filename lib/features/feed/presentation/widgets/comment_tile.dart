@@ -164,7 +164,10 @@ class CommentTile extends StatelessWidget {
                       ),
                     ),
                   ),
-              Row(
+              // Wrap, а не Row: у вложенных ответов кнопки не помещаются в
+              // одну строку и раньше уезжали за край экрана.
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _Action(
                     icon: comment.likedByMe
@@ -199,7 +202,6 @@ class CommentTile extends StatelessWidget {
                       color: AppColors.textFaint,
                       onTap: onDelete,
                     ),
-                  const Spacer(),
                   // Свернуть ветку явной кнопкой: раньше это было только
                   // тапом по шапке, и про него никто не знал.
                   _Action(
