@@ -15,8 +15,8 @@ class VideoNoteResult {
   final Duration duration;
 }
 
-/// Запись кружка: фронтальная камера, круглое превью, до минуты. Запись
-/// начинается сразу при открытии, как в DDChat; «стоп» отправляет.
+/// Запись кружка: круглое превью, до минуты. Сначала человек выбирает камеру
+/// (по умолчанию фронтальная), потом нажимает запись; вторая кнопка отправляет.
 class VideoNoteRecorderScreen extends StatefulWidget {
   const VideoNoteRecorderScreen({super.key, this.maxDuration = const Duration(seconds: 60)});
 
@@ -37,6 +37,7 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   String? _error;
   bool _finishing = false;
   bool _switching = false;
+  bool _recording = false;
   bool _canFlip = false;
   var _lens = CameraLensDirection.front;
 
@@ -67,17 +68,6 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
           await camera.setZoomLevel(1.25.clamp(1.0, maxZoom));
         } catch (_) {}
       }
-      await camera.startVideoRecording();
-      _stopwatch
-        ..reset()
-        ..start();
-      _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
-        if (_stopwatch.elapsed >= _max) {
-          _finish(send: true);
-        } else if (mounted) {
-          setState(() {});
-        }
-      });
       if (mounted) {
         setState(() => _camera = camera);
       } else {
@@ -91,21 +81,51 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
     }
   }
 
-  /// Смена камеры начинает запись заново: две камеры в один файл не
-  /// склеить, поэтому снятое до переключения не сохраняется.
+  /// Запись идёт только после нажатия: до этого человек выбирает камеру.
+  Future<void> _beginRecording() async {
+    final camera = _camera;
+    if (camera == null || _recording || _switching) return;
+    try {
+      await camera.startVideoRecording();
+    } catch (error) {
+      AppLog.add('Кружок не начал запись: $error');
+      if (mounted) setState(() => _error = 'Не удалось начать запись');
+      return;
+    }
+    _recording = true;
+    _stopwatch
+      ..reset()
+      ..start();
+    _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (_stopwatch.elapsed >= _max) {
+        _finish(send: true);
+      } else if (mounted) {
+        setState(() {});
+      }
+    });
+    if (mounted) setState(() {});
+  }
+
+  /// До записи смена камеры ничего не стоит. Во время записи она начинает её
+  /// заново: два разных объектива в один файл без склейки не попадают, и снятое
+  /// до переключения не сохраняется.
   Future<void> _flip() async {
     final camera = _camera;
     if (_finishing || _switching || camera == null) return;
     _switching = true;
-    _ticker?.cancel();
-    _stopwatch
-      ..stop()
-      ..reset();
-    try {
-      final file = await camera.stopVideoRecording();
-      await File(file.path).delete().catchError((_) => File(file.path));
-    } catch (error) {
-      AppLog.add('Камера кружка не остановилась при смене: $error');
+    final wasRecording = _recording;
+    if (wasRecording) {
+      _ticker?.cancel();
+      _stopwatch
+        ..stop()
+        ..reset();
+      _recording = false;
+      try {
+        final file = await camera.stopVideoRecording();
+        await File(file.path).delete().catchError((_) => File(file.path));
+      } catch (error) {
+        AppLog.add('Камера кружка не остановилась при смене: $error');
+      }
     }
     await camera.dispose();
     if (!mounted) return;
@@ -115,11 +135,18 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
         : CameraLensDirection.front;
     await _start();
     _switching = false;
+    if (wasRecording) await _beginRecording();
   }
 
   Future<void> _finish({required bool send}) async {
     final camera = _camera;
     if (_finishing || _switching || camera == null) return;
+    if (!_recording) {
+      // Запись не начиналась — отправлять нечего.
+      _finishing = true;
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
     _finishing = true;
     _ticker?.cancel();
     _stopwatch.stop();
@@ -181,7 +208,9 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                   if (_canFlip)
                     IconButton(
                       onPressed: camera == null || _switching ? null : _flip,
-                      tooltip: 'Сменить камеру (запись начнётся заново)',
+                      tooltip: _recording
+                          ? 'Сменить камеру (запись начнётся заново)'
+                          : 'Сменить камеру',
                       icon: const Icon(Icons.cameraswitch_outlined, color: Colors.white),
                     ),
                 ],
@@ -234,19 +263,23 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                 ),
               ),
               Text(
-                '${formatDuration(_stopwatch.elapsed)} / ${formatDuration(_max)}',
+                _recording
+                    ? '${formatDuration(_stopwatch.elapsed)} / ${formatDuration(_max)}'
+                    : 'Выберите камеру и нажмите запись',
                 style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 20),
               IconButton.filled(
-                onPressed: camera == null ? null : () => _finish(send: true),
-                tooltip: 'Отправить',
+                onPressed: camera == null || _switching
+                    ? null
+                    : (_recording ? () => _finish(send: true) : _beginRecording),
+                tooltip: _recording ? 'Отправить' : 'Начать запись',
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
                   minimumSize: const Size(72, 72),
                 ),
-                icon: const Icon(Icons.send, size: 30),
+                icon: Icon(_recording ? Icons.send : Icons.fiber_manual_record, size: 30),
               ),
               const SizedBox(height: 32),
             ],

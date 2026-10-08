@@ -40,7 +40,9 @@ abstract final class SendSound {
           AudioContext(
             android: const AudioContextAndroid(
               audioFocus: AndroidAudioFocus.none,
-              usageType: AndroidUsageType.assistanceSonification,
+              // Поток уведомлений, как у щелчка входящего: «системные звуки»
+              // интерфейса на многих телефонах выключены, и звук пропадал.
+              usageType: AndroidUsageType.notificationCommunicationInstant,
               contentType: AndroidContentType.sonification,
             ),
             iOS: AudioContextIOS(
