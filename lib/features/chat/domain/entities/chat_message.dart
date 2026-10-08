@@ -165,9 +165,10 @@ class ChatMessage {
     if (kind == MessageKind.text || kind == MessageKind.sticker) {
       return caption?.isNotEmpty == true ? caption! : kind.preview;
     }
-    return caption?.isNotEmpty == true
-        ? '${kind.preview} · $caption'
+    final label = kind == MessageKind.image && (attachment?.album.isNotEmpty ?? false)
+        ? '📷 Фото (${attachment!.all.length})'
         : kind.preview;
+    return caption?.isNotEmpty == true ? '$label · $caption' : label;
   }
 
   ChatMessage copyWith({

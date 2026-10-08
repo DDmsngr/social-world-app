@@ -677,6 +677,27 @@ Future<void> _saveToGallery(
     }
     // В личных чатах файл на сервере зашифрован — в галерею уходит уже
     // расшифрованная копия с устройства.
+    final all = message.attachment?.all ?? const <ChatAttachment>[];
+    if (message.kind == MessageKind.image && all.length > 1) {
+      // Альбом сохраняется целиком, фото по одному.
+      for (var i = 0; i < all.length; i++) {
+        final path = await repository.attachmentFile(
+          ChatMessage(
+            id: i == 0 ? message.id : '${message.id}-a$i',
+            conversationId: message.conversationId,
+            senderId: message.senderId,
+            sentAt: message.sentAt,
+            kind: MessageKind.image,
+            attachment: all[i],
+          ),
+        );
+        await Gal.putImage(path, album: 'ChaWo');
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Сохранено в галерею: ${all.length} фото')),
+      );
+      return;
+    }
     final path = await repository.attachmentFile(message);
     if (message.kind == MessageKind.image) {
       await Gal.putImage(path, album: 'ChaWo');

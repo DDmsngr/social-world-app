@@ -297,9 +297,11 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     String? mime,
     int? durationMs,
     List<double>? waveform,
+    String? caption,
+    List<String>? album,
   }) async {
     final label = switch (kind) {
-      MessageKind.image => 'фото',
+      MessageKind.image => album == null ? 'фото' : 'фото (${album.length})',
       MessageKind.video => 'видео',
       MessageKind.videoNote => 'видеосообщение',
       MessageKind.voice => 'голосовое',
@@ -315,18 +317,27 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     hub?.ping(activity: kind.wire);
     final keepAlive = Timer.periodic(const Duration(seconds: 3), (_) => hub?.ping(activity: kind.wire));
     try {
-      await ref
-          .read(chatRepositoryProvider)
-          .sendAttachment(
-            conversationId: widget.conversationId,
-            kind: kind,
-            filePath: path,
-            name: name,
-            mime: mime,
-            durationMs: durationMs,
-            waveform: waveform,
-            options: SendOptions(replyTo: reply),
-          );
+      final repository = ref.read(chatRepositoryProvider);
+      if (album != null) {
+        await repository.sendAlbum(
+          conversationId: widget.conversationId,
+          filePaths: album,
+          caption: caption,
+          options: SendOptions(replyTo: reply),
+        );
+      } else {
+        await repository.sendAttachment(
+          conversationId: widget.conversationId,
+          kind: kind,
+          filePath: path,
+          name: name,
+          mime: mime,
+          durationMs: durationMs,
+          waveform: waveform,
+          caption: caption,
+          options: SendOptions(replyTo: reply),
+        );
+      }
       if (reply != null) widget.onReplyCleared?.call();
       _afterSend();
     } catch (error) {
@@ -335,6 +346,62 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       keepAlive.cancel();
       hub?.stop();
       if (mounted) setState(() => _uploads.remove(label));
+    }
+  }
+
+  /// Подпись к видео или файлу перед отправкой. null — передумали отправлять,
+  /// пустая строка — отправить без подписи.
+  Future<String?> _askCaption(String what) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(what),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 1000,
+          minLines: 1,
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Подпись (необязательно)', counterText: ''),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Отправить'),
+          ),
+        ],
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
+  /// Фото одним сообщением (альбомом) по [maxAlbumPhotos] штук: что больше —
+  /// уходит следующим альбомом. Подпись — к первому сообщению. Одиночное фото
+  /// (в том числе остаток группы) уходит обычным вложением.
+  Future<void> _sendPhotos(PhotoSendResult chosen) async {
+    final paths = chosen.paths;
+    for (var start = 0; start < paths.length; start += maxAlbumPhotos) {
+      final end = start + maxAlbumPhotos > paths.length ? paths.length : start + maxAlbumPhotos;
+      final group = paths.sublist(start, end);
+      final caption = start == 0 && chosen.caption.isNotEmpty ? chosen.caption : null;
+      if (group.length == 1) {
+        await _upload(
+          kind: MessageKind.image,
+          path: group.first,
+          name: group.first.split(Platform.pathSeparator).last,
+          mime: 'image/jpeg',
+          caption: caption,
+        );
+      } else {
+        await _upload(
+          kind: MessageKind.image,
+          path: group.first,
+          album: group,
+          caption: caption,
+        );
+      }
     }
   }
 
@@ -376,14 +443,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           if (images.isEmpty || !mounted) return;
           // Перед отправкой — просмотр и правка (рисовать, обрезать, повернуть).
           final chosen = await showPhotoSendScreen(context, [for (final i in images) i.path]);
-          for (final path in chosen ?? const <String>[]) {
-            await _upload(
-              kind: MessageKind.image,
-              path: path,
-              name: path.split(Platform.pathSeparator).last,
-              mime: 'image/jpeg',
-            );
-          }
+          if (chosen != null) await _sendPhotos(chosen);
         case 'camera':
           final image = await _picker.pickImage(
             source: ImageSource.camera,
@@ -393,22 +453,18 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           );
           if (image == null || !mounted) return;
           final chosen = await showPhotoSendScreen(context, [image.path]);
-          for (final path in chosen ?? const <String>[]) {
-            await _upload(
-              kind: MessageKind.image,
-              path: path,
-              name: path.split(Platform.pathSeparator).last,
-              mime: 'image/jpeg',
-            );
-          }
+          if (chosen != null) await _sendPhotos(chosen);
         case 'video':
           final video = await _picker.pickVideo(source: ImageSource.gallery);
-          if (video != null) {
+          if (video != null && mounted) {
+            final caption = await _askCaption('Видео');
+            if (caption == null) return;
             await _upload(
               kind: MessageKind.video,
               path: video.path,
               name: video.name,
               mime: 'video/mp4',
+              caption: caption.isEmpty ? null : caption,
             );
           }
         case 'videonote':
@@ -426,12 +482,15 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
         case 'file':
           final file = await FilePicker.pickFile();
           final path = file?.path;
-          if (file != null && path != null) {
+          if (file != null && path != null && mounted) {
+            final caption = await _askCaption('Файл «${file.name}»');
+            if (caption == null) return;
             await _upload(
               kind: MessageKind.file,
               path: path,
               name: file.name,
               mime: mimeFromName(file.name),
+              caption: caption.isEmpty ? null : caption,
             );
           }
       }

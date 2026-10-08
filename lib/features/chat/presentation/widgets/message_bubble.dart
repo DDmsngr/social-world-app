@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/link_text.dart';
+import '../../../channels/presentation/widgets/channel_media.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_meta.dart';
 import 'attachment_views.dart';
@@ -89,6 +90,15 @@ class MessageBubble extends StatelessWidget {
                 _ => 36,
               },
               height: 1.1,
+            ),
+          )
+        else if (hasAttachment && message.attachment!.album.isNotEmpty)
+          // Несколько фото одним сообщением: сетка по пропорциям кадров.
+          SizedBox(
+            width: 260,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: MessageAlbum(message: message),
             ),
           )
         else if (hasAttachment)

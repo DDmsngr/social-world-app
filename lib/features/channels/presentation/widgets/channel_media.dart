@@ -37,6 +37,17 @@ class ChannelMedia extends StatelessWidget {
   }
 }
 
+/// Альбом сеткой для любого сообщения, у которого есть вложения-альбом
+/// (чаты, группы, каналы).
+class MessageAlbum extends StatelessWidget {
+  const MessageAlbum({super.key, required this.message});
+
+  final ChatMessage message;
+
+  @override
+  Widget build(BuildContext context) => _Album(message: message);
+}
+
 /// Пост-альбом: несколько фото и видео сеткой, как в Telegram. Ряды: 2 → [2],
 /// 3 → [1, 2], 4 → [2, 2], 6 → [3, 3] и т. д. Высота ряда подбирается по
 /// пропорциям кадров: два вертикальных фото встают рядом целиком, а не

@@ -581,6 +581,107 @@ class SecureChatRepository implements ChatRepository {
   }
 
   @override
+  Future<ChatMessage> sendAlbum({
+    required String conversationId,
+    required List<String> filePaths,
+    String? caption,
+    SendOptions options = SendOptions.none,
+  }) async {
+    if (filePaths.length < 2 || filePaths.length > maxAlbumPhotos) {
+      throw ArgumentError('В альбоме от 2 до $maxAlbumPhotos фото');
+    }
+    await _ready;
+    final direct = await _kind(conversationId) == ConversationKind.direct;
+    final id = _uuid.v4();
+    final photos = <ChatAttachment>[];
+    final storagePaths = <String>[];
+
+    Future<void> removeUploaded() => _client.storage
+        .from(_bucket)
+        .remove(storagePaths)
+        .then((_) {})
+        .catchError((_) {});
+
+    try {
+      for (var i = 0; i < filePaths.length; i++) {
+        final clear = stripJpegMetadata(await File(filePaths[i]).readAsBytes());
+        if (clear.length > maxAttachmentBytes) throw const ChatAttachmentTooLarge();
+        final storagePath = '$conversationId/${i == 0 ? id : '$id-a$i'}';
+        String? key;
+        var upload = clear;
+        if (direct) {
+          final encrypted = await ChatCryptoService.encryptFile(clear);
+          upload = encrypted.bytes;
+          key = encrypted.key;
+        }
+        await _client.storage
+            .from(_bucket)
+            .uploadBinary(
+              storagePath,
+              upload,
+              fileOptions: FileOptions(
+                contentType: direct ? 'application/octet-stream' : 'image/jpeg',
+              ),
+            );
+        storagePaths.add(storagePath);
+        photos.add(
+          ChatAttachment(
+            path: storagePath,
+            size: clear.length,
+            name: filePaths[i].split(RegExp(r'[\\/]')).last,
+            mime: 'image/jpeg',
+            key: key,
+          ),
+        );
+      }
+
+      final first = photos.first;
+      final attachment = ChatAttachment(
+        path: first.path,
+        size: first.size,
+        name: first.name,
+        mime: first.mime,
+        key: first.key,
+        album: photos.skip(1).toList(),
+      );
+      final text = caption?.trim();
+      await _insert(
+        id: id,
+        conversationId: conversationId,
+        kind: MessageKind.image,
+        text: text == null || text.isEmpty ? null : text,
+        attachment: attachment,
+        options: options,
+      );
+      for (var i = 0; i < filePaths.length; i++) {
+        await ChatMediaCache.keepSent(
+          i == 0 ? id : '$id-a$i',
+          MessageKind.image,
+          filePaths[i],
+          photos[i].name,
+        ).catchError((_) {});
+      }
+      return ChatMessage(
+        id: id,
+        conversationId: conversationId,
+        senderId: currentUserId,
+        sentAt: DateTime.now(),
+        kind: MessageKind.image,
+        text: text == null || text.isEmpty ? null : text,
+        attachment: attachment,
+        status: MessageStatus.sent,
+        signatureValid: true,
+        replyTo: options.replyTo,
+        forwardedFrom: options.forwardedFrom,
+      );
+    } catch (_) {
+      // Сообщение не ушло целиком — загруженные файлы без него не нужны.
+      await removeUploaded();
+      rethrow;
+    }
+  }
+
+  @override
   Future<String> attachmentFile(ChatMessage message) async {
     final attachment = message.attachment;
     if (attachment == null) throw StateError('У сообщения нет вложения');

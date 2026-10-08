@@ -7,11 +7,20 @@ import 'package:pro_image_editor/pro_image_editor.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
+/// Что решил человек на экране просмотра: какие фото отправить и с какой
+/// подписью (пустая — без подписи).
+class PhotoSendResult {
+  const PhotoSendResult(this.paths, this.caption);
+
+  final List<String> paths;
+  final String caption;
+}
+
 /// Выбранные фото перед отправкой: листать, «Изменить» (рисовать, обрезать,
-/// повернуть, текст, фильтры), убрать лишнее. Возвращает пути к тому, что
-/// отправить, или null, если передумали.
-Future<List<String>?> showPhotoSendScreen(BuildContext context, List<String> paths) {
-  return Navigator.of(context, rootNavigator: true).push<List<String>>(
+/// повернуть, текст, фильтры), убрать лишнее, написать подпись. Возвращает
+/// то, что отправить, или null, если передумали.
+Future<PhotoSendResult?> showPhotoSendScreen(BuildContext context, List<String> paths) {
+  return Navigator.of(context, rootNavigator: true).push<PhotoSendResult>(
     MaterialPageRoute(fullscreenDialog: true, builder: (_) => _PhotoSendScreen(paths)),
   );
 }
@@ -28,6 +37,7 @@ class _PhotoSendScreen extends StatefulWidget {
 class _PhotoSendScreenState extends State<_PhotoSendScreen> {
   late final List<String> _paths = [...widget.initial];
   final _pages = PageController();
+  final _caption = TextEditingController();
   var _index = 0;
 
   Future<void> _edit() async {
@@ -46,6 +56,7 @@ class _PhotoSendScreenState extends State<_PhotoSendScreen> {
   @override
   void dispose() {
     _pages.dispose();
+    _caption.dispose();
     super.dispose();
   }
 
@@ -78,6 +89,28 @@ class _PhotoSendScreenState extends State<_PhotoSendScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              controller: _caption,
+              maxLength: 1000,
+              minLines: 1,
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: many ? 'Подпись ко всем фото' : 'Добавить подпись',
+                hintStyle: const TextStyle(color: Colors.white54),
+                counterText: '',
+                filled: true,
+                fillColor: Colors.white12,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
           SafeArea(
             top: false,
             child: Padding(
@@ -95,7 +128,9 @@ class _PhotoSendScreenState extends State<_PhotoSendScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () => Navigator.of(context).pop(_paths),
+                      onPressed: () => Navigator.of(context).pop(
+                        PhotoSendResult(_paths, _caption.text.trim()),
+                      ),
                       style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
                       icon: const Icon(Icons.send),
                       label: Text(many ? 'Отправить ${_paths.length}' : 'Отправить'),
