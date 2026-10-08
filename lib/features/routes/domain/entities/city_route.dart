@@ -1,3 +1,5 @@
+import '../../../feed/domain/entities/post.dart';
+
 /// Точка пути. Намеренно без времени: в базе маршрут лежит как linestring,
 /// у которого поточечных отметок времени нет — они нужны только во время
 /// записи и живут в [RouteDraft].
@@ -80,6 +82,8 @@ class RouteDraft {
     required this.duration,
     required this.startedAt,
     this.photos = const [],
+    this.visibility = PostVisibility.everyone,
+    this.linkAccess = false,
   });
 
   final String title;
@@ -88,4 +92,10 @@ class RouteDraft {
   final Duration duration;
   final DateTime startedAt;
   final List<PendingRoutePhoto> photos;
+
+  /// Кому виден маршрут. Сервер проверяет его так же, как видимость поста.
+  final PostVisibility visibility;
+
+  /// Открывается ли маршрут по прямой ссылке, даже если в ленте он скрыт.
+  final bool linkAccess;
 }

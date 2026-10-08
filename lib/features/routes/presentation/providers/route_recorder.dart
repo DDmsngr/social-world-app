@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/debug/app_log.dart';
+import '../../../feed/domain/entities/post.dart';
 import '../../domain/entities/city_route.dart';
 
 enum RecordingStatus {
@@ -314,13 +315,19 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     );
   }
 
-  RouteDraft draft(String title) => RouteDraft(
+  RouteDraft draft(
+    String title, {
+    PostVisibility visibility = PostVisibility.everyone,
+    bool linkAccess = false,
+  }) => RouteDraft(
     title: title,
     path: state.path,
     distanceMeters: state.distanceMeters,
     duration: state.elapsed,
     startedAt: state.startedAt ?? DateTime.now(),
     photos: state.photos,
+    visibility: visibility,
+    linkAccess: linkAccess,
   );
 
   Future<bool> _ensurePermission() async {
