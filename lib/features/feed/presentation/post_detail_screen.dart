@@ -1,7 +1,10 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/debug/app_log.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
@@ -10,6 +13,7 @@ import '../../auth/presentation/providers/auth_providers.dart';
 import '../domain/comment_thread.dart';
 import '../domain/entities/comment.dart';
 import '../domain/entities/post.dart';
+import '../domain/repositories/comments_repository.dart';
 import 'providers/comments_providers.dart';
 import 'providers/feed_providers.dart';
 import 'widgets/comment_composer.dart';
@@ -100,21 +104,60 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     }
     return widget.post ?? _fetched;
   }
+  /// Картинки, приложенные к будущему комментарию (пути на телефоне).
+  final _media = <String>[];
+  final _picker = ImagePicker();
+
+  Future<void> _pickPhotos() async {
+    try {
+      final room = maxCommentMedia - _media.length;
+      if (room <= 0) return;
+      final picked = await _picker.pickMultiImage(
+        imageQuality: 85,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        limit: room,
+      );
+      if (picked.isEmpty || !mounted) return;
+      setState(() => _media.addAll(picked.take(room).map((file) => file.path)));
+    } catch (error) {
+      AppLog.add('Фото для комментария: $error');
+    }
+  }
+
+  /// GIF берётся файлом как есть: через обычную галерею Android пересжимает
+  /// кадры, и анимация пропадает.
+  Future<void> _pickGif() async {
+    try {
+      if (_media.length >= maxCommentMedia) return;
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['gif'],
+      );
+      final path = files.isEmpty ? null : files.first.path;
+      if (path == null || !mounted) return;
+      setState(() => _media.add(path));
+    } catch (error) {
+      AppLog.add('GIF для комментария: $error');
+    }
+  }
+
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty && _media.isEmpty) return;
 
     setState(() => _sending = true);
     try {
       await ref
           .read(commentsProvider(widget.postId).notifier)
-          .add(text, parent: _replyTo);
+          .add(text, parent: _replyTo, mediaPaths: List.of(_media));
       ref.read(feedProvider.notifier).bumpCommentCount(widget.postId, 1);
 
       if (!mounted) return;
       _controller.clear();
       setState(() {
         _replyTo = null;
+        _media.clear();
         _sending = false;
       });
     } catch (_) {
@@ -251,6 +294,10 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             sending: _sending,
             onCancelReply: () => setState(() => _replyTo = null),
             onSend: _send,
+            attachments: _media,
+            onPickPhotos: _pickPhotos,
+            onPickGif: _pickGif,
+            onRemoveAttachment: (index) => setState(() => _media.removeAt(index)),
           ),
         ],
       ),

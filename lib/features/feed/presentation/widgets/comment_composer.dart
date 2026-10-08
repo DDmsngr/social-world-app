@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -19,6 +21,10 @@ class CommentComposer extends StatefulWidget {
     required this.sending,
     required this.onCancelReply,
     required this.onSend,
+    this.attachments = const [],
+    this.onPickPhotos,
+    this.onPickGif,
+    this.onRemoveAttachment,
   });
 
   final TextEditingController controller;
@@ -27,6 +33,15 @@ class CommentComposer extends StatefulWidget {
   final bool sending;
   final VoidCallback onCancelReply;
   final VoidCallback onSend;
+
+  /// Выбранные, но ещё не отправленные картинки (пути на телефоне).
+  final List<String> attachments;
+
+  /// Пока null, кнопки вложения нет (например, в комментариях к постам
+  /// каналов).
+  final VoidCallback? onPickPhotos;
+  final VoidCallback? onPickGif;
+  final void Function(int index)? onRemoveAttachment;
 
   @override
   State<CommentComposer> createState() => _CommentComposerState();
@@ -106,8 +121,56 @@ class _CommentComposerState extends State<CommentComposer> {
                         ],
                       ),
                     ),
+                  if (widget.attachments.isNotEmpty)
+                    SizedBox(
+                      height: 64,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.gutter - 4, 0, 0, 8),
+                        itemCount: widget.attachments.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) => Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(widget.attachments[index]),
+                                width: 56,
+                                height: 56,
+                                fit: BoxFit.cover,
+                                cacheWidth: 160,
+                              ),
+                            ),
+                            Positioned(
+                              top: -6,
+                              right: -6,
+                              child: GestureDetector(
+                                onTap: () => widget.onRemoveAttachment?.call(index),
+                                child: CircleAvatar(
+                                  radius: 10,
+                                  backgroundColor: AppColors.ink,
+                                  child: Icon(Icons.close, size: 13, color: AppColors.text),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   Row(
                     children: [
+                      if (widget.onPickPhotos != null)
+                        PopupMenuButton<String>(
+                          tooltip: 'Фото или GIF',
+                          icon: Icon(Icons.add_photo_alternate_outlined, color: AppColors.textDim),
+                          onSelected: (value) =>
+                              value == 'gif' ? widget.onPickGif?.call() : widget.onPickPhotos?.call(),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'photo', child: Text('Фото из галереи')),
+                            PopupMenuItem(value: 'gif', child: Text('GIF-файл')),
+                          ],
+                        ),
                       IconButton(
                         onPressed: _toggleEmoji,
                         tooltip: _emoji ? 'Клавиатура' : 'Эмодзи и стикеры',

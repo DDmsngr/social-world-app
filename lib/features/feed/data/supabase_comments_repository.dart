@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/media/media_uploader.dart';
 import '../domain/entities/comment.dart';
 import '../domain/repositories/comments_repository.dart';
 
@@ -40,9 +41,19 @@ class SupabaseCommentsRepository implements CommentsRepository {
     required String postId,
     required String body,
     Comment? parent,
+    List<String> mediaPaths = const [],
   }) async {
     final userId = _userId;
     final channelPost = channelPostOf(postId);
+    if (channelPost != null && mediaPaths.isNotEmpty) {
+      throw ArgumentError('Картинки в комментариях к постам каналов пока недоступны');
+    }
+    // Файлы уходят до записи комментария: сорвётся загрузка — в ветке не
+    // останется комментария с битыми ссылками.
+    final uploader = MediaUploader(_client, bucket: 'post-media');
+    final mediaUrls = <String>[
+      for (final path in mediaPaths.take(maxCommentMedia)) await uploader.upload(path),
+    ];
     final Map<String, dynamic> row;
     if (channelPost != null) {
       final rows = await _client.rpc(
@@ -58,6 +69,7 @@ class SupabaseCommentsRepository implements CommentsRepository {
             'parent_id': parent?.id,
             'author_id': userId,
             'body': body.trim(),
+            'media_urls': mediaUrls,
           })
           .select()
           .single();
@@ -87,6 +99,7 @@ class SupabaseCommentsRepository implements CommentsRepository {
       authorName: authorName ?? 'Без имени',
       authorAvatarUrl: authorAvatarUrl,
       body: row['body'] as String?,
+      mediaUrls: mediaUrls,
       createdAt: DateTime.parse(row['created_at'] as String),
       depth: parent == null ? 0 : parent.depth + 1,
     );

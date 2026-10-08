@@ -28,6 +28,7 @@ class LocalCommentsRepository implements CommentsRepository {
     required String postId,
     required String body,
     Comment? parent,
+    List<String> mediaPaths = const [],
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     final comment = Comment(
@@ -37,6 +38,7 @@ class LocalCommentsRepository implements CommentsRepository {
       authorId: currentUserId(),
       authorName: currentUserName(),
       body: body.trim(),
+      mediaUrls: mediaPaths,
       createdAt: DateTime.now(),
       depth: parent == null ? 0 : parent.depth + 1,
     );
