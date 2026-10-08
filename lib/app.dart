@@ -12,6 +12,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_choice.dart';
+import 'features/notifications/bell.dart';
 
 class SocialWorldApp extends ConsumerStatefulWidget {
   const SocialWorldApp({super.key});
@@ -102,6 +103,14 @@ class _SocialWorldAppState extends ConsumerState<SocialWorldApp>
       darkTheme: _darkTheme,
       themeMode: palette.isDark ? ThemeMode.dark : ThemeMode.light,
       routerConfig: router,
+      // Колокольчик уведомлений живёт над всем приложением, поверх любого
+      // экрана; сам он появляется только по событию.
+      builder: (context, child) => Stack(
+        children: [
+          Positioned.fill(child: child ?? const SizedBox.shrink()),
+          NotificationBell(router: router),
+        ],
+      ),
       locale: const Locale('ru'),
       supportedLocales: const [Locale('ru'), Locale('en')],
       localizationsDelegates: const [

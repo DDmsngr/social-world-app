@@ -88,6 +88,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 10),
           const _LastSeenSwitch(),
           const SizedBox(height: 26),
+          const SectionLabel('Уведомления'),
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            onTap: () => context.push(Routes.notificationSettings),
+            child: Row(
+              children: [
+                Icon(Icons.notifications_none, color: AppColors.primaryTint),
+                const SizedBox(width: 14),
+                const Expanded(child: Text('Что присылать, звук и тихие часы')),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
+          const SizedBox(height: 26),
           const SectionLabel('Чаты'),
           const SizedBox(height: 12),
           const _SendSoundSwitch(),

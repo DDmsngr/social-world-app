@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/calls/call_background.dart';
 import '../../features/calls/call_controller.dart';
 import '../../features/chat/presentation/providers/chat_providers.dart';
+import '../../features/notifications/bell.dart';
 import '../../features/notifications/notifications.dart';
 import '../audio/incoming_click.dart';
 import '../config/env.dart';
@@ -224,6 +225,10 @@ class PushService {
       if (data['conversation_id'] == activeConversationId) return;
     } else {
       _ref.read(notificationsProvider.notifier).refreshQuietly();
+      // Приложение открыто: вместо системного уведомления — колокольчик
+      // поверх экрана со своим звуком.
+      _ref.read(bellProvider.notifier).ping();
+      return;
     }
 
     final notification = message.notification;

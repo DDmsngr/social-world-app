@@ -33,6 +33,7 @@ import '../../features/needs/domain/entities/need_request.dart';
 import '../../features/needs/presentation/create_need_screen.dart';
 import '../../features/needs/presentation/my_needs_screen.dart';
 import '../../features/needs/presentation/need_detail_screen.dart';
+import '../../features/notifications/notification_settings_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/channels/presentation/channel_catalog_screen.dart';
 import '../../features/chat/presentation/chat_search_screen.dart';
@@ -103,6 +104,7 @@ abstract final class Routes {
   /// Лента хэштега: ${Routes.hashtag}/<тег без #>.
   static const hashtag = '/tags';
   static const notifications = '/notifications';
+  static const notificationSettings = '/profile/settings/notifications';
   static const places = '/places';
 
   /// Запись и просмотр маршрутов живут вне вкладок: во время прогулки нижняя
@@ -375,6 +377,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.settings,
         builder: (_, _) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.notificationSettings,
+        builder: (_, _) => const NotificationSettingsScreen(),
       ),
       GoRoute(
         path: Routes.events,
