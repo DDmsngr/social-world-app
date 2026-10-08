@@ -15,7 +15,16 @@ class Analytics {
   static Future<void> init() async {
     if (kIsWeb || _ready) return;
     try {
-      await AppMetrica.activate(AppMetricaConfig(_apiKey));
+      // Геопозицию и рекламный идентификатор не собираем: у приложения есть
+      // разрешение на геолокацию, и по умолчанию SDK отправил бы точное
+      // положение телефона, а мы обещаем, что оно не уходит с устройства.
+      await AppMetrica.activate(
+        AppMetricaConfig(
+          _apiKey,
+          locationTracking: false,
+          advIdentifiersTracking: false,
+        ),
+      );
       _ready = true;
     } catch (error) {
       AppLog.add('AppMetrica: $error');
