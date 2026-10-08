@@ -39,6 +39,7 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   bool _switching = false;
   bool _recording = false;
   bool _canFlip = false;
+  var _cameras = <CameraDescription>[];
   var _lens = CameraLensDirection.front;
 
   @override
@@ -51,6 +52,7 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw StateError('Камеры нет');
+      _cameras = cameras;
       _canFlip =
           cameras.any((c) => c.lensDirection == CameraLensDirection.front) &&
           cameras.any((c) => c.lensDirection == CameraLensDirection.back);
@@ -60,14 +62,8 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
       );
       final camera = CameraController(description, ResolutionPreset.medium);
       await camera.initialize();
-      // Лёгкий зум убирает «рыбий глаз» фронталки (приём из DDChat); у
-      // основной камеры зум не нужен.
-      if (description.lensDirection == CameraLensDirection.front) {
-        try {
-          final maxZoom = await camera.getMaxZoomLevel();
-          await camera.setZoomLevel(1.25.clamp(1.0, maxZoom));
-        } catch (_) {}
-      }
+      _lens = description.lensDirection;
+      await _applyZoom(camera);
       if (mounted) {
         setState(() => _camera = camera);
       } else {
@@ -106,36 +102,50 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
     if (mounted) setState(() {});
   }
 
-  /// До записи смена камеры ничего не стоит. Во время записи она начинает её
-  /// заново: два разных объектива в один файл без склейки не попадают, и снятое
-  /// до переключения не сохраняется.
+  CameraLensDirection get _otherLens => _lens == CameraLensDirection.front
+      ? CameraLensDirection.back
+      : CameraLensDirection.front;
+
+  /// Смена камеры. Во время записи объектив переключается на лету, запись и
+  /// таймер продолжаются (CameraX держит запись при смене камеры). До записи
+  /// просто пересоздаётся превью.
   Future<void> _flip() async {
     final camera = _camera;
     if (_finishing || _switching || camera == null) return;
     _switching = true;
-    final wasRecording = _recording;
-    if (wasRecording) {
-      _ticker?.cancel();
-      _stopwatch
-        ..stop()
-        ..reset();
-      _recording = false;
-      try {
-        final file = await camera.stopVideoRecording();
-        await File(file.path).delete().catchError((_) => File(file.path));
-      } catch (error) {
-        AppLog.add('Камера кружка не остановилась при смене: $error');
+    try {
+      if (_recording) {
+        final target = _cameras.firstWhere(
+          (c) => c.lensDirection == _otherLens,
+          orElse: () => camera.description,
+        );
+        await camera.setDescription(target);
+        _lens = target.lensDirection;
+        await _applyZoom(camera);
+        if (mounted) setState(() {});
+        return;
       }
+      await camera.dispose();
+      if (!mounted) return;
+      setState(() => _camera = null);
+      _lens = _otherLens;
+      await _start();
+    } catch (error) {
+      AppLog.add('Смена камеры кружка: $error');
+      if (mounted) setState(() => _error = 'Не удалось сменить камеру');
+    } finally {
+      _switching = false;
     }
-    await camera.dispose();
-    if (!mounted) return;
-    setState(() => _camera = null);
-    _lens = _lens == CameraLensDirection.front
-        ? CameraLensDirection.back
-        : CameraLensDirection.front;
-    await _start();
-    _switching = false;
-    if (wasRecording) await _beginRecording();
+  }
+
+  // Лёгкий зум убирает «рыбий глаз» фронталки (приём из DDChat); у основной
+  // камеры зум не нужен.
+  Future<void> _applyZoom(CameraController camera) async {
+    try {
+      final maxZoom = await camera.getMaxZoomLevel();
+      final wanted = _lens == CameraLensDirection.front ? 1.25 : 1.0;
+      await camera.setZoomLevel(wanted.clamp(1.0, maxZoom));
+    } catch (_) {}
   }
 
   Future<void> _finish({required bool send}) async {
@@ -208,9 +218,7 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                   if (_canFlip)
                     IconButton(
                       onPressed: camera == null || _switching ? null : _flip,
-                      tooltip: _recording
-                          ? 'Сменить камеру (запись начнётся заново)'
-                          : 'Сменить камеру',
+                      tooltip: 'Сменить камеру',
                       icon: const Icon(Icons.cameraswitch_outlined, color: Colors.white),
                     ),
                 ],
