@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/analytics/analytics.dart';
 import '../../../core/media/media_uploader.dart';
 import '../../../core/permissions/content_permissions.dart';
 import '../domain/entities/post.dart';
@@ -130,6 +131,7 @@ class SupabaseFeedRepository implements FeedRepository {
         })
         .select()
         .single();
+    Analytics.event('post_created');
 
     // Пост уже записан — сбой в этом отдельном чтении не должен превращать
     // успешную публикацию в «не удалось»: имя/аватар просто отобразятся не

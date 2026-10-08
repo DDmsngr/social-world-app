@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'core/analytics/analytics.dart';
 import 'core/config/env.dart';
 import 'core/config/mapkit_boot.dart';
 import 'core/debug/app_log.dart';
@@ -51,6 +52,7 @@ Future<void> main() async {
   };
 
   await Env.load();
+  unawaited(Analytics.init());
   if (Env.isConfigured) {
     // initialize читает сохранённую сессию и подписывается на ссылки; на
     // странном телефоне это может зависнуть, и тогда приложение не дошло бы до

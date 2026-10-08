@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/analytics/analytics.dart';
 import '../../core/config/env.dart';
 import '../../core/debug/app_log.dart';
 import '../../core/router/app_router.dart';
@@ -136,6 +137,7 @@ class CallController extends ChangeNotifier {
     required bool video,
   }) async {
     if (busy) return;
+    Analytics.event(video ? 'call_started_video' : 'call_started_audio');
     _reset();
     call = CallInfo(
       id: '',
