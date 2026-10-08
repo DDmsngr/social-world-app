@@ -75,10 +75,20 @@ class LocalAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AppUser> completeProfile({required String displayName}) async {
+  Future<AppUser> completeProfile({
+    required String displayName,
+    required String city,
+    String? username,
+  }) async {
     final current = _user;
     if (current == null) throw Exception('Нет активной сессии');
-    return _openSession(current.copyWith(displayName: displayName.trim()));
+    return _openSession(
+      current.copyWith(
+        displayName: displayName.trim(),
+        city: city,
+        username: username == null ? null : Username.normalize(username),
+      ),
+    );
   }
 
   @override
@@ -86,6 +96,7 @@ class LocalAuthRepository implements AuthRepository {
     String? displayName,
     String? bio,
     String? city,
+    String? username,
     String? avatarLocalPath,
   }) async {
     final current = _user;
@@ -105,6 +116,9 @@ class LocalAuthRepository implements AuthRepository {
             : (city.trim().isEmpty ? null : city.trim()),
         socialScore: current.socialScore,
         locationBlurM: current.locationBlurM,
+        username: username == null
+            ? current.username
+            : (Username.normalize(username).isEmpty ? null : Username.normalize(username)),
       ),
     );
   }

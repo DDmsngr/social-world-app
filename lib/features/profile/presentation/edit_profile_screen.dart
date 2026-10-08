@@ -10,6 +10,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/user_avatar.dart';
+import '../../auth/domain/repositories/auth_repository.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../chat/presentation/widgets/video_note_recorder.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
@@ -118,6 +119,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late final TextEditingController _name;
   late final TextEditingController _city;
   late final TextEditingController _bio;
+  late final TextEditingController _nick;
+  String? _nickError;
   final _picker = ImagePicker();
 
   XFile? _newAvatar;
@@ -130,6 +133,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _name = TextEditingController(text: me?.displayName ?? '');
     _city = TextEditingController(text: me?.city ?? '');
     _bio = TextEditingController(text: me?.bio ?? '');
+    _nick = TextEditingController(text: me?.username ?? '');
   }
 
   @override
@@ -137,10 +141,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _name.dispose();
     _city.dispose();
     _bio.dispose();
+    _nick.dispose();
     super.dispose();
   }
 
-  bool get _valid => _name.text.trim().length >= 2;
+  bool get _valid =>
+      _name.text.trim().length >= 2 && Username.validate(_nick.text) == null;
 
   Future<void> _pickAvatar(ImageSource source) async {
     final file = await _picker.pickImage(
@@ -203,6 +209,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         displayName: _name.text,
         city: _city.text,
         bio: _bio.text,
+        username: _nick.text,
         avatarLocalPath: _newAvatar?.path,
       );
 
@@ -217,6 +224,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final messenger = ScaffoldMessenger.of(context);
       context.canPop() ? context.pop() : context.go(Routes.profile);
       messenger.showSnackBar(const SnackBar(content: Text('Профиль сохранён')));
+    } on UsernameTakenException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _nickError = error.toString();
+      });
     } catch (error) {
       AppLog.add('Профиль не сохранился: $error');
       if (!mounted) return;
@@ -301,6 +314,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(labelText: 'Имя'),
             onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _nick,
+            autocorrect: false,
+            maxLength: 21,
+            decoration: InputDecoration(
+              labelText: 'Ник',
+              prefixText: '@',
+              helperText: 'По нику вас найдут, не зная номера телефона',
+              errorText: _nickError ?? Username.validate(_nick.text),
+            ),
+            onChanged: (_) => setState(() => _nickError = null),
           ),
           const SizedBox(height: 10),
           TextField(

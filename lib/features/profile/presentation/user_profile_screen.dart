@@ -67,6 +67,7 @@ class UserProfileScreen extends ConsumerWidget {
         avatarUrl: me.avatarUrl,
         bio: me.bio,
         city: me.city,
+        username: me.username,
         socialScore: me.socialScore,
         followerCount: profile?.followerCount ?? 0,
         followingCount: profile?.followingCount ?? 0,
@@ -365,6 +366,11 @@ class _BodyState extends ConsumerState<_Body> {
         ),
         const SizedBox(height: 12),
         Text(profile.displayName, style: theme.textTheme.titleLarge),
+        if (profile.username != null)
+          Text(
+            '@${profile.username}',
+            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.primaryTint),
+          ),
         if (profile.city != null)
           Text(profile.city!, style: theme.textTheme.bodyMedium),
         if (profile.bio != null && profile.bio!.isNotEmpty) ...[

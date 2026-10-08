@@ -46,14 +46,18 @@ class _FakeAuthRepository implements AuthRepository {
   Future<void> deleteAccount() async => emit(null);
 
   @override
-  Future<AppUser> completeProfile({required String displayName}) async =>
-      _current!;
+  Future<AppUser> completeProfile({
+    required String displayName,
+    required String city,
+    String? username,
+  }) async => _current!;
 
   @override
   Future<AppUser> updateProfile({
     String? displayName,
     String? bio,
     String? city,
+    String? username,
     String? avatarLocalPath,
   }) async => _current!;
 

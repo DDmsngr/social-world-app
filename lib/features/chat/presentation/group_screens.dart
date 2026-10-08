@@ -286,6 +286,7 @@ class _PeoplePickerState extends ConsumerState<PeoplePicker> {
                       url: hit.avatarUrl,
                     ),
                     title: Text(hit.displayName),
+                    subtitle: hit.username == null ? null : Text('@${hit.username}'),
                   );
                 },
               );

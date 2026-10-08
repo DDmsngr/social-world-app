@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/debug/app_log.dart';
@@ -7,8 +7,16 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
+import '../../../discover/domain/entities/city.dart';
+import '../../../discover/presentation/providers/city_provider.dart';
+import '../../../discover/presentation/widgets/city_picker.dart';
+import '../../../shell/presentation/app_tour.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../providers/auth_providers.dart';
 
+/// Знакомство после первого входа: имя, город, по желанию @ник. Город не
+/// подставляется сам — раньше всем ставился Сочи, и человек открывал карту
+/// чужого города. После знакомства показывается проводник по вкладкам.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -17,15 +25,69 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 }
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
-  final _nameController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _nickController;
+  City? _city;
   double _radius = GeoPrivacy.defaultRadiusMeters;
   bool _busy = false;
   String? _error;
+  String? _nickError;
+
+  @override
+  void initState() {
+    super.initState();
+    final me = ref.read(currentUserProvider);
+    // Вход через VK/Яндекс уже знает имя — подставляем, человек поправит.
+    _nameController = TextEditingController(text: me?.displayName ?? '');
+    _nickController = TextEditingController(text: me?.username ?? '');
+    _city = Cities.byName(me?.city);
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _nickController.dispose();
     super.dispose();
+  }
+
+  bool get _valid =>
+      _nameController.text.trim().length >= 2 &&
+      _city != null &&
+      Username.validate(_nickController.text) == null;
+
+  Future<void> _pickCity() async {
+    final city = await chooseCity(context, selected: _city);
+    if (city != null && mounted) setState(() => _city = city);
+  }
+
+  Future<void> _submit() async {
+    final city = _city;
+    if (city == null) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+      _nickError = null;
+    });
+    try {
+      // Сначала карта и проводник: completeProfile переключит роутер на
+      // вкладки, и они должны открыться уже на выбранном городе.
+      await ref.read(cityProvider.notifier).choose(city);
+      await AppTour.markPending();
+      await ref.read(authRepositoryProvider).completeProfile(
+            displayName: _nameController.text,
+            city: city.name,
+            username: _nickController.text,
+          );
+    } on UsernameTakenException catch (e) {
+      if (mounted) setState(() => _nickError = e.toString());
+    } catch (e) {
+      AppLog.add('Onboarding: completeProfile упал — $e');
+      if (mounted) {
+        setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -44,10 +106,36 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SizedBox(height: 20),
               TextField(
                 controller: _nameController,
-                autofocus: true,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(hintText: 'имя'),
+                decoration: const InputDecoration(labelText: 'Имя'),
                 onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _nickController,
+                autocorrect: false,
+                maxLength: 21,
+                decoration: InputDecoration(
+                  labelText: 'Ник (необязательно)',
+                  prefixText: '@',
+                  helperText: 'По нику вас найдут, не зная номера телефона',
+                  errorText: _nickError ?? Username.validate(_nickController.text),
+                ),
+                onChanged: (_) => setState(() => _nickError = null),
+              ),
+              const SizedBox(height: 20),
+              const SectionLabel('Ваш город'),
+              const SizedBox(height: 10),
+              Text(
+                'Лента и карта покажут жизнь этого города. Поменять можно '
+                'в любой момент на карте.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _pickCity,
+                icon: const Icon(Icons.location_city_outlined),
+                label: Text(_city?.name ?? 'Выбрать город'),
               ),
               const SizedBox(height: 32),
               const SectionLabel('Геопозиция'),
@@ -92,32 +180,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ],
               const SizedBox(height: 28),
               FilledButton(
-                onPressed: _nameController.text.trim().length < 2 || _busy
-                    ? null
-                    : () async {
-                        setState(() {
-                          _busy = true;
-                          _error = null;
-                        });
-                        try {
-                          await ref
-                              .read(authRepositoryProvider)
-                              .completeProfile(
-                                displayName: _nameController.text,
-                              );
-                        } catch (e) {
-                          AppLog.add('Onboarding: completeProfile упал — $e');
-                          if (mounted) {
-                            setState(
-                              () => _error = e
-                                  .toString()
-                                  .replaceFirst('Exception: ', ''),
-                            );
-                          }
-                        } finally {
-                          if (mounted) setState(() => _busy = false);
-                        }
-                      },
+                onPressed: !_valid || _busy ? null : _submit,
                 child: _busy
                     ? SizedBox(
                         width: 20,

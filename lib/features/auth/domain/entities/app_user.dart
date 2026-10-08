@@ -10,6 +10,8 @@ class AppUser {
     this.city,
     this.socialScore = 0,
     this.locationBlurM = 500,
+    this.username,
+    this.onboarded = true,
   });
 
   final String id;
@@ -30,8 +32,15 @@ class AppUser {
   /// ограничением (>= 200) колонки profiles.location_blur_m из 0001_init.sql.
   final int locationBlurM;
 
+  /// @ник без «@»: латиница, цифры и _, 3–20 знаков. null — ещё не выбран.
+  final String? username;
+
+  /// Знакомство пройдено (имя и город). Вход через VK/Яндекс сразу заполняет
+  /// имя, поэтому одного имени для этого мало.
+  final bool onboarded;
+
   /// Пока профиль не заполнен — гоним пользователя в онбординг.
-  bool get hasProfile => (displayName ?? '').trim().isNotEmpty;
+  bool get hasProfile => (displayName ?? '').trim().isNotEmpty && onboarded;
 
   /// Мост входа через VK ID/Яндекс ID заводит служебный адрес вида
   /// `vk.<external_id>@id.socialworld.internal`, чтобы у auth.users была
@@ -53,6 +62,7 @@ class AppUser {
     String? city,
     int? socialScore,
     int? locationBlurM,
+    String? username,
   }) =>
       AppUser(
         id: id,
@@ -65,5 +75,7 @@ class AppUser {
         city: city ?? this.city,
         socialScore: socialScore ?? this.socialScore,
         locationBlurM: locationBlurM ?? this.locationBlurM,
+        username: username ?? this.username,
+        onboarded: onboarded,
       );
 }

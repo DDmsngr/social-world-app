@@ -654,7 +654,7 @@ final mapSearchResultsProvider =
                 kind: SearchKind.profile,
                 id: hit.id,
                 title: hit.displayName,
-                subtitle: 'Профиль',
+                subtitle: hit.username == null ? 'Профиль' : '@${hit.username}',
                 avatarUrl: hit.avatarUrl,
               ),
             );

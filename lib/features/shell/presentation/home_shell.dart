@@ -21,6 +21,7 @@ import '../../chat/presentation/providers/chat_providers.dart';
 import '../../notifications/notifications.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
 import '../../saved/saved.dart';
+import 'app_tour.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({
@@ -56,6 +57,24 @@ class _HomeShellState extends ConsumerState<HomeShell>
   Timer? _poll;
   Timer? _presence;
   var _foreground = true;
+
+  /// Шаг проводника по вкладкам; null — проводник не показывается.
+  int? _tourStep;
+
+  void _tourGo(int step) {
+    final tab = AppTour.steps[step].tab;
+    if (tab != null) widget.navigationShell.goBranch(tab);
+    setState(() => _tourStep = step);
+  }
+
+  void _tourNext() {
+    final next = (_tourStep ?? 0) + 1;
+    if (next >= AppTour.steps.length) {
+      setState(() => _tourStep = null);
+    } else {
+      _tourGo(next);
+    }
+  }
 
   /// Раз в минуту, пока приложение открыто: «я в сети». По этой отметке
   /// сервер отправляет сообщения, отложенные «до появления в сети». Не чаще
@@ -98,6 +117,11 @@ class _HomeShellState extends ConsumerState<HomeShell>
       // Своя трансляция геопозиции переживает перезапуск приложения.
       ref.read(liveLocationSharerProvider).resumeMine();
       _touchPresence();
+      unawaited(
+        AppTour.takePending().then((pending) {
+          if (pending && mounted) _tourGo(0);
+        }),
+      );
     });
     _presence = Timer.periodic(
       const Duration(seconds: 60),
@@ -193,6 +217,14 @@ class _HomeShellState extends ConsumerState<HomeShell>
                 right: 16,
                 bottom: MediaQuery.paddingOf(context).bottom + 84,
                 child: const UpdateReadyBanner(),
+              ),
+            if (_tourStep != null)
+              Positioned.fill(
+                child: AppTourOverlay(
+                  step: _tourStep!,
+                  onNext: _tourNext,
+                  onClose: () => setState(() => _tourStep = null),
+                ),
               ),
           ],
         ),

@@ -36,6 +36,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       followingCount: (row['following_count'] as num?)?.toInt() ?? 0,
       followedByMe: row['followed_by_me'] as bool? ?? false,
       blockKind: BlockKind.parse(row['block_kind']),
+      username: row['username'] as String?,
     );
   }
 
@@ -109,6 +110,7 @@ class SupabaseProfileRepository implements ProfileRepository {
           id: (raw as Map<String, dynamic>)['id'] as String,
           displayName: (raw['display_name'] as String?) ?? 'Без имени',
           avatarUrl: raw['avatar_url'] as String?,
+          username: raw['username'] as String?,
         ),
     ];
   }
