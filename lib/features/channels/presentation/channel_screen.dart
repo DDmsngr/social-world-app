@@ -16,6 +16,7 @@ import '../../chat/presentation/providers/chat_notify_providers.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../chat/presentation/widgets/chat_composer.dart';
 import '../../chat/presentation/widgets/chat_notify_sheet.dart';
+import '../../chat/presentation/widgets/swipe_back.dart';
 import '../data/channels_repository.dart';
 import 'providers/channel_providers.dart';
 import 'widgets/channel_avatar.dart';
@@ -308,7 +309,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           }
           return Column(
             children: [
-              Expanded(child: info.canRead ? _posts(info) : _closed(info)),
+              Expanded(
+                child: SwipeBackToExit(
+                  onExit: () => context.canPop() ? context.pop() : context.go(Routes.chats),
+                  child: info.canRead ? _posts(info) : _closed(info),
+                ),
+              ),
               _bottom(info),
             ],
           );

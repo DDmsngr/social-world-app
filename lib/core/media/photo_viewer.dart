@@ -240,7 +240,12 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
         child: Center(
           child: Image(
             image: imageProviderFor(widget.url),
+            // На весь экран: маленькая картинка (аватар от VK 100×100) иначе
+            // висит крошечной точкой посреди чёрного.
+            width: double.infinity,
+            height: double.infinity,
             fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
             loadingBuilder: (context, child, progress) => progress == null
                 ? child
                 : const Center(

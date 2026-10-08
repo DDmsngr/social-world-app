@@ -60,6 +60,7 @@ class MessageBubble extends StatelessWidget {
         if (showSender && message.senderName != null)
           Align(
             alignment: Alignment.centerLeft,
+            widthFactor: 1,
             child: Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Text(
@@ -94,19 +95,30 @@ class MessageBubble extends StatelessWidget {
           )
         else if (hasAttachment && message.attachment!.album.isNotEmpty)
           // Несколько фото одним сообщением: сетка по пропорциям кадров.
-          SizedBox(
-            width: 260,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: MessageAlbum(message: message),
+          Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            child: SizedBox(
+              width: 260,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: MessageAlbum(message: message),
+              ),
             ),
           )
         else if (hasAttachment)
-          AttachmentView(message: message, mine: mine, onMore: onMediaMore),
+          // Медиа и подпись под ним — по одному левому краю: раньше фото
+          // уезжало вправо, а текст оставался слева, и пузырь выглядел кривым.
+          Align(
+            alignment: Alignment.centerLeft,
+            widthFactor: 1,
+            child: AttachmentView(message: message, mine: mine, onMore: onMediaMore),
+          ),
         if (!bare && (!hasAttachment || caption.isNotEmpty)) ...[
           if (hasAttachment) const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerLeft,
+            widthFactor: 1,
             child: LinkText(
               caption.isEmpty && !hasAttachment ? message.preview : caption,
               linkColor: mine ? AppColors.onBubbleMine : AppColors.primaryTint,
@@ -224,6 +236,7 @@ class _ForwardedLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
+            widthFactor: 1,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Row(

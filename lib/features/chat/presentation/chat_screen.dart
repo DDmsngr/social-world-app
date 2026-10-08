@@ -44,6 +44,7 @@ import 'widgets/message_bubble.dart';
 import 'widgets/message_menu.dart';
 import 'widgets/pinned_bar.dart';
 import 'widgets/reaction_chips.dart';
+import 'widgets/swipe_back.dart';
 import 'widgets/swipe_to_reply.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -595,7 +596,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
           if (info != null && !isDirect) const _PlainTextNotice(),
           Expanded(
-            child: messages.when(
+            child: SwipeBackToExit(
+              onExit: () => context.canPop() ? context.pop() : context.go(Routes.chats),
+              child: messages.when(
               // Уже показанные сообщения не прячем за спиннером при
               // переподключении и ошибках сети: переписка остаётся на месте,
               // а о связи говорит тонкая полоска сверху.
@@ -793,6 +796,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   ],
                 );
               },
+              ),
             ),
           ),
           if (messages.hasValue && (messages.isLoading || messages.hasError))

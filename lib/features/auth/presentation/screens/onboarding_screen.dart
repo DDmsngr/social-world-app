@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/location/geo_privacy.dart';
@@ -7,6 +10,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/sw_widgets.dart';
+import '../../../../core/widgets/user_avatar.dart';
+import '../../../profile/presentation/avatar_crop_screen.dart';
 import '../../../discover/domain/entities/city.dart';
 import '../../../discover/presentation/providers/city_provider.dart';
 import '../../../discover/presentation/widgets/city_picker.dart';
@@ -28,6 +33,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _nickController;
   City? _city;
+
+  /// Фото с телефона, выбранное вместо картинки от VK/Яндекса.
+  String? _avatarPath;
   double _radius = GeoPrivacy.defaultRadiusMeters;
   bool _busy = false;
   String? _error;
@@ -55,6 +63,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _city != null &&
       Username.validate(_nickController.text) == null;
 
+  Future<void> _pickAvatar() async {
+    final file = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    if (file == null || !mounted) return;
+    // Сразу настройка кадра: видно, как фото ляжет в кружок.
+    final framed = await openAvatarCrop(context, source: file.path);
+    if (!mounted) return;
+    setState(() => _avatarPath = framed ?? file.path);
+  }
+
   Future<void> _pickCity() async {
     final city = await chooseCity(context, selected: _city);
     if (city != null && mounted) setState(() => _city = city);
@@ -73,6 +95,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       // вкладки, и они должны открыться уже на выбранном городе.
       await ref.read(cityProvider.notifier).choose(city);
       await AppTour.markPending();
+      // Своё фото — до завершения знакомства: completeProfile переключит
+      // роутер на вкладки, и аватар должен уже стоять.
+      final avatar = _avatarPath;
+      if (avatar != null) {
+        await ref.read(authRepositoryProvider).updateProfile(avatarLocalPath: avatar);
+      }
       await ref.read(authRepositoryProvider).completeProfile(
             displayName: _nameController.text,
             city: city.name,
@@ -103,6 +131,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               const SectionLabel('Знакомство'),
               const SizedBox(height: 14),
               Text('Представьтесь,\nпожалуйста', style: AppTypography.serif(36)),
+              const SizedBox(height: 20),
+              _avatarBlock(),
               const SizedBox(height: 20),
               TextField(
                 controller: _nameController,
@@ -196,6 +226,67 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Фото профиля: если вход принёс картинку от VK/Яндекса, она маленькая и
+  /// часто не та, поэтому сразу предлагаем загрузить своё или оставить эту.
+  Widget _avatarBlock() {
+    final me = ref.watch(currentUserProvider);
+    final providerUrl = me?.avatarUrl;
+    final own = _avatarPath;
+    return Row(
+      children: [
+        if (own != null)
+          CircleAvatar(radius: 40, backgroundImage: FileImage(File(own)))
+        else
+          UserAvatar(
+            name: _nameController.text.isEmpty ? (me?.displayName ?? '?') : _nameController.text,
+            url: providerUrl,
+            userId: me?.id,
+            radius: 40,
+          ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                own != null
+                    ? 'Ваше фото'
+                    : providerUrl != null
+                    ? 'Фото с площадки входа'
+                    : 'Фото профиля',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                own == null && providerUrl != null
+                    ? 'Оно небольшое. Можно оставить или загрузить своё.'
+                    : 'Можно поменять позже в профиле.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  OutlinedButton(
+                    style: AppButtons.compact,
+                    onPressed: _busy ? null : _pickAvatar,
+                    child: Text(own == null ? 'Загрузить своё' : 'Другое фото'),
+                  ),
+                  if (own != null && providerUrl != null)
+                    TextButton(
+                      style: AppButtons.compact,
+                      onPressed: _busy ? null : () => setState(() => _avatarPath = null),
+                      child: const Text('Оставить прежнее'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
