@@ -491,7 +491,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
               ),
             ),
           ),
-          ChatComposer(conversationId: widget.channelId, isDirect: false),
+          ChatComposer(conversationId: widget.channelId, isDirect: false, isChannel: true),
         ],
       );
     }

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/errors/friendly_error.dart';
+import '../../chat/domain/schedule_format.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
+import '../../chat/presentation/widgets/schedule_picker.dart';
 import '../../create/presentation/widgets/article_editor.dart';
 import '../../create/presentation/widgets/article_media.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
@@ -77,6 +79,34 @@ class _ChannelArticleScreenState extends ConsumerState<ChannelArticleScreen> {
     }
   }
 
+  /// Статья уйдёт в канал позже, в выбранное время.
+  Future<void> _schedule() async {
+    final at = await showSchedulePicker(
+      context,
+      title: 'Отложить пост',
+      action: 'Опубликовать',
+    );
+    if (at == null || !mounted) return;
+    final text = _text;
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .scheduleText(conversationId: widget.channelId, text: text, sendAt: at);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Опубликуем ${formatScheduledAt(at, DateTime.now())}')),
+      );
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось отложить'))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final repo = ref.read(feedRepositoryProvider);
@@ -84,6 +114,11 @@ class _ChannelArticleScreenState extends ConsumerState<ChannelArticleScreen> {
       appBar: AppBar(
         title: const Text('Статья в канал'),
         actions: [
+          IconButton(
+            onPressed: _canPublish ? _schedule : null,
+            tooltip: 'Отложить пост',
+            icon: const Icon(Icons.schedule),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilledButton(

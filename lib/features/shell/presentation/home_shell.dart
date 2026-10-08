@@ -24,6 +24,7 @@ import '../../routes/presentation/providers/route_recorder.dart';
 import '../../routes/presentation/route_recorder_screen.dart';
 import '../../saved/saved.dart';
 import 'app_tour.dart';
+import 'swipe_tabs.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({
@@ -211,7 +212,15 @@ class _HomeShellState extends ConsumerState<HomeShell>
         extendBody: true,
         body: Stack(
           children: [
-            Positioned.fill(child: widget.navigationShell),
+            Positioned.fill(
+              child: SwipeBetweenTabs(
+                shell: widget.navigationShell,
+                // В переписке жест у сообщений (свайп-ответ), с клавиатурой
+                // и панелью эмодзи — у текста; во время проводника — у него.
+                enabled: !inChat && !keyboard && _tourStep == null,
+                child: widget.navigationShell,
+              ),
+            ),
             // В переписке плашки закрывали бы поле ввода.
             if (!inChat)
               Positioned(

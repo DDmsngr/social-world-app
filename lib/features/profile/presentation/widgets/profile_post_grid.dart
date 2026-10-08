@@ -13,9 +13,13 @@ import '../../../feed/domain/entities/post.dart';
 /// Квадрат — первое фото; у видео и подборок значок в углу; пост без фото —
 /// плитка с началом текста. Нажатие открывает публикацию целиком.
 class ProfilePostGrid extends StatelessWidget {
-  const ProfilePostGrid({super.key, required this.posts});
+  const ProfilePostGrid({super.key, required this.posts, this.showVisibility = false});
 
   final List<Post> posts;
+
+  /// Подписи «только мне» и «подписчикам» нужны автору, чужому они ни к чему:
+  /// он видит пост, значит, ему он и предназначен.
+  final bool showVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +30,7 @@ class ProfilePostGrid extends StatelessWidget {
         crossAxisSpacing: 2,
       ),
       delegate: SliverChildBuilderDelegate(
-        (context, index) => _Tile(post: posts[index]),
+        (context, index) => _Tile(post: posts[index], showVisibility: showVisibility),
         childCount: posts.length,
       ),
     );
@@ -139,9 +143,10 @@ class _RouteTile extends StatelessWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.post});
+  const _Tile({required this.post, required this.showVisibility});
 
   final Post post;
+  final bool showVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +201,7 @@ class _Tile extends StatelessWidget {
             ),
           // Кому виден пост: «только мне» — замок, «подписчикам» — люди.
           // Публичные без значка. Чужие закрытые посты сюда и не приходят.
-          if (post.visibility != PostVisibility.everyone)
+          if (showVisibility && post.visibility != PostVisibility.everyone)
             Positioned(
               left: 6,
               bottom: 6,

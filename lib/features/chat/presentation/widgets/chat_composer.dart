@@ -28,6 +28,7 @@ import '../../live_location/live_location_screen.dart';
 import 'emoji_panel.dart';
 import 'photo_send_screen.dart';
 import 'scheduled_sheet.dart';
+import 'schedule_picker.dart';
 import 'video_note_recorder.dart';
 
 /// Поле ввода чата: текст с эмодзи, вложения (фото, камера, видео, файл),
@@ -37,6 +38,7 @@ class ChatComposer extends ConsumerStatefulWidget {
     super.key,
     required this.conversationId,
     this.isDirect = true,
+    this.isChannel = false,
     this.peerName,
     this.replyTo,
     this.onReplyCleared,
@@ -47,6 +49,9 @@ class ChatComposer extends ConsumerStatefulWidget {
   /// «Когда будет в сети» есть только в личных диалогах: в группе непонятно,
   /// кого ждать.
   final bool isDirect;
+
+  /// Пост канала: рядом с кнопкой отправки появляется «Отложить пост».
+  final bool isChannel;
   final String? peerName;
 
   /// Ответ, который уйдёт вместе со следующим сообщением.
@@ -220,27 +225,12 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   }
 
   Future<void> _scheduleLater() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: now,
-      lastDate: now.add(maxScheduleLead),
-      helpText: 'Когда отправить',
+    final at = await showSchedulePicker(
+      context,
+      title: widget.isChannel ? 'Отложить пост' : 'Отправить позже',
+      action: widget.isChannel ? 'Опубликовать' : 'Отправить',
     );
-    if (date == null || !mounted) return;
-    final soon = now.add(const Duration(hours: 1));
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: soon.hour, minute: soon.minute),
-    );
-    if (time == null || !mounted) return;
-    final at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    final problem = validateSendAt(at, DateTime.now());
-    if (problem != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
-      return;
-    }
+    if (at == null || !mounted) return;
     await _schedule(sendAt: at);
   }
 
@@ -765,6 +755,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           ),
         ),
         const SizedBox(width: 8),
+        // В канале отложенный пост — обычное дело, а долгий тап по кнопке никто
+        // не находил: даём отдельную кнопку с часами.
+        if (hasText && widget.isChannel)
+          IconButton(
+            onPressed: _sendingText ? null : _scheduleLater,
+            tooltip: 'Отложить пост',
+            icon: Icon(Icons.schedule, color: AppColors.textDim),
+          ),
         if (hasText)
           // Без tooltip: его собственный долгий тап спорил бы с меню отправки.
           Semantics(

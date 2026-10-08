@@ -8,6 +8,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
+import '../../shell/presentation/swipe_tabs.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
@@ -202,7 +203,9 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
           title: 'Не удалось загрузить чаты',
           onAction: () => ref.invalidate(conversationsProvider),
         ),
-        data: (_) => TabBarView(
+        data: (_) => NotificationListener<ScrollNotification>(
+          onNotification: _handOffAtEdge,
+          child: TabBarView(
           controller: _tabs,
           children: [
             for (final tab in _Tab.values)
@@ -220,9 +223,30 @@ class _ConversationsScreenState extends ConsumerState<ConversationsScreen>
                 ),
               ),
           ],
+          ),
         ),
       ),
     );
+  }
+
+  // Дошли до последней вкладки чатов и тянем дальше (или до первой и назад) —
+  // свайп переходит на соседний экран приложения.
+  var _edgePull = 0.0;
+  var _edgeHandedOff = false;
+
+  bool _handOffAtEdge(ScrollNotification n) {
+    if (n.metrics.axis != Axis.horizontal) return false;
+    if (n is ScrollStartNotification) {
+      _edgePull = 0;
+      _edgeHandedOff = false;
+    } else if (n is OverscrollNotification && !_edgeHandedOff) {
+      _edgePull += n.overscroll;
+      if (_edgePull.abs() >= 36) {
+        _edgeHandedOff = true;
+        SwipeTabsHandoff.notify(context, forward: _edgePull > 0);
+      }
+    }
+    return false;
   }
 
   Widget _list(

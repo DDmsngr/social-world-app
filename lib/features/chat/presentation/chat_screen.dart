@@ -89,6 +89,43 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   int _pinCursor = 0;
   String? _pendingJump;
 
+  /// Что было в ленте при прошлой отрисовке и какие сообщения только что
+  /// исчезли: они ещё мгновение остаются на своём месте и растворяются.
+  List<ChatMessage> _lastItems = const [];
+  final _ghosts = <String, ({ChatMessage message, String? after})>{};
+  static const _vanishFor = Duration(milliseconds: 420);
+
+  void _trackRemoved(List<ChatMessage> items) {
+    final now = {for (final m in items) m.id};
+    final gone = [
+      for (var i = 0; i < _lastItems.length; i++)
+        if (!now.contains(_lastItems[i].id) && !_ghosts.containsKey(_lastItems[i].id))
+          (message: _lastItems[i], after: i > 0 ? _lastItems[i - 1].id : null),
+    ];
+    // Очистка всего чата или пачка исчезнувших разом — без представления:
+    // три сотни растворяющихся пузырей не нужны.
+    if (gone.isNotEmpty && gone.length <= 6 && _lastItems.isNotEmpty) {
+      for (final g in gone) {
+        _ghosts[g.message.id] = g;
+        Future<void>.delayed(_vanishFor + const Duration(milliseconds: 80), () {
+          if (mounted) setState(() => _ghosts.remove(g.message.id));
+        });
+      }
+    }
+    _lastItems = items;
+  }
+
+  /// Лента с исчезающими сообщениями на их прежних местах.
+  List<ChatMessage> _withGhosts(List<ChatMessage> items) {
+    if (_ghosts.isEmpty) return items;
+    final result = [...items];
+    for (final ghost in _ghosts.values) {
+      final at = ghost.after == null ? 0 : result.indexWhere((m) => m.id == ghost.after) + 1;
+      result.insert(at, ghost.message);
+    }
+    return result;
+  }
+
   /// Подводит ленту к сообщению и ненадолго подсвечивает его. Лента ленивая:
   /// пока сообщение не построено, прыгаем по оценке положения и пробуем снова.
   Future<void> _jumpTo(String messageId, List<ChatMessage> items) async {
@@ -565,7 +602,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         for (final m in all)
                           if (!hidden.contains(m.id) && (cleared == null || m.sentAt.isAfter(cleared))) m,
                       ];
-                final entries = mergeCallsIntoTimeline(items, [
+                _trackRemoved(items);
+                final entries = mergeCallsIntoTimeline(_withGhosts(items), [
                   for (final c in calls)
                     if (cleared == null || c.createdAt.isAfter(cleared)) c,
                 ]);
@@ -627,6 +665,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     }
                     final message = entry.message!;
                     final mine = message.senderId == myId;
+                    // Удалённое сообщение ещё мгновение стоит на месте и
+                    // растворяется, а не пропадает рывком.
+                    if (_ghosts.containsKey(message.id)) {
+                      return _Vanish(
+                        key: ValueKey('vanish-${message.id}'),
+                        child: IgnorePointer(
+                          child: MessageBubble(
+                            message: message,
+                            mine: mine,
+                            showSender: !isDirect && !mine,
+                          ),
+                        ),
+                      );
+                    }
                     final item = KeyedSubtree(
                       key: _itemKeys.putIfAbsent(message.id, GlobalKey.new),
                       child: Semantics(
@@ -1276,6 +1328,46 @@ class _CallLogTile extends StatelessWidget {
 }
 
 /// Подпись дня в ленте и плашка с датой при прокрутке.
+/// Исчезновение удалённого сообщения: тает, слегка уменьшается, а место под
+/// ним схлопывается, и соседи плавно съезжаются.
+class _Vanish extends StatefulWidget {
+  const _Vanish({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Vanish> createState() => _VanishState();
+}
+
+class _VanishState extends State<_Vanish> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _ChatScreenState._vanishFor,
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fade = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    final collapse = CurvedAnimation(parent: _controller, curve: const Interval(0.35, 1, curve: Curves.easeInOut));
+    return SizeTransition(
+      sizeFactor: ReverseAnimation(collapse),
+      child: FadeTransition(
+        opacity: ReverseAnimation(fade),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 1, end: 0.88).animate(fade),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
 class _DayChip extends StatelessWidget {
   const _DayChip(this.label);
 

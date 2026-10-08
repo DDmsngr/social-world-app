@@ -546,7 +546,7 @@ class _BodyState extends ConsumerState<_Body> {
                   else if (filter == _PostFilter.stories)
                     _StoriesGrid(group: storyGroup!)
                   else
-                    ProfilePostGrid(posts: shown),
+                    ProfilePostGrid(posts: shown, showVisibility: isMe),
                   SliverToBoxAdapter(child: SizedBox(height: bottom)),
                 ];
               },
