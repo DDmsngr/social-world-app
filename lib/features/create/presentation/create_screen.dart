@@ -20,6 +20,7 @@ import '../../feed/presentation/providers/feed_providers.dart';
 import '../../feed/presentation/providers/publish_settings_provider.dart';
 import '../../feed/presentation/widgets/publish_settings_panel.dart';
 import '../../feed/domain/repositories/feed_repository.dart';
+import '../../routes/presentation/providers/route_recorder.dart';
 import 'widgets/article_editor.dart';
 import 'widgets/article_media.dart';
 import 'widgets/composer_parts.dart';
@@ -354,11 +355,26 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 22),
-            FilledButton.icon(
-              onPressed: () => context.push(Routes.routeRecorder),
-              icon: const Icon(Icons.timeline),
-              label: const Text('Начать запись'),
-            ),
+            // Запись уже идёт (в том числе свёрнутая): вторая кнопка «Начать»
+            // не нужна, вместо неё — переход к текущей записи.
+            if (ref.watch(routeRecorderProvider).isActive) ...[
+              Text(
+                'Запись маршрута идёт. Остановить или сохранить её можно на '
+                'экране записи.',
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => context.push(Routes.routeRecorder),
+                icon: const Icon(Icons.timeline),
+                label: const Text('К записи маршрута'),
+              ),
+            ] else
+              FilledButton.icon(
+                onPressed: () => context.push(Routes.routeRecorder),
+                icon: const Icon(Icons.timeline),
+                label: const Text('Начать запись'),
+              ),
           ],
           if (_kind == _CreateKind.moment) ...[
             Text('Что происходит\nв городе?', style: AppTypography.serif(32)),
