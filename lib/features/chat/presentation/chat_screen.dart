@@ -96,6 +96,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final _ghosts = <String, ({ChatMessage message, String? after})>{};
   static const _vanishFor = Duration(milliseconds: 420);
 
+  /// Сколько моих сообщений собеседник уже прочитал и когда это число выросло
+  /// в последний раз: по этому узнаём, что он прямо сейчас в чате.
+  int? _readCount;
+  DateTime? _peerReadAt;
+
+  void _noteRead(List<ChatMessage>? all, String myId) {
+    if (all == null) return;
+    final count = all.where((m) => m.senderId == myId && m.status == MessageStatus.read).length;
+    final before = _readCount;
+    _readCount = count;
+    if (before != null && count > before) {
+      _peerReadAt = DateTime.now();
+      // Через две минуты «в сети» должно само смениться на «был(а)».
+      Future<void>.delayed(const Duration(minutes: 2, seconds: 1), () {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
   /// Свои только что отправленные сообщения: они вылетают снизу, от поля ввода.
   final _arriving = <String>{};
 
@@ -344,6 +363,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   void _markRead() {
+    // Прочитал — значит в приложении: отметка присутствия не ждёт минутного
+    // таймера, и у собеседника сразу «в сети».
+    unawaited(ref.read(chatRepositoryProvider).touchPresence());
     ref
         .read(chatRepositoryProvider)
         .markRead(widget.conversationId)
@@ -405,11 +427,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // присутствия на сервере ещё не догнала (обновляется раз в минуту):
     // раньше Вика писала, а в шапке висело «был(а) 13 мин назад».
     final now = DateTime.now();
+    _noteRead(messages.value, myId);
     final peerLastMessage = isDirect
         ? messages.value?.lastWhere((m) => m.senderId != myId, orElse: () => _noMessage).sentAt
         : null;
     final peerActive = typing.isNotEmpty ||
-        (peerLastMessage != null && now.difference(peerLastMessage) < const Duration(minutes: 2));
+        (peerLastMessage != null && now.difference(peerLastMessage) < const Duration(minutes: 2)) ||
+        // Собеседник только что прочитал наше сообщение или посмотрел медиа:
+        // он в приложении, даже если отметка присутствия ещё не обновилась.
+        (_peerReadAt != null && now.difference(_peerReadAt!) < const Duration(minutes: 2));
     final subtitle = typingText.isNotEmpty
         ? typingText
         : info != null && !isDirect

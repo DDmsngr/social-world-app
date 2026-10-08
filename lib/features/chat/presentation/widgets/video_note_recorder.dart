@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -41,6 +42,14 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   bool _canFlip = false;
   var _cameras = <CameraDescription>[];
   var _lens = CameraLensDirection.front;
+
+  // Зум: щипком по кружку или кнопками громкости.
+  var _zoom = 1.0;
+  var _minZoom = 1.0;
+  var _maxZoom = 1.0;
+  var _scaleBase = 1.0;
+  Timer? _zoomLabelTimer;
+  var _zoomLabel = false;
 
   @override
   void initState() {
@@ -142,10 +151,50 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   // камеры зум не нужен.
   Future<void> _applyZoom(CameraController camera) async {
     try {
-      final maxZoom = await camera.getMaxZoomLevel();
+      _minZoom = await camera.getMinZoomLevel();
+      _maxZoom = await camera.getMaxZoomLevel();
       final wanted = _lens == CameraLensDirection.front ? 1.25 : 1.0;
-      await camera.setZoomLevel(wanted.clamp(1.0, maxZoom));
+      _zoom = wanted.clamp(_minZoom, _maxZoom);
+      await camera.setZoomLevel(_zoom);
     } catch (_) {}
+  }
+
+  /// Новый зум: ограничен возможностями камеры, на экране на секунду
+  /// показывается «1.8×».
+  Future<void> _setZoom(double value) async {
+    final camera = _camera;
+    if (camera == null || _maxZoom <= _minZoom) return;
+    final next = value.clamp(_minZoom, _maxZoom);
+    if ((next - _zoom).abs() < 0.01) return;
+    _zoom = next;
+    _zoomLabelTimer?.cancel();
+    setState(() => _zoomLabel = true);
+    _zoomLabelTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _zoomLabel = false);
+    });
+    try {
+      await camera.setZoomLevel(next);
+    } catch (error) {
+      AppLog.add('Зум кружка: $error');
+    }
+  }
+
+  /// Шаг зума на одно нажатие громкости: примерно двенадцатая часть диапазона.
+  double get _zoomStep => ((_maxZoom - _minZoom) / 12).clamp(0.15, 0.6);
+
+  /// Кнопки громкости: «плюс» приближает, «минус» отдаляет. Событие
+  /// съедается, поэтому системная громкость не меняется и не звучит.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
+      _setZoom(_zoom + _zoomStep);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
+      _setZoom(_zoom - _zoomStep);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Future<void> _finish({required bool send}) async {
@@ -179,6 +228,7 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _zoomLabelTimer?.cancel();
     _camera?.dispose();
     super.dispose();
   }
@@ -186,7 +236,10 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   @override
   Widget build(BuildContext context) {
     final camera = _camera;
-    final size = MediaQuery.sizeOf(context).width * 0.8;
+    // Круг крупнее и выше: смотреть в камеру удобнее, когда лицо в кружке
+    // рядом с объективом, а не посреди экрана.
+    final screen = MediaQuery.sizeOf(context);
+    final size = (screen.width * 0.94).clamp(0.0, screen.height * 0.6);
     final progress =
         _stopwatch.elapsed.inMilliseconds / _max.inMilliseconds;
 
@@ -200,7 +253,10 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
           _finish(send: false);
         }
       },
-      child: Scaffold(
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
           child: Column(
@@ -224,7 +280,8 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                 ],
               ),
               Expanded(
-                child: Center(
+                child: Align(
+                  alignment: Alignment.topCenter,
                   child: _error != null
                       ? Padding(
                           padding: const EdgeInsets.all(24),
@@ -234,7 +291,13 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                             style: const TextStyle(color: Colors.white),
                           ),
                         )
-                      : SizedBox.square(
+                      : GestureDetector(
+                          // Щипок по кружку — зум.
+                          onScaleStart: (_) => _scaleBase = _zoom,
+                          onScaleUpdate: (details) {
+                            if (details.pointerCount >= 2) _setZoom(_scaleBase * details.scale);
+                          },
+                          child: SizedBox.square(
                           dimension: size,
                           child: Stack(
                             alignment: Alignment.center,
@@ -265,7 +328,28 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                                   backgroundColor: Colors.white12,
                                 ),
                               ),
+                              Positioned(
+                                bottom: size * 0.12,
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 200),
+                                  opacity: _zoomLabel ? 1 : 0,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      child: Text(
+                                        '${_zoom.toStringAsFixed(1)}×',
+                                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
+                          ),
                           ),
                         ),
                 ),
@@ -292,6 +376,7 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
               const SizedBox(height: 32),
             ],
           ),
+        ),
         ),
       ),
     );

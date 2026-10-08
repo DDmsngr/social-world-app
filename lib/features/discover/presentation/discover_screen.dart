@@ -195,7 +195,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                         showMapFiltersSheet(context, snapshot.places),
                   ),
                   const SizedBox(height: 8),
-                  const MapLayerChips(),
+                  // Только то, что сейчас сужено; слои, режим зон и категории
+                  // живут в «Фильтрах» и не закрывают карту.
+                  MapActiveFilters(
+                    onOpenFilters: () => showMapFiltersSheet(context, snapshot.places),
+                  ),
                   if (picking) ...[
                     const SizedBox(height: 8),
                     _PickingBanner(
@@ -219,38 +223,23 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             // запросом наведения, что и выбор результата поиска.
             // Когда показан баннер «ничего не найдено», кнопка уходит выше,
             // чтобы не налезть на него.
+            // Две круглые кнопки справа над «Пульсом города»: где я и что
+            // рядом. Режим зон («Сейчас / Спокойнее») переехал в «Фильтры»,
+            // подпись «Рядом» стала иконкой с подсказкой.
             Positioned(
               right: AppSpacing.gutter,
-              bottom: (view.isEmpty && view.isFiltered ? 212 : 148) + nav,
-              child: _MyLocationButton(
-                onLocated: (lat, lng) => _focus(lat, lng, zoom: 15.5),
-              ),
-            ),
-            // Один Row вместо двух независимых Positioned: раньше оба
-            // считали, что для них хватит места, и на узких экранах
-            // переключатель режима наезжал текстом на кнопку «Рядом».
-            // Flexible + spaceBetween раздвигает их и ужимает текст
-            // переключателя, если места всё равно мало, вместо наложения.
-            Positioned(
-              left: AppSpacing.gutter,
-              right: AppSpacing.gutter,
-              bottom: 92 + nav,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              bottom: (view.isEmpty && view.isFiltered ? 156 : 92) + nav,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Flexible(child: MapModeSwitch()),
-                  const SizedBox(width: 8),
-                  ActionChip(
-                    avatar: Icon(
-                      Icons.radar,
-                      size: 18,
-                      color: AppColors.primaryTint,
-                    ),
-                    label: const Text('Рядом'),
-                    onPressed: () =>
-                        showNearbySheet(context, onSelect: _onSelect),
-                    backgroundColor: AppColors.ink2,
-                    side: BorderSide(color: AppColors.hairStrong),
+                  _MyLocationButton(
+                    onLocated: (lat, lng) => _focus(lat, lng, zoom: 15.5),
+                  ),
+                  const SizedBox(height: 10),
+                  _RoundMapButton(
+                    icon: Icons.radar,
+                    label: 'Что рядом',
+                    onTap: () => showNearbySheet(context, onSelect: _onSelect),
                   ),
                 ],
               ),
@@ -366,6 +355,40 @@ class _MyLocationButtonState extends State<_MyLocationButton> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Icon(Icons.my_location, color: AppColors.primaryTint),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Круглая кнопка поверх карты того же вида, что «Моё местоположение».
+class _RoundMapButton extends StatelessWidget {
+  const _RoundMapButton({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          color: AppColors.ink2,
+          shape: const CircleBorder(),
+          elevation: 4,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(icon, color: AppColors.primaryTint),
             ),
           ),
         ),
