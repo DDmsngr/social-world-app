@@ -96,6 +96,28 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="api-socialworld.deepdrift.tech" android:pathPrefix="/r/"/>
             </intent-filter>
+            <!-- «Поделиться» из других приложений: текст и ссылки, фото, видео,
+                 любые файлы. ChaWo появляется в системном списке, дальше
+                 приложение само предлагает выбрать чат (lib/core/share). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <action android:name="android.intent.action.SEND_MULTIPLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="image/*"/>
+                <data android:mimeType="video/*"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <action android:name="android.intent.action.SEND_MULTIPLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/*"/>
+                <data android:mimeType="audio/*"/>
+            </intent-filter>
         </activity>
         <!-- Пуши, пришедшие в фоне, рисует система: ей нужны монохромная иконка
              и канал по умолчанию (каналы создаёт приложение, lib/core/push). -->

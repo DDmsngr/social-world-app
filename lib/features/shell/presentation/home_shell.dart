@@ -9,6 +9,7 @@ import '../../../core/config/feature_flags.dart';
 import '../../../core/debug/app_log.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/share/incoming_share.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update/update_banner.dart';
 import '../../../core/update/update_controller.dart';
@@ -18,6 +19,7 @@ import '../../calls/call_controller.dart';
 import '../../referrals/invite_claimer.dart';
 import '../../chat/live_location/live_location.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
+import '../../chat/presentation/share_intake.dart';
 import '../../notifications/notifications.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
 import '../../routes/presentation/providers/route_recorder.dart';
@@ -116,6 +118,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
       }
       ref.read(pushServiceProvider).start();
       ref.read(callControllerProvider).start();
+      // Всё, чем делились из других приложений, пока ChaWo был закрыт.
+      unawaited(ref.read(incomingShareProvider.notifier).start());
       ref.read(inviteClaimerProvider).run();
       // Своя трансляция геопозиции переживает перезапуск приложения.
       ref.read(liveLocationSharerProvider).resumeMine();
@@ -189,6 +193,13 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   @override
   Widget build(BuildContext context) {
+    // Из другого приложения нажали «Поделиться → ChaWo»: показываем выбор
+    // чата. Состояние сразу сбрасываем, чтобы не показать повторно.
+    ref.listen(incomingShareProvider, (_, share) {
+      if (share == null || !Features.chat) return;
+      ref.read(incomingShareProvider.notifier).clear();
+      handleIncomingShare(context, ref, share);
+    });
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: _onBackAtRoot,
