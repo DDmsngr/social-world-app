@@ -236,6 +236,15 @@ class _VideoItemState extends State<_VideoItem> {
 
   var _wasPlaying = false;
 
+  /// Вкладку или экран с видео закрыли другим (TickerMode выключен): видео не
+  /// должно играть за кадром. Раньше ролик из ленты продолжал звучать после
+  /// перехода в чат.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!TickerMode.valuesOf(context).enabled && _controller.value.isPlaying) _controller.pause();
+  }
+
   void _onChange() {
     final playing = _controller.value.isPlaying;
     if (playing != _wasPlaying && mounted) setState(() => _wasPlaying = playing);
