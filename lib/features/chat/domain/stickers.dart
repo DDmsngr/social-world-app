@@ -57,11 +57,75 @@ String? stickerAsset(String? id) {
   return 'assets/stickers/${match[1]}/${match[2]}.webp';
 }
 
+/// Свой эмодзи внутри текста: в [offset] текста стоит [text] — обычный
+/// эмодзи-заменитель (его видят старые версии, превью и пуш), а новые
+/// версии рисуют на этом месте стикер [sticker] размером с букву.
+class CustomEmoji {
+  const CustomEmoji({
+    required this.offset,
+    required this.text,
+    required this.sticker,
+  });
+
+  /// Смещение в тексте в единицах UTF-16 — как у [String.substring].
+  final int offset;
+  final String text;
+  final String sticker;
+
+  int get end => offset + text.length;
+
+  Map<String, Object?> toJson() => {'o': offset, 't': text, 's': sticker};
+
+  static CustomEmoji? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final offset = raw['o'];
+    final text = raw['t'];
+    final sticker = raw['s'];
+    if (offset is! int || offset < 0) return null;
+    if (text is! String || text.isEmpty || text.length > 16) return null;
+    if (sticker is! String || stickerAsset(sticker) == null) return null;
+    return CustomEmoji(offset: offset, text: text, sticker: sticker);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is CustomEmoji &&
+      other.offset == offset &&
+      other.text == text &&
+      other.sticker == sticker;
+
+  @override
+  int get hashCode => Object.hash(offset, text, sticker);
+}
+
+/// Только те свои эмодзи, что действительно стоят в [text] на своём месте:
+/// по порядку и без наложений. Текст могли поправить (в группе правка
+/// меняет только текст, служебная часть остаётся прежней) — тогда
+/// съехавшие отметки просто не рисуются, и видно обычный эмодзи.
+List<CustomEmoji> validCustomEmoji(String text, List<CustomEmoji> emoji) {
+  final sorted = [...emoji]..sort((a, b) => a.offset.compareTo(b.offset));
+  final result = <CustomEmoji>[];
+  var from = 0;
+  for (final e in sorted) {
+    if (e.offset < from || e.end > text.length) continue;
+    if (text.substring(e.offset, e.end) != e.text) continue;
+    result.add(e);
+    from = e.end;
+  }
+  return result;
+}
+
+/// Первый символ области частного использования: свой эмодзи в поле ввода
+/// — один такой символ, поэтому курсор и «стереть» работают с ним как с
+/// буквой. В сообщение он не уходит: при отправке его заменяет эмодзи.
+const inlineEmojiBase = 0xE000;
+
 class StickerCatalog {
   StickerCatalog({required this.packs, required this.families}) {
     for (final pack in packs) {
       for (final sticker in pack.stickers) {
         _byId[sticker.id] = sticker;
+        _inline[sticker.id] = _index.length;
         _index.add(
           _Indexed(
             sticker,
@@ -120,9 +184,44 @@ class StickerCatalog {
 
   final _byId = <String, Sticker>{};
   final _index = <_Indexed>[];
+  final _inline = <String, int>{};
   final _familyStems = <String, List<String>>{};
 
   Sticker? byId(String? id) => id == null ? null : _byId[id];
+
+  /// Символ, которым свой эмодзи стоит в поле ввода (см. [inlineEmojiBase]).
+  String inlineChar(Sticker sticker) =>
+      String.fromCharCode(inlineEmojiBase + _inline[sticker.id]!);
+
+  /// Чей это символ в поле ввода; null — обычный символ.
+  Sticker? byInlineCode(int codeUnit) {
+    final i = codeUnit - inlineEmojiBase;
+    return i >= 0 && i < _index.length ? _index[i].sticker : null;
+  }
+
+  /// Черновик из поля ввода — в текст для отправки: каждый свой эмодзи
+  /// становится обычным эмодзи-заменителем, а его место и id уходят
+  /// отдельным списком.
+  ({String text, List<CustomEmoji> emoji}) encodeDraft(String draft) {
+    final buffer = StringBuffer();
+    final emoji = <CustomEmoji>[];
+    for (final unit in draft.codeUnits) {
+      final sticker = byInlineCode(unit);
+      if (sticker == null) {
+        buffer.writeCharCode(unit);
+        continue;
+      }
+      emoji.add(
+        CustomEmoji(
+          offset: buffer.length,
+          text: sticker.emoji,
+          sticker: sticker.id,
+        ),
+      );
+      buffer.write(sticker.emoji);
+    }
+    return (text: buffer.toString(), emoji: emoji);
+  }
 
   /// Стикеры по словам или эмодзи. Порядок: совпало название, потом
   /// синонимы, потом стикеры, где эта эмоция главная, потом побочные.

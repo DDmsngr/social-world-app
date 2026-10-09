@@ -377,6 +377,7 @@ class SecureChatRepository implements ChatRepository {
           stickerId: row['kind'] == MessageKind.sticker.wire
               ? ChatMeta.fromJson(row['meta']).sticker
               : null,
+          customEmoji: ChatMeta.fromJson(row['meta']).emoji,
         ),
     ];
   }
@@ -496,6 +497,7 @@ class SecureChatRepository implements ChatRepository {
       replyTo: options.replyTo,
       forwardedFrom: options.forwardedFrom,
       stickerId: options.sticker,
+      customEmoji: options.customEmoji,
     );
   }
 
@@ -1055,6 +1057,7 @@ class SecureChatRepository implements ChatRepository {
         forwardedFrom: meta.forwardedFrom,
         editedAt: _editedAt(row),
         stickerId: kind == MessageKind.sticker ? meta.sticker : null,
+        customEmoji: meta.emoji,
       );
     } catch (_) {
       return ChatMessage(

@@ -26,9 +26,14 @@ class LinkText extends StatefulWidget {
     this.hashtags = false,
     this.selectable = false,
     this.maxLines,
+    this.inline = const [],
   });
 
   final String text;
+
+  /// Куски текста, которые рисуются виджетом (свои эмодзи в чате): по
+  /// порядку, без наложений. Внутри ссылки не подставляются.
+  final List<({int start, int end, InlineSpan span})> inline;
   final TextStyle? style;
   final Color? linkColor;
   final bool hashtags;
@@ -114,6 +119,20 @@ class _LinkTextState extends State<LinkText> {
     return found;
   }
 
+  /// Обычный текст [start, end) с подстановками из [LinkText.inline].
+  void _plain(List<InlineSpan> spans, int start, int end) {
+    var from = start;
+    for (final item in widget.inline) {
+      if (item.start < from || item.end > end) continue;
+      if (item.start > from) {
+        spans.add(TextSpan(text: widget.text.substring(from, item.start)));
+      }
+      spans.add(item.span);
+      from = item.end;
+    }
+    if (from < end) spans.add(TextSpan(text: widget.text.substring(from, end)));
+  }
+
   @override
   Widget build(BuildContext context) {
     _clear();
@@ -121,9 +140,7 @@ class _LinkTextState extends State<LinkText> {
     final spans = <InlineSpan>[];
     var from = 0;
     for (final link in _links()) {
-      if (link.start > from) {
-        spans.add(TextSpan(text: widget.text.substring(from, link.start)));
-      }
+      if (link.start > from) _plain(spans, from, link.start);
       final recognizer = TapGestureRecognizer()..onTap = link.onTap;
       _recognizers.add(recognizer);
       spans.add(
@@ -135,7 +152,7 @@ class _LinkTextState extends State<LinkText> {
       );
       from = link.end;
     }
-    if (from < widget.text.length) spans.add(TextSpan(text: widget.text.substring(from)));
+    if (from < widget.text.length) _plain(spans, from, widget.text.length);
 
     final span = TextSpan(style: widget.style, children: spans);
     return widget.selectable

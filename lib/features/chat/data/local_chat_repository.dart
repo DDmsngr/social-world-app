@@ -78,6 +78,7 @@ class LocalChatRepository implements ChatRepository {
       replyTo: options.replyTo,
       forwardedFrom: options.forwardedFrom,
       stickerId: options.sticker,
+      customEmoji: options.customEmoji,
     ),
   );
 

@@ -282,9 +282,7 @@ void main() {
       final lastPack = tester.getCenter(
         find.byKey(const ValueKey('sticker-pack-chao')),
       );
-      final recent = tester.getCenter(
-        find.byKey(const ValueKey('emoji-tab')),
-      );
+      final recent = tester.getCenter(find.byKey(const ValueKey('emoji-tab')));
       expect(lastPack.dx, lessThan(recent.dx));
     });
 
@@ -300,11 +298,165 @@ void main() {
       await tester.pump();
       await tester.tap(find.byTooltip('Эмодзи'));
       await tester.pumpAndSettle();
+      // Панель открывается в режиме эмодзи — переключаемся на стикеры.
+      await tester.tap(find.byKey(const ValueKey('panel-mode')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('sticker-pack-chao')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('sticker-chao.lookout')));
       await tester.pumpAndSettle();
       expect(repository.sent.single.$3.sticker, 'chao.lookout');
+    });
+  });
+
+  group('свои эмодзи в тексте', () {
+    final wave = catalog.byId('chao.wave')!;
+    final heart = catalog.byId('basic.heart_eyes')!;
+
+    test('черновик: символы-заместители становятся эмодзи и отметками', () {
+      final draft =
+          'Привет ${catalog.inlineChar(wave)}! ${catalog.inlineChar(heart)}';
+      final (:text, :emoji) = catalog.encodeDraft(draft);
+      expect(text, 'Привет 👋! 😍');
+      expect(emoji, const [
+        CustomEmoji(offset: 7, text: '👋', sticker: 'chao.wave'),
+        CustomEmoji(offset: 11, text: '😍', sticker: 'basic.heart_eyes'),
+      ]);
+      // Каждый свой эмодзи — один символ: курсор и «стереть» как у буквы.
+      expect(catalog.inlineChar(wave), hasLength(1));
+      expect(
+        catalog.byInlineCode(catalog.inlineChar(wave).codeUnitAt(0)),
+        wave,
+      );
+      expect(catalog.byInlineCode('а'.codeUnitAt(0)), isNull);
+    });
+
+    test('отметки, не сходящиеся с текстом, отбрасываются', () {
+      const ok = CustomEmoji(offset: 0, text: '👋', sticker: 'chao.wave');
+      const shifted = CustomEmoji(offset: 1, text: '👋', sticker: 'chao.wave');
+      const outside = CustomEmoji(
+        offset: 40,
+        text: '😍',
+        sticker: 'basic.heart_eyes',
+      );
+      expect(validCustomEmoji('👋 ок', [shifted, ok, outside]), [ok]);
+      // После правки текста в группе отметка съехала — остаётся обычный эмодзи.
+      expect(validCustomEmoji('ок 👋', [ok]), isEmpty);
+    });
+
+    test('отметки едут в служебной части, чужой мусор не проходит', () {
+      const meta = ChatMeta(
+        emoji: [CustomEmoji(offset: 3, text: '👋', sticker: 'chao.wave')],
+      );
+      final json = meta.toJson();
+      expect(ChatMeta.fromJson(json).emoji, meta.emoji);
+      expect(
+        ChatMeta.fromJson({
+          'e': [
+            {'o': -1, 't': '👋', 's': 'chao.wave'},
+            {'o': 0, 't': '👋', 's': '../x'},
+            'мусор',
+          ],
+        }).emoji,
+        isEmpty,
+      );
+
+      final encoded = MessageEnvelope.encode(
+        kind: MessageKind.text,
+        text: 'Ку 👋',
+        meta: meta,
+      );
+      final decoded = MessageEnvelope.decode(
+        encoded,
+        rowKind: MessageKind.text,
+      );
+      expect(decoded.text, 'Ку 👋');
+      expect(decoded.meta.emoji, meta.emoji);
+    });
+  });
+
+  group('свои эмодзи на экране', () {
+    late _SpyRepository repository;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      repository = _SpyRepository();
+    });
+    tearDown(() => repository.dispose());
+
+    Widget app(Widget child) => ProviderScope(
+      overrides: [
+        chatRepositoryProvider.overrideWithValue(repository),
+        currentUserProvider.overrideWithValue(const AppUser(id: 'me')),
+        stickerCatalogProvider.overrideWith((ref) async => catalog),
+      ],
+      child: MaterialApp(home: Scaffold(body: child)),
+    );
+
+    testWidgets('из панели смайл встаёт в текст картинкой и уходит эмодзи', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        app(
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: ChatComposer(conversationId: 'conv-1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'Привет');
+      await tester.tap(find.byTooltip('Эмодзи'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('sticker-pack-chao')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('sticker-chao.wave')));
+      await tester.pumpAndSettle();
+
+      // Ничего не отправлено, в поле — картинка.
+      expect(repository.sent, isEmpty);
+      expect(
+        find.descendant(
+          of: find.byType(TextField),
+          matching: find.byType(Image),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byTooltip('Клавиатура'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pumpAndSettle();
+      final (text, kind, options) = repository.sent.single;
+      expect(text, 'Привет👋');
+      expect(kind, MessageKind.text);
+      expect(options.customEmoji, const [
+        CustomEmoji(offset: 6, text: '👋', sticker: 'chao.wave'),
+      ]);
+    });
+
+    testWidgets('в пузыре свой эмодзи — картинкой среди текста', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        app(
+          MessageBubble(
+            message: ChatMessage(
+              id: 'm',
+              conversationId: 'c',
+              senderId: 'me',
+              sentAt: DateTime(2026, 10, 9, 12),
+              text: 'Привет 👋 как дела',
+              customEmoji: const [
+                CustomEmoji(offset: 7, text: '👋', sticker: 'chao.wave'),
+              ],
+            ),
+            mine: true,
+          ),
+        ),
+      );
+      final image = tester.widget<Image>(find.byType(Image));
+      expect((image.image as ResizeImage).imageProvider, isA<AssetImage>());
     });
   });
 }

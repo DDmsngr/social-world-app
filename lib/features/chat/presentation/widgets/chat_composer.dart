@@ -72,7 +72,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   /// выключения VPN висела молча: сокет остаётся на исчезнувшей сети.
   static const sendTimeout = Duration(seconds: 20);
 
-  final _controller = TextEditingController();
+  final _controller = InlineEmojiController();
   final _focus = FocusNode();
   bool _emojiOpen = false;
   final _picker = ImagePicker();
@@ -120,6 +120,25 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     setState(() {});
   }
 
+  /// Свой смайл в текст: символ-заместитель, который поле рисует картинкой.
+  void _insertCustomEmoji(Sticker sticker) {
+    final catalog = ref.read(stickerCatalogProvider).value;
+    if (catalog == null) return;
+    _controller.value = insertAtSelection(
+      _controller.value,
+      catalog.inlineChar(sticker),
+    );
+    setState(() {});
+  }
+
+  /// Текст из поля для отправки: свои эмодзи становятся обычными
+  /// эмодзи-заменителями, их места и id — отдельным списком.
+  ({String text, List<CustomEmoji> emoji}) _draft() {
+    final draft = _controller.text.trim();
+    return ref.read(stickerCatalogProvider).value?.encodeDraft(draft) ??
+        (text: draft, emoji: const <CustomEmoji>[]);
+  }
+
   void _backspace() {
     _controller.value = deleteBeforeSelection(_controller.value);
     setState(() {});
@@ -144,7 +163,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   // ── текст ─────────────────────────────────────────────────────────────
 
   Future<void> _sendText({bool silent = false}) async {
-    final text = _controller.text.trim();
+    final (:text, :emoji) = _draft();
     if (text.isEmpty || _sendingText) return;
     setState(() {
       _sendingText = true;
@@ -156,7 +175,11 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           .send(
             conversationId: widget.conversationId,
             text: text,
-            options: SendOptions(replyTo: widget.replyTo, silent: silent),
+            options: SendOptions(
+              replyTo: widget.replyTo,
+              silent: silent,
+              customEmoji: emoji,
+            ),
           )
           .timeout(sendTimeout);
       _controller.clear();
@@ -290,7 +313,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   }
 
   Future<void> _schedule({DateTime? sendAt, bool whenOnline = false}) async {
-    final text = _controller.text.trim();
+    final (:text, :emoji) = _draft();
     if (text.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
     setState(() {
@@ -305,7 +328,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             text: text,
             sendAt: sendAt,
             whenOnline: whenOnline,
-            options: SendOptions(replyTo: widget.replyTo),
+            options: SendOptions(replyTo: widget.replyTo, customEmoji: emoji),
           )
           .timeout(sendTimeout);
       _controller.clear();
@@ -656,6 +679,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   Widget build(BuildContext context) {
     final hasText = _controller.text.trim().isNotEmpty;
     final catalog = ref.watch(stickerCatalogProvider).value;
+    _controller.catalog = catalog;
     final suggestions = _stickerSuggestions(catalog);
 
     return SafeArea(
@@ -730,6 +754,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                   onBackspace: _backspace,
                   stickerPacks: catalog?.packs ?? const [],
                   onSticker: _sendSticker,
+                  onCustomEmoji: _insertCustomEmoji,
                 ),
               ),
           ],

@@ -88,17 +88,24 @@ class StickerSuggestions extends StatelessWidget {
   }
 }
 
-/// Сетка стикеров одного пака в панели эмодзи.
+/// Сетка одного пака в панели: крупно — стикеры, [compact] — свои эмодзи
+/// (мельче и плотнее, как обычные эмодзи).
 class StickerGrid extends StatelessWidget {
-  const StickerGrid({super.key, required this.stickers, required this.onPick});
+  const StickerGrid({
+    super.key,
+    required this.stickers,
+    required this.onPick,
+    this.compact = false,
+  });
 
   final List<Sticker> stickers;
   final ValueChanged<Sticker> onPick;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return GridView.count(
-      crossAxisCount: 4,
+      crossAxisCount: compact ? 7 : 4,
       padding: const EdgeInsets.all(8),
       mainAxisSpacing: 4,
       crossAxisSpacing: 4,
@@ -110,11 +117,89 @@ class StickerGrid extends StatelessWidget {
             child: StickerImage(
               asset: sticker.asset,
               fallback: sticker.emoji,
-              size: 72,
-              semanticLabel: 'Стикер «${sticker.title}»',
+              size: compact ? 40 : 72,
+              semanticLabel: compact
+                  ? 'Эмодзи «${sticker.title}»'
+                  : 'Стикер «${sticker.title}»',
             ),
           ),
       ],
     );
+  }
+}
+
+/// Свои эмодзи в тексте сообщения — картинками на месте эмодзи-заменителей
+/// (для [LinkText.inline]). Отметки, которые не сходятся с текстом,
+/// пропускаются: там остаётся обычный эмодзи.
+List<({int start, int end, InlineSpan span})> customEmojiInlines(
+  String text,
+  List<CustomEmoji> emoji, {
+  required double size,
+}) => [
+  for (final e in validCustomEmoji(text, emoji))
+    if (stickerAsset(e.sticker) case final asset?)
+      (
+        start: e.offset,
+        end: e.end,
+        span: WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: StickerImage(asset: asset, fallback: e.text, size: size),
+        ),
+      ),
+];
+
+/// Поле ввода со своими эмодзи: каждый — один символ-заместитель
+/// ([StickerCatalog.inlineChar]), который рисуется картинкой размером с
+/// букву. Курсор и «стереть» работают с ним как с обычным символом.
+class InlineEmojiController extends TextEditingController {
+  StickerCatalog? catalog;
+
+  bool _hasInline(StickerCatalog catalog) {
+    for (final unit in text.codeUnits) {
+      if (catalog.byInlineCode(unit) != null) return true;
+    }
+    return false;
+  }
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final catalog = this.catalog;
+    if (catalog == null || !_hasInline(catalog)) {
+      return super.buildTextSpan(
+        context: context,
+        style: style,
+        withComposing: withComposing,
+      );
+    }
+    final size = (style?.fontSize ?? 16) * 1.35;
+    final children = <InlineSpan>[];
+    final buffer = StringBuffer();
+    for (final unit in text.codeUnits) {
+      final sticker = catalog.byInlineCode(unit);
+      if (sticker == null) {
+        buffer.writeCharCode(unit);
+        continue;
+      }
+      if (buffer.isNotEmpty) {
+        children.add(TextSpan(text: buffer.toString()));
+        buffer.clear();
+      }
+      children.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: StickerImage(
+            asset: sticker.asset,
+            fallback: sticker.emoji,
+            size: size,
+          ),
+        ),
+      );
+    }
+    if (buffer.isNotEmpty) children.add(TextSpan(text: buffer.toString()));
+    return TextSpan(style: style, children: children);
   }
 }

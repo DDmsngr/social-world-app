@@ -60,6 +60,7 @@ Future<ForwardResult> forwardMessages({
           sticker: message.kind == MessageKind.sticker
               ? message.stickerId
               : null,
+          customEmoji: message.customEmoji,
         );
         final attachment = message.attachment;
         if (attachment == null || message.kind == MessageKind.sticker) {

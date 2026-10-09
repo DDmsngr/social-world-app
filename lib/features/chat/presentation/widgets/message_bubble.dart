@@ -55,6 +55,11 @@ class MessageBubble extends StatelessWidget {
         ? stickerAsset(message.stickerId)
         : null;
     final bigEmoji = emojiCount > 0 && !hasMeta;
+    final bigEmojiSize = switch (emojiCount) {
+      1 => 56.0,
+      2 => 44.0,
+      _ => 36.0,
+    };
     final bare =
         bigEmoji ||
         (stickerPath != null && !hasMeta) ||
@@ -95,17 +100,21 @@ class MessageBubble extends StatelessWidget {
           ),
         if (stickerPath != null)
           StickerImage(asset: stickerPath, fallback: caption, size: 148)
+        else if (bigEmoji && message.customEmoji.isNotEmpty)
+          // Сообщение из одних своих эмодзи — крупно, как обычные.
+          LinkText(
+            caption,
+            style: TextStyle(fontSize: bigEmojiSize, height: 1.1),
+            inline: customEmojiInlines(
+              caption,
+              message.customEmoji,
+              size: bigEmojiSize * 1.15,
+            ),
+          )
         else if (bigEmoji)
           Text(
             caption,
-            style: TextStyle(
-              fontSize: switch (emojiCount) {
-                1 => 56,
-                2 => 44,
-                _ => 36,
-              },
-              height: 1.1,
-            ),
+            style: TextStyle(fontSize: bigEmojiSize, height: 1.1),
           )
         else if (hasAttachment && message.attachment!.album.isNotEmpty)
           // Несколько фото одним сообщением: сетка по пропорциям кадров.
@@ -142,6 +151,11 @@ class MessageBubble extends StatelessWidget {
                 fontSize: 15,
                 height: 1.4,
                 color: mine ? AppColors.onBubbleMine : AppColors.text,
+              ),
+              inline: customEmojiInlines(
+                caption,
+                message.customEmoji,
+                size: 21,
               ),
             ),
           ),

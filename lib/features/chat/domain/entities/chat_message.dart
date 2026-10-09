@@ -1,3 +1,4 @@
+import '../stickers.dart';
 import 'chat_meta.dart';
 
 /// Тип сообщения. [wire] совпадает с `chat_messages.kind` в базе.
@@ -122,6 +123,7 @@ class ChatMessage {
     this.forwardedFrom,
     this.editedAt,
     this.stickerId,
+    this.customEmoji = const [],
   });
 
   final String id;
@@ -157,6 +159,9 @@ class ChatMessage {
 
   /// Id фирменного стикера; [text] у такого сообщения — эмодзи-заменитель.
   final String? stickerId;
+
+  /// Свои эмодзи внутри [text]; на их местах в тексте — обычные эмодзи.
+  final List<CustomEmoji> customEmoji;
 
   /// Строка для списка чатов.
   String get preview {
@@ -196,5 +201,6 @@ class ChatMessage {
         forwardedFrom: forwardedFrom,
         editedAt: editedAt ?? this.editedAt,
         stickerId: stickerId,
+        customEmoji: customEmoji,
       );
 }
