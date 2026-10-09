@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/markdown_view.dart';
+import '../../../chat/presentation/providers/chat_extras_providers.dart';
+import '../../../chat/presentation/widgets/reaction_chips.dart';
 import '../../../create/domain/article_parts.dart';
 import '../../data/channels_repository.dart';
 import 'channel_media.dart';
@@ -14,13 +16,22 @@ class ChannelPostCard extends StatelessWidget {
     super.key,
     required this.post,
     this.onComments,
+    this.onTap,
     this.onLongPress,
+    this.reactions = const [],
+    this.onReact,
     this.full = false,
   });
 
   final ChannelPost post;
   final VoidCallback? onComments;
-  final VoidCallback? onLongPress;
+
+  /// Короткий тап по посту. Контекст карточки нужен, чтобы повесить панель
+  /// реакций у самого поста. Без него тап ведёт в обсуждение.
+  final void Function(BuildContext context)? onTap;
+  final void Function(BuildContext context)? onLongPress;
+  final List<ReactionCount> reactions;
+  final void Function(String emoji)? onReact;
 
   /// На экране обсуждения текст не обрезается и кнопка комментариев не нужна.
   final bool full;
@@ -34,8 +45,12 @@ class ChannelPostCard extends StatelessWidget {
     // внутри поста, а не в ленте канала.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: full ? null : onComments,
-      onLongPress: onLongPress,
+      onTap: full
+          ? null
+          : onTap != null
+          ? () => onTap!(context)
+          : onComments,
+      onLongPress: onLongPress == null ? null : () => onLongPress!(context),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
@@ -54,6 +69,11 @@ class ChannelPostCard extends StatelessWidget {
                 child: full || text.length <= 700
                     ? MarkdownView(data: text, selectable: full)
                     : MarkdownView(data: channelPostPreview(text)),
+              ),
+            if (reactions.isNotEmpty && onReact != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                child: ReactionChips(reactions: reactions, mine: false, onTap: onReact!),
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 6, 4),

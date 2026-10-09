@@ -12,7 +12,10 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
+import '../../auth/presentation/providers/auth_providers.dart';
+import '../../chat/presentation/providers/chat_extras_providers.dart';
 import '../../chat/presentation/providers/chat_notify_providers.dart';
+import '../../chat/presentation/widgets/message_menu.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../chat/presentation/widgets/chat_composer.dart';
 import '../../chat/presentation/widgets/chat_notify_sheet.dart';
@@ -189,27 +192,49 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     }
   }
 
-  Future<void> _deletePost(ChannelPost post) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('Удалить пост?'),
-        content: const Text('Пост и обсуждение под ним исчезнут у всех.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Удалить')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+  String? _myReaction(String messageId) {
+    final list = ref.read(chatReactionsProvider(widget.channelId)).value?[messageId];
+    for (final r in list ?? const <ReactionCount>[]) {
+      if (r.mine) return r.emoji;
+    }
+    return null;
+  }
+
+  Future<void> _react(String messageId, String emoji) async {
+    unawaited(ReactionUsage.record(emoji));
     try {
-      await ref.read(chatRepositoryProvider).deleteForEveryone([post.message]);
-      ref.read(channelPostsProvider(widget.channelId).notifier).remove(post.message.id);
+      await toggleReaction(ref, widget.channelId, messageId, emoji);
     } catch (error) {
+      AppLog.add('Реакция на пост: $error');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось удалить'))),
+        SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось поставить реакцию'))),
       );
+    }
+  }
+
+  Future<void> _quickReact(BuildContext cardContext, ChannelPost post) async {
+    final emoji = await showReactionPicker(
+      cardContext,
+      mine: false,
+      myReaction: _myReaction(post.message.id),
+    );
+    if (emoji != null) await _react(post.message.id, emoji);
+  }
+
+  Future<void> _openMenu(BuildContext cardContext, ChannelPost post) async {
+    final gone = await showMessageMenu(
+      cardContext,
+      ref,
+      message: post.message,
+      myId: ref.read(currentUserProvider)?.id ?? '',
+      conversation: ref.read(conversationProvider(widget.channelId)).value,
+      myReaction: _myReaction(post.message.id),
+      onReact: (emoji) => _react(post.message.id, emoji),
+    );
+    // Удалили (или скрыли у себя): пост уходит из ленты сразу.
+    if (gone && mounted) {
+      ref.read(channelPostsProvider(widget.channelId).notifier).remove(post.message.id);
     }
   }
 
@@ -354,6 +379,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         _newerCount = newer.length;
         _items = items;
 
+        final reactions = ref.watch(chatReactionsProvider(widget.channelId)).value ?? const {};
+
         SliverList list(List<ChannelPost> posts) => SliverList(
           delegate: SliverChildBuilderDelegate(
             childCount: posts.length,
@@ -377,7 +404,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
                     '${Routes.channel(widget.channelId)}/post/${post.message.id}',
                     extra: post,
                   ),
-                  onLongPress: info.isAdmin ? () => _deletePost(post) : null,
+                  reactions: reactions[post.message.id] ?? const [],
+                  onReact: (emoji) => _react(post.message.id, emoji),
+                  // Короткий тап — реакции у самого поста, долгий — меню:
+                  // поделиться, сохранить, закладка (только в этом канале) и т. д.
+                  onTap: (cardContext) => _quickReact(cardContext, post),
+                  onLongPress: (cardContext) => _openMenu(cardContext, post),
                 ),
               );
             },

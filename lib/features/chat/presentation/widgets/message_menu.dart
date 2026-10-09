@@ -116,11 +116,9 @@ Future<bool> showMessageMenu(
           message.id,
           pinned: action == MessageAction.pin,
         );
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(action == MessageAction.pin ? 'Сообщение закреплено' : 'Сообщение откреплено'),
-          ),
-        );
+        // Без плашки: она вставала поверх поля ввода, а итог и так виден по
+        // полосе закреплённого сверху.
+        HapticFeedback.selectionClick();
       } catch (error) {
         AppLog.add('Закреп: $error');
         messenger.showSnackBar(
