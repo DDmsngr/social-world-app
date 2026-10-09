@@ -264,6 +264,30 @@ void main() {
       );
     });
 
+    testWidgets('панель открывается на своих стикерах, их вкладки — первыми', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        app(
+          const Align(
+            alignment: Alignment.bottomCenter,
+            child: ChatComposer(conversationId: 'conv-1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('Эмодзи'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('sticker-basic.smile')), findsOneWidget);
+      final lastPack = tester.getCenter(
+        find.byKey(const ValueKey('sticker-pack-chao')),
+      );
+      final recent = tester.getCenter(
+        find.byKey(const ValueKey('emoji-tab-recent')),
+      );
+      expect(lastPack.dx, lessThan(recent.dx));
+    });
+
     testWidgets('паки стикеров — вкладками в панели эмодзи', (tester) async {
       await tester.pumpWidget(
         app(

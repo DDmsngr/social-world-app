@@ -68,6 +68,9 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Привет');
     await tester.tap(find.byTooltip('Эмодзи'));
     await tester.pumpAndSettle();
+    // Панель открывается на стикерах — переходим к эмодзи.
+    await tester.tap(find.byKey(const ValueKey('emoji-tab-0')));
+    await tester.pumpAndSettle();
     // 😀 — ещё и иконка вкладки, поэтому жмём соседний в первом ряду.
     await tester.tap(find.text('😃'));
     await tester.pump();

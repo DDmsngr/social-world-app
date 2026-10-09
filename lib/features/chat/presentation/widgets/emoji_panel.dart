@@ -296,7 +296,11 @@ class EmojiPanel extends StatefulWidget {
 }
 
 class _EmojiPanelState extends State<EmojiPanel> {
-  late int _tab = EmojiPanel.recent.isEmpty ? 1 : 0;
+  /// Выбранная вкладка: `pack:<id>`, `recent` или `emoji:<номер>`. null —
+  /// по умолчанию: свои стикеры первыми, без них — недавние или первая
+  /// категория эмодзи. Ключ, а не номер: паки приходят после первого кадра,
+  /// и номера вкладок за ними сдвинулись бы.
+  String? _tab;
 
   void _pick(String emoji) {
     HapticFeedback.selectionClick();
@@ -318,16 +322,26 @@ class _EmojiPanelState extends State<EmojiPanel> {
       for (final pack in widget.stickerPacks)
         if (pack.stickers.isNotEmpty) pack,
     ];
-    // Вкладки: 0 — недавние, дальше категории эмодзи, за ними паки.
-    final packIndex = _tab - emojiCategories.length - 1;
-    final pack = packIndex >= 0 && packIndex < packs.length
-        ? packs[packIndex]
+    // Вкладки по порядку: паки стикеров, недавние, категории эмодзи.
+    final tab =
+        _tab ??
+        (packs.isNotEmpty
+            ? 'pack:${packs.first.id}'
+            : EmojiPanel.recent.isEmpty
+            ? 'emoji:0'
+            : 'recent');
+    StickerPack? pack;
+    for (final p in packs) {
+      if (tab == 'pack:${p.id}') pack = p;
+    }
+    final category = tab.startsWith('emoji:')
+        ? int.tryParse(tab.substring(6))
         : null;
     final emojis = pack != null
         ? const <String>[]
-        : _tab == 0 || _tab > emojiCategories.length
-        ? EmojiPanel.recent
-        : emojiCategories[_tab - 1].$2;
+        : category != null && category < emojiCategories.length
+        ? emojiCategories[category].$2
+        : EmojiPanel.recent;
 
     return Container(
       height: widget.height,
@@ -343,38 +357,38 @@ class _EmojiPanelState extends State<EmojiPanel> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     children: [
+                      for (final p in packs)
+                        _Tab(
+                          key: ValueKey('sticker-pack-${p.id}'),
+                          selected: tab == 'pack:${p.id}',
+                          onTap: () => setState(() => _tab = 'pack:${p.id}'),
+                          child: StickerImage(
+                            asset: p.stickers.first.asset,
+                            fallback: p.stickers.first.emoji,
+                            size: 28,
+                            semanticLabel: 'Стикеры «${p.title}»',
+                          ),
+                        ),
                       _Tab(
-                        selected: _tab == 0,
-                        onTap: () => setState(() => _tab = 0),
+                        key: const ValueKey('emoji-tab-recent'),
+                        selected: tab == 'recent',
+                        onTap: () => setState(() => _tab = 'recent'),
                         child: Icon(
                           Icons.schedule,
                           size: 20,
-                          color: _tab == 0
+                          color: tab == 'recent'
                               ? AppColors.primaryTint
                               : AppColors.textFaint,
                         ),
                       ),
                       for (var i = 0; i < emojiCategories.length; i++)
                         _Tab(
-                          selected: _tab == i + 1,
-                          onTap: () => setState(() => _tab = i + 1),
+                          key: ValueKey('emoji-tab-$i'),
+                          selected: tab == 'emoji:$i',
+                          onTap: () => setState(() => _tab = 'emoji:$i'),
                           child: Text(
                             emojiCategories[i].$1,
                             style: const TextStyle(fontSize: 20),
-                          ),
-                        ),
-                      for (var i = 0; i < packs.length; i++)
-                        _Tab(
-                          key: ValueKey('sticker-pack-${packs[i].id}'),
-                          selected: _tab == emojiCategories.length + 1 + i,
-                          onTap: () => setState(
-                            () => _tab = emojiCategories.length + 1 + i,
-                          ),
-                          child: StickerImage(
-                            asset: packs[i].stickers.first.asset,
-                            fallback: packs[i].stickers.first.emoji,
-                            size: 28,
-                            semanticLabel: 'Стикеры «${packs[i].title}»',
                           ),
                         ),
                     ],
