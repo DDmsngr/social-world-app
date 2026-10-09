@@ -177,7 +177,7 @@ class PostCard extends ConsumerWidget {
                     if (permissions.isOwner)
                       const PopupMenuItem(
                         value: _PostMenu.story,
-                        child: Text('Добавить в историю'),
+                        child: Text('Добавить в блики'),
                       ),
                     PopupMenuItem(
                       value: _PostMenu.save,

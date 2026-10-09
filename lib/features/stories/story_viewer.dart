@@ -243,7 +243,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Удалить историю?'),
+        title: const Text('Удалить блик?'),
         content: const Text('Её не получится вернуть.'),
         actions: [
           TextButton(
@@ -489,7 +489,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
           replyTo: ChatReply(
             messageId: 'story-${story.id}',
             senderName: story.authorName,
-            preview: caption.isEmpty ? 'История' : 'История · $caption',
+            preview: caption.isEmpty ? 'Блик' : 'Блик · $caption',
             thumbUrl: story.kind == StoryKind.text ? null : story.mediaUrl,
             thumbB64: story.kind == StoryKind.video && story.mediaUrl != null
                 ? await ReplyPreview.forVideoUrl(story.mediaUrl!)
@@ -700,7 +700,7 @@ class _StoryReplyState extends State<_StoryReply> {
                   )
                 : Semantics(
                     button: true,
-                    label: 'Ответить на историю',
+                    label: 'Ответить на блик',
                     child: GestureDetector(
                       onTap: _expand,
                       child: Container(

@@ -150,7 +150,7 @@ class _GroupTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'История: ${group.authorName}',
+      label: 'Блик: ${group.authorName}',
       child: GestureDetector(
         onTap: onTap,
         child: SizedBox(
@@ -206,7 +206,7 @@ class _MineTile extends StatelessWidget {
             children: [
               Semantics(
                 button: true,
-                label: mine == null ? 'Добавить историю' : 'Ваша история',
+                label: mine == null ? 'Добавить блик' : 'Ваш блик',
                 child: GestureDetector(
                   onTap: mine == null ? onAdd : onOpen,
                   child: mine == null
@@ -229,7 +229,7 @@ class _MineTile extends StatelessWidget {
                   bottom: -4,
                   child: GestureDetector(
                     onTap: onAdd,
-                    child: Semantics(button: true, label: 'Добавить историю', child: plus),
+                    child: Semantics(button: true, label: 'Добавить блик', child: plus),
                   ),
                 ),
             ],

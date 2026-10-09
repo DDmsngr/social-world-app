@@ -231,7 +231,7 @@ enum _PostFilter {
   article(Icons.article_outlined, 'Статьи'),
   route(Icons.route_outlined, 'Маршруты'),
   text(Icons.notes, 'Заметки'),
-  stories(Icons.amp_stories_outlined, 'Истории');
+  stories(Icons.amp_stories_outlined, 'Блики');
 
   const _PostFilter(this.icon, this.label);
   final IconData icon;

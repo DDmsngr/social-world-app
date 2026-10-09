@@ -55,7 +55,7 @@ Future<bool?> _openComposer(BuildContext context, StoryDraft draft) =>
 /// «+» в полосе сторис: выбор — фото, снимок, видео или текст.
 Future<void> addStory(BuildContext context, WidgetRef ref) async {
   if (!ref.read(storiesRepositoryProvider).available) {
-    _toast(context, 'Истории доступны только при подключении к серверу');
+    _toast(context, 'Блики доступны только при подключении к серверу');
     return;
   }
   final choice = await showModalBottomSheet<String>(
@@ -110,18 +110,18 @@ Future<void> addStory(BuildContext context, WidgetRef ref) async {
   }
   if (draft == null || !context.mounted) return;
   final published = await _openComposer(context, draft);
-  if (published == true && context.mounted) _toast(context, 'История опубликована');
+  if (published == true && context.mounted) _toast(context, 'Блик опубликован');
 }
 
 /// «В сторис» у своего поста любого типа: фото или видео поста, а у статьи,
 /// маршрута и текстового поста — заголовок или начало текста на цветном фоне.
 Future<void> storyFromPost(BuildContext context, WidgetRef ref, Post post) async {
   if (!ref.read(storiesRepositoryProvider).available) {
-    _toast(context, 'Истории доступны только при подключении к серверу');
+    _toast(context, 'Блики доступны только при подключении к серверу');
     return;
   }
   final published = await _openComposer(context, _draftForPost(post));
-  if (published == true && context.mounted) _toast(context, 'История опубликована');
+  if (published == true && context.mounted) _toast(context, 'Блик опубликован');
 }
 
 /// Тот же пост сразу историей, без редактора: для тумблера «Ещё и в историях».
@@ -355,7 +355,7 @@ class _StoryComposerScreenState extends ConsumerState<StoryComposerScreen> {
     final height = MediaQuery.of(context).size.height * 0.46;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Новая история')),
+      appBar: AppBar(title: const Text('Новый блик')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
@@ -441,7 +441,7 @@ class _StoryComposerScreenState extends ConsumerState<StoryComposerScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'История пропадёт через 24 часа.',
+            'Блик пропадёт через 24 часа.',
             style: TextStyle(fontSize: 12, color: AppColors.textFaint),
           ),
           const SizedBox(height: 16),

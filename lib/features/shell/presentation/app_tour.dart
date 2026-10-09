@@ -38,7 +38,7 @@ abstract final class AppTour {
       tab: 0,
       icon: Icons.photo_library_outlined,
       title: 'Flow — лента',
-      text: 'Посты, фото и истории людей. Листайте, ставьте лайки, '
+      text: 'Посты, фото и блики людей. Листайте, ставьте лайки, '
           'комментируйте, подписывайтесь на интересных людей.',
     ),
     TourStep(
@@ -52,7 +52,7 @@ abstract final class AppTour {
       tab: 2,
       icon: Icons.add_circle_outline,
       title: 'Создать',
-      text: 'Пост, история, событие или маршрут — всё публикуется отсюда.',
+      text: 'Пост, блик, событие или маршрут — всё публикуется отсюда.',
     ),
     TourStep(
       tab: 3,

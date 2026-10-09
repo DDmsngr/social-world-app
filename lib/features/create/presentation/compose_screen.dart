@@ -503,8 +503,8 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
                 contentPadding: EdgeInsets.zero,
                 value: _alsoStory,
                 onChanged: (value) => setState(() => _alsoStory = value),
-                title: const Text('Ещё и в историях'),
-                subtitle: const Text('Момент появится и в ленте, и в кружках сверху на сутки'),
+                title: const Text('Ещё и как блик'),
+                subtitle: const Text('Момент появится и в ленте, и в бликах сверху на сутки'),
               ),
             ],
             if (_kind == ComposeKind.article) ...[
