@@ -78,6 +78,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   ChatReply? _replyTo;
 
   final _scroll = ScrollController();
+  final _farFromBottom = ValueNotifier(false);
 
   /// Плашка с датой поверх ленты, пока её листают (как в Telegram).
   final _listBox = GlobalKey();
@@ -379,6 +380,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     WidgetsBinding.instance.removeObserver(this);
     _floatingHide?.cancel();
     _scroll.dispose();
+    _farFromBottom.dispose();
     _push.leaveChat(widget.conversationId);
     super.dispose();
   }
@@ -813,6 +815,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       child: list,
                     ),
                     Positioned(
+                      right: 12,
+                      bottom: 12,
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _farFromBottom,
+                        builder: (context, far, _) => IgnorePointer(
+                          ignoring: !far,
+                          child: AnimatedScale(
+                            scale: far ? 1 : 0,
+                            duration: const Duration(milliseconds: 160),
+                            child: Semantics(
+                              button: true,
+                              label: 'К последним сообщениям',
+                              child: Material(
+                                color: AppColors.card,
+                                elevation: 3,
+                                shape: CircleBorder(side: BorderSide(color: AppColors.hair)),
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () => _scroll.animateTo(
+                                    0,
+                                    duration: const Duration(milliseconds: 350),
+                                    curve: Curves.easeOutCubic,
+                                  ),
+                                  child: SizedBox.square(
+                                    dimension: 44,
+                                    child: Icon(Icons.keyboard_arrow_down, color: AppColors.text),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
                       top: 8,
                       left: 0,
                       right: 0,
@@ -867,6 +904,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   /// Листают — показываем дату верхнего видимого сообщения; перестали —
   /// через секунду плашка уходит.
   bool _onListScroll(ScrollNotification notification) {
+    // Список перевёрнут: 0 — самый низ. Кнопка «вниз» после 7–10 сообщений.
+    _farFromBottom.value = notification.metrics.pixels > 700;
     if (notification is ScrollUpdateNotification) {
       final now = DateTime.now();
       if (now.difference(_floatingChecked) > const Duration(milliseconds: 120)) {
