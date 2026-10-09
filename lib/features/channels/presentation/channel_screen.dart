@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'channel_article_screen.dart';
+
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
 import '../../../core/router/app_router.dart';
@@ -14,6 +16,7 @@ import '../../chat/presentation/providers/chat_notify_providers.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../chat/presentation/widgets/chat_composer.dart';
 import '../../chat/presentation/widgets/chat_notify_sheet.dart';
+import '../../chat/presentation/widgets/swipe_back.dart';
 import '../data/channels_repository.dart';
 import 'providers/channel_providers.dart';
 import 'widgets/channel_avatar.dart';
@@ -45,7 +48,31 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
       if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 600) {
         ref.read(channelPostsProvider(widget.channelId).notifier).loadMore();
       }
+      final away = _scroll.position.pixels > _scroll.position.minScrollExtent + 300;
+      if (away != _showDown) setState(() => _showDown = away);
     });
+  }
+
+  /// Кнопка «вниз»: видна, когда отмотали от самого свежего поста.
+  var _showDown = false;
+
+  /// Сколько новых (непрочитанных при входе) постов лежит ниже места, где
+  /// остановились в прошлый раз.
+  var _newerCount = 0;
+
+  /// Отмотали выше непрочитанных — к первому непрочитанному (самому старому
+  /// из новых); уже среди новых — к самому свежему. Ноль прокрутки — это
+  /// нижняя кромка прежнего места: всё, что ниже (отрицательное смещение), —
+  /// новые посты.
+  void _scrollDown() {
+    if (!_scroll.hasClients) return;
+    final position = _scroll.position;
+    final aboveUnread = _newerCount > 0 && position.pixels > 0;
+    final target = aboveUnread
+        // Первое непрочитанное — у верхнего края экрана.
+        ? (-position.viewportDimension + 80).clamp(position.minScrollExtent, 0.0)
+        : position.minScrollExtent;
+    _scroll.animateTo(target, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
   }
 
   final _probes = <_SeenProbeState>{};
@@ -64,7 +91,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   /// Самый новый из постов, которые сейчас на экране, запоминается как место,
   /// где остановились: при возвращении лента откроется на нём, даже если
   /// новых постов набежало сотня.
-  void _saveSeen() {
+  void _saveSeen({bool updateCounter = true}) {
     final box = _viewKey.currentContext?.findRenderObject();
     if (box is! RenderBox || !box.attached || !box.hasSize) return;
     final top = box.localToGlobal(Offset.zero).dy;
@@ -81,14 +108,26 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         if (newest == null || at.isAfter(newest)) newest = at;
       }
     }
-    if (newest != null) ChannelSeen.save(widget.channelId, newest);
+    if (newest != null) {
+      ChannelSeen.save(widget.channelId, newest);
+      _markRead(newest);
+      // Счётчик у кнопки «вниз»: сколько постов ниже самого свежего из тех,
+      // что сейчас на экране, — ещё не виденные. Уменьшается по мере прокрутки.
+      final below = _items.where((p) => p.message.sentAt.isAfter(newest!)).length;
+      if (updateCounter && below != _unreadBelow && mounted) setState(() => _unreadBelow = below);
+    }
   }
+
+  /// Посты ленты (от новых к старым) — для счётчика непрочитанных ниже.
+  List<ChannelPost> _items = const [];
+  var _unreadBelow = 0;
 
   @override
   void deactivate() {
     // Уходим с экрана: фиксируем место, пока карточки ещё в дереве.
     _seenTimer?.cancel();
-    _saveSeen();
+    // Дерево уже разбирается — перерисовывать счётчик нельзя.
+    _saveSeen(updateCounter: false);
     super.deactivate();
   }
 
@@ -99,11 +138,23 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     super.dispose();
   }
 
-  Future<void> _markRead() async {
+  DateTime? _markedUntil;
+
+  /// Прочитано на сервере до самого свежего поста, побывавшего на экране, —
+  /// тогда счётчик в списке каналов совпадает с непрочитанными внутри.
+  Future<void> _markRead(DateTime until) async {
+    if (!(ref.read(channelInfoProvider(widget.channelId)).value?.isMember ?? false)) return;
+    final marked = _markedUntil;
+    if (marked != null && !until.isAfter(marked)) return;
+    _markedUntil = until;
+    // Вызывается и при уходе с экрана: после await ref экрана уже мёртв,
+    // поэтому список чатов освежаем через контейнер, взятый заранее.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
-      await ref.read(channelsRepositoryProvider).markRead(widget.channelId);
-      ref.invalidate(conversationsProvider);
+      await container.read(channelsRepositoryProvider).markRead(widget.channelId, until);
+      container.invalidate(conversationsProvider);
     } catch (error) {
+      _markedUntil = marked;
       AppLog.add('Канал не отметился прочитанным: $error');
     }
   }
@@ -168,18 +219,15 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
     final info = infoAsync.value;
 
     // Подписчик получает новые посты реалтаймом чатов: на каждое изменение
-    // ленты подтягиваем верх и сбрасываем счётчик непрочитанного.
+    // ленты подтягиваем верх. Прочитанным пост отмечается, только когда
+    // побывал на экране (_saveSeen).
     if (info?.isMember ?? false) {
       ref.listen(messagesProvider(widget.channelId), (_, next) {
         if (next.hasValue) {
           ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop();
-          _markRead();
         }
       });
     }
-    ref.listen(channelInfoProvider(widget.channelId), (_, next) {
-      if (next.value?.isMember ?? false) _markRead();
-    });
 
     final subtitle = info == null
         ? null
@@ -261,7 +309,12 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
           }
           return Column(
             children: [
-              Expanded(child: info.canRead ? _posts(info) : _closed(info)),
+              Expanded(
+                child: SwipeBackToExit(
+                  onExit: () => context.canPop() ? context.pop() : context.go(Routes.chats),
+                  child: info.canRead ? _posts(info) : _closed(info),
+                ),
+              ),
               _bottom(info),
             ],
           );
@@ -298,6 +351,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         final older = anchor == null
             ? items
             : [for (final p in items) if (!p.message.sentAt.isAfter(anchor)) p];
+        _newerCount = newer.length;
+        _items = items;
 
         SliverList list(List<ChannelPost> posts) => SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -343,7 +398,7 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         }
 
         _scheduleSeen();
-        return RefreshIndicator(
+        final feed = RefreshIndicator(
           onRefresh: () => ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop(),
           child: NotificationListener<ScrollNotification>(
             onNotification: (_) {
@@ -377,6 +432,33 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
             ),
           ),
         );
+        return Stack(
+          children: [
+            Positioned.fill(child: feed),
+            Positioned(
+              right: 16,
+              bottom: 16 + _bottomInset,
+              child: AnimatedScale(
+                scale: _showDown ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Badge(
+                  isLabelVisible: _unreadBelow > 0,
+                  label: Text(_unreadBelow > 99 ? '99+' : '$_unreadBelow'),
+                  backgroundColor: AppColors.primaryTint,
+                  offset: const Offset(-4, -6),
+                  child: FloatingActionButton.small(
+                    heroTag: null,
+                    onPressed: _scrollDown,
+                    tooltip: 'Вниз',
+                    backgroundColor: AppColors.card,
+                    foregroundColor: AppColors.text,
+                    child: const Icon(Icons.keyboard_arrow_down),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
       },
     );
   }
@@ -392,7 +474,32 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
 
   Widget _bottom(ChannelInfo info) {
     if (info.isAdmin) {
-      return ChatComposer(conversationId: widget.channelId, isDirect: false);
+      // Два формата: короткий пост — полем ввода, статья с фото посреди
+      // текста — отдельным редактором.
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: TextButton.icon(
+                onPressed: () async {
+                  final published = await Navigator.of(context, rootNavigator: true).push<bool>(
+                    MaterialPageRoute(builder: (_) => ChannelArticleScreen(channelId: widget.channelId)),
+                  );
+                  if (published == true) {
+                    ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop();
+                  }
+                },
+                icon: const Icon(Icons.article_outlined, size: 18),
+                label: const Text('Статья с фото'),
+              ),
+            ),
+          ),
+          ChatComposer(conversationId: widget.channelId, isDirect: false, isChannel: true),
+        ],
+      );
     }
     if (info.isMember) return const SizedBox.shrink();
 

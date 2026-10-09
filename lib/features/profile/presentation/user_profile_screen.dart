@@ -67,6 +67,7 @@ class UserProfileScreen extends ConsumerWidget {
         avatarUrl: me.avatarUrl,
         bio: me.bio,
         city: me.city,
+        username: me.username,
         socialScore: me.socialScore,
         followerCount: profile?.followerCount ?? 0,
         followingCount: profile?.followingCount ?? 0,
@@ -365,6 +366,11 @@ class _BodyState extends ConsumerState<_Body> {
         ),
         const SizedBox(height: 12),
         Text(profile.displayName, style: theme.textTheme.titleLarge),
+        if (profile.username != null)
+          Text(
+            '@${profile.username}',
+            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.primaryTint),
+          ),
         if (profile.city != null)
           Text(profile.city!, style: theme.textTheme.bodyMedium),
         if (profile.bio != null && profile.bio!.isNotEmpty) ...[
@@ -372,10 +378,30 @@ class _BodyState extends ConsumerState<_Body> {
           Text(profile.bio!, style: theme.textTheme.bodyLarge),
         ],
         const SizedBox(height: 4),
-        Text(
-          'Activity Points: ${profile.socialScore}',
-          style: TextStyle(fontSize: 12, color: AppColors.textDim),
-        ),
+        if (isMe)
+          // Свои баллы открываются: сколько и за что, плюс справка.
+          InkWell(
+            onTap: () => context.push(Routes.activityPoints),
+            borderRadius: BorderRadius.circular(AppRadius.chip),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Activity Points: ${profile.socialScore}',
+                    style: TextStyle(fontSize: 13, color: AppColors.primaryTint),
+                  ),
+                  Icon(Icons.chevron_right, size: 18, color: AppColors.primaryTint),
+                ],
+              ),
+            ),
+          )
+        else
+          Text(
+            'Activity Points: ${profile.socialScore}',
+            style: TextStyle(fontSize: 12, color: AppColors.textDim),
+          ),
         const SizedBox(height: 14),
         // Правка своего профиля — в настройках (шестерёнка сверху).
         if (isMe)
@@ -488,15 +514,21 @@ class _BodyState extends ConsumerState<_Body> {
                     ),
                   ];
                 }
+                // В своём профиле плашка всегда целиком — все виды публикаций,
+                // даже пустые: так видно, что вообще можно выложить. У чужого
+                // — только те, что у человека есть.
                 final available = [
                   for (final f in _PostFilter.values)
-                    if (f == _PostFilter.all ||
+                    if (isMe ||
+                        f == _PostFilter.all ||
                         (f == _PostFilter.stories ? storyGroup != null : items.any(f.matches)))
                       f,
                 ];
                 final filter = available.contains(_filter) ? _filter : _PostFilter.all;
+                final shown = [for (final p in items) if (filter.matches(p)) p];
+                final emptyStories = filter == _PostFilter.stories && storyGroup == null;
                 return [
-                  if (available.length > 2)
+                  if (isMe || available.length > 2)
                     SliverToBoxAdapter(
                       child: _FilterBar(
                         filters: available,
@@ -504,10 +536,17 @@ class _BodyState extends ConsumerState<_Body> {
                         onSelected: (f) => setState(() => _filter = f),
                       ),
                     ),
-                  if (filter == _PostFilter.stories)
+                  if (emptyStories || (filter != _PostFilter.stories && shown.isEmpty))
+                    message(
+                      Text(
+                        '${filter.label ?? 'Публикаций'}: пока нет.',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    )
+                  else if (filter == _PostFilter.stories)
                     _StoriesGrid(group: storyGroup!)
                   else
-                    ProfilePostGrid(posts: [for (final p in items) if (filter.matches(p)) p]),
+                    ProfilePostGrid(posts: shown, showVisibility: isMe),
                   SliverToBoxAdapter(child: SizedBox(height: bottom)),
                 ];
               },
@@ -630,9 +669,16 @@ class _Stat extends StatelessWidget {
             children: [
               Text('$value', style: AppTypography.serif(24)),
               const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(fontSize: 12, color: AppColors.textDim),
+              // При крупном системном шрифте подпись ужимается, а не рвётся
+              // посреди слова («публикаци/и»).
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(fontSize: 12, color: AppColors.textDim),
+                ),
               ),
             ],
           ),

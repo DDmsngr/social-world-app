@@ -8,6 +8,9 @@ import '../entities/conversation.dart';
 /// презентация не знает ни про ключи, ни про транспорт. Личные диалоги
 /// шифруются (X25519 + ChaCha20-Poly1305 + Ed25519, как в DDChat), группы —
 /// нет; какой путь выбрать, решает реализация по типу чата.
+/// Сколько фото помещается в одном сообщении-альбоме.
+const maxAlbumPhotos = 8;
+
 abstract interface class ChatRepository {
   bool get endToEndEncryptionEnabled;
 
@@ -37,6 +40,15 @@ abstract interface class ChatRepository {
     String? mime,
     int? durationMs,
     List<double>? waveform,
+    String? caption,
+    SendOptions options = SendOptions.none,
+  });
+
+  /// Несколько фото одним сообщением (альбом) с общей подписью. От 2 до
+  /// [maxAlbumPhotos] файлов; больше — вызывающий делит на группы.
+  Future<ChatMessage> sendAlbum({
+    required String conversationId,
+    required List<String> filePaths,
     String? caption,
     SendOptions options = SendOptions.none,
   });
@@ -87,6 +99,13 @@ abstract interface class ChatRepository {
   /// Отпечаток общего секрета — то, что собеседники сверяют голосом,
   /// чтобы исключить подмену ключей посередине. Только для личных диалогов.
   Future<String> securityCode(String conversationId);
+
+  /// Ключ собеседника не совпадает с тем, что телефон запомнил при первой
+  /// встрече. Пока новый ключ не принят, отправка в диалог не идёт.
+  Future<bool> peerKeyChanged(String conversationId);
+
+  /// Принять текущий ключ собеседника (после сверки кода безопасности).
+  Future<void> acceptPeerKey(String conversationId);
 
   /// Личный диалог с человеком: существующий или новый. Возвращает id чата.
   Future<String> openDirect(String peerId);

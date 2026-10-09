@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/location/device_position.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/location/distance.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -14,6 +16,14 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../domain/activity.dart';
 import '../../domain/entities/place.dart';
 import '../providers/discover_providers.dart';
+
+/// Хэштег из строки поиска: «#закат» → «закат». null — это не хэштег.
+String? hashtagQuery(String text) {
+  final trimmed = text.trim();
+  if (!trimmed.startsWith('#')) return null;
+  final tag = trimmed.substring(1).replaceAll(RegExp(r'\s+'), '');
+  return tag.isEmpty ? null : tag.toLowerCase();
+}
 
 /// Поле поиска над картой с выпадающими результатами. Ищет места, события и
 /// людей; выбранный результат наводит на себя камеру (если у него есть точка)
@@ -74,8 +84,12 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
       });
     }
 
-    final categoryCount = ref.watch(categoryFilterProvider).length;
+    // Значок на «Фильтрах»: сколько всего сужено — категории и скрытые слои.
+    final categoryCount =
+        ref.watch(categoryFilterProvider).length +
+        (MapLayer.values.length - ref.watch(mapLayersProvider).length);
     final results = ref.watch(mapSearchResultsProvider);
+    final tag = hashtagQuery(_controller.text);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -85,7 +99,7 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
           onChanged: _onChanged,
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
-            hintText: 'Место, событие или человек',
+            hintText: 'Место, событие, человек или #тег',
             prefixIcon: const Icon(Icons.search),
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
@@ -114,7 +128,29 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
             ),
           ),
         ),
-        if (_controller.text.trim().isNotEmpty)
+        // «#тег» — поиск моментов по хэштегу: отдельного места для него не
+        // было, теперь он живёт в том же поиске.
+        if (tag != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Material(
+              color: AppColors.ink2,
+              elevation: 6,
+              borderRadius: BorderRadius.circular(AppRadius.field),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: Icon(Icons.tag, color: AppColors.primaryTint),
+                title: Text('Моменты с #$tag'),
+                subtitle: const Text('Показать публикации с этим хэштегом'),
+                onTap: () {
+                  FocusScope.of(context).unfocus();
+                  _clear();
+                  context.push('${Routes.hashtag}/${Uri.encodeComponent(tag)}');
+                },
+              ),
+            ),
+          )
+        else if (_controller.text.trim().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Material(
@@ -204,13 +240,17 @@ class _MapSearchBarState extends ConsumerState<MapSearchBar> {
 /// показывает. Сразу видно, что включено, что выключено и сколько объектов на
 /// карте; «Сбросить» появляется, только когда есть что сбрасывать.
 class MapLayerChips extends ConsumerWidget {
-  const MapLayerChips({super.key});
+  /// [layersOnly] — только слои со счётчиками (внутри окна «Фильтры»), без
+  /// чипов «Рядом» и «Сбросить».
+  const MapLayerChips({super.key, this.layersOnly = false});
+
+  final bool layersOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final layers = ref.watch(mapLayersProvider);
     final view = ref.watch(mapViewProvider);
-    final anchor = ref.watch(nearbyAnchorProvider);
+    final anchor = layersOnly ? null : ref.watch(nearbyAnchorProvider);
 
     int countFor(MapLayer layer) => switch (layer) {
       MapLayer.events => view.events.length,
@@ -265,7 +305,7 @@ class MapLayerChips extends ConsumerWidget {
             ),
             side: BorderSide(color: AppColors.hair),
           ),
-        if (view.isFiltered)
+        if (view.isFiltered && !layersOnly)
           ActionChip(
             visualDensity: density,
             labelPadding: labelPadding,
@@ -280,6 +320,67 @@ class MapLayerChips extends ConsumerWidget {
             side: BorderSide(color: AppColors.hair),
           ),
       ],
+    );
+  }
+}
+
+/// Что на карте сейчас отфильтровано, одной строкой и только когда есть что
+/// показать: точка «Рядом», число скрытых слоёв и категорий, «Сбросить».
+/// Раньше сверху всегда висели шесть чипов слоёв в два ряда, и они закрывали
+/// карту, хотя нужны раз в сто запусков.
+class MapActiveFilters extends ConsumerWidget {
+  const MapActiveFilters({super.key, required this.onOpenFilters});
+
+  final VoidCallback onOpenFilters;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final layers = ref.watch(mapLayersProvider);
+    final view = ref.watch(mapViewProvider);
+    final anchor = ref.watch(nearbyAnchorProvider);
+    final hidden = MapLayer.values.length - layers.length;
+    final categories = ref.watch(categoryFilterProvider).length;
+    final active = hidden + categories;
+
+    if (anchor == null && active == 0 && !view.isFiltered) return const SizedBox.shrink();
+
+    const density = VisualDensity(horizontal: -2, vertical: -2);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          if (anchor != null)
+            InputChip(
+              visualDensity: density,
+              avatar: Icon(Icons.my_location, size: 16, color: AppColors.geo),
+              label: Text('Рядом · ${_radius(anchor.radiusMeters)}'),
+              onDeleted: () => ref.read(nearbyAnchorProvider.notifier).clear(),
+              deleteButtonTooltipMessage: 'Убрать точку «Рядом»',
+              backgroundColor: AppColors.ink2,
+              side: BorderSide(color: AppColors.geo.withValues(alpha: 0.6)),
+            ),
+          if (active > 0)
+            ActionChip(
+              visualDensity: density,
+              avatar: Icon(Icons.tune, size: 16, color: AppColors.primaryTint),
+              label: Text('Фильтры · $active'),
+              onPressed: onOpenFilters,
+              backgroundColor: AppColors.ink2,
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
+            ),
+          if (view.isFiltered)
+            ActionChip(
+              visualDensity: density,
+              avatar: Icon(Icons.restart_alt, size: 16, color: AppColors.primaryTint),
+              label: const Text('Сбросить'),
+              onPressed: () => resetMapFilters(ref),
+              backgroundColor: AppColors.ink2,
+              side: BorderSide(color: AppColors.hair),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -395,7 +496,6 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
         child: Consumer(
           builder: (context, ref, _) {
             final selected = ref.watch(categoryFilterProvider);
-            final layers = ref.watch(mapLayersProvider);
             final mode = ref.watch(activityModeProvider);
             final view = ref.watch(mapViewProvider);
 
@@ -426,30 +526,7 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final layer in MapLayer.values)
-                        FilterChip(
-                          label: Text(layer.label),
-                          selected: layers.contains(layer),
-                          onSelected: (_) => ref
-                              .read(mapLayersProvider.notifier)
-                              .toggle(layer),
-                          showCheckmark: false,
-                          backgroundColor: AppColors.card,
-                          selectedColor: AppColors.primary,
-                          labelStyle: TextStyle(
-                            fontSize: 13,
-                            color: layers.contains(layer)
-                                ? AppColors.onPrimary
-                                : AppColors.textDim,
-                          ),
-                          side: BorderSide(color: AppColors.hair),
-                        ),
-                    ],
-                  ),
+                  const MapLayerChips(layersOnly: true),
                   const SizedBox(height: 18),
                   Text(
                     'Категории мест',

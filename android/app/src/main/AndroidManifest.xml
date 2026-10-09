@@ -4,6 +4,12 @@
     <!-- Запись маршрута идёт только при открытом приложении: фоновой службы
          нет, поэтому ACCESS_BACKGROUND_LOCATION намеренно не запрашиваем. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Трансляция геопозиции в чате (0060) идёт и при свёрнутом приложении:
+         служба геолокатора с уведомлением «ChaWo транслирует геопозицию».
+         Служба стартует из открытого приложения, поэтому фонового доступа к
+         геолокации по-прежнему не нужно. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Фото-метки на маршруте снимаются камерой прямо во время прогулки. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Голосовые и звук кружков в чатах. -->
@@ -80,6 +86,37 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="ddmsngr.github.io" android:pathPrefix="/social-world/o"/>
+            </intent-filter>
+            <!-- Личные приглашения https://api-socialworld.deepdrift.tech/r/<код>:
+                 стоит приложение — открывается сразу в нём, нет — страница
+                 с кнопкой «Скачать». -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="api-socialworld.deepdrift.tech" android:pathPrefix="/r/"/>
+            </intent-filter>
+            <!-- «Поделиться» из других приложений: текст и ссылки, фото, видео,
+                 любые файлы. ChaWo появляется в системном списке, дальше
+                 приложение само предлагает выбрать чат (lib/core/share). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <action android:name="android.intent.action.SEND_MULTIPLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="image/*"/>
+                <data android:mimeType="video/*"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <action android:name="android.intent.action.SEND_MULTIPLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/*"/>
+                <data android:mimeType="audio/*"/>
             </intent-filter>
         </activity>
         <!-- Пуши, пришедшие в фоне, рисует система: ей нужны монохромная иконка

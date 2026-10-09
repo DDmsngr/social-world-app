@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Приглашение в ChaWo</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { --bg: #111315; --card: #1c1f22; --text: #eef0f2; --dim: #9aa3ab; --accent: #e6e9ec; --accent-ink: #14171a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  main { width: 100%; max-width: 420px; text-align: center; }
+  .logo { font-size: 34px; font-weight: 700; letter-spacing: .5px; margin: 0 0 4px; }
+  .logo span { color: var(--dim); }
+  p { color: var(--dim); margin: 8px 0; }
+  .code { margin: 22px 0 6px; padding: 14px; border-radius: 16px; background: var(--card);
+    font: 600 30px/1.2 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 6px; }
+  .btn { display: block; width: 100%; margin-top: 14px; padding: 15px; border-radius: 14px; border: 0;
+    font: 600 17px/1.2 inherit; cursor: pointer; text-decoration: none; }
+  .primary { background: var(--accent); color: var(--accent-ink); }
+  .ghost { background: transparent; color: var(--text); border: 1px solid #3a4046; }
+  .steps { text-align: left; background: var(--card); border-radius: 16px; padding: 14px 18px; margin-top: 22px; }
+  .steps li { color: var(--dim); margin: 6px 0; }
+  .note { font-size: 13px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="logo">Cha<span>Wo</span></h1>
+  <p>Соцсеть, которая становится городом.</p>
+  <p id="lead">Вас пригласили в ChaWo.</p>
+  <div class="code" id="code">······</div>
+  <p class="note">Код приглашения</p>
+
+  <a class="btn primary" id="download" href="/updates/chawo.apk">Скачать ChaWo</a>
+  <a class="btn ghost" id="open" href="#">Уже установлено — открыть</a>
+
+  <ol class="steps">
+    <li>Нажмите «Скачать ChaWo» и установите файл (Android может попросить разрешение на установку).</li>
+    <li>Откройте ChaWo и войдите — код подставится сам.</li>
+    <li>Не подставился — введите его в «Пригласить в ChaWo» → «Ввести код пригласившего».</li>
+  </ol>
+  <p class="note">Пока приложение есть только для Android.</p>
+</main>
+<script>
+  (function () {
+    var parts = location.pathname.split('/').filter(Boolean);
+    var raw = parts.length >= 2 && parts[0] === 'r' ? parts[1] : '';
+    var code = /^[A-Za-z2-9]{6,10}$/.test(raw) ? raw.toUpperCase() : '';
+    var codeEl = document.getElementById('code');
+    if (!code) {
+      document.getElementById('lead').textContent = 'Ссылка приглашения неполная — попросите прислать её ещё раз.';
+      codeEl.style.display = 'none';
+      document.getElementById('open').style.display = 'none';
+      return;
+    }
+    codeEl.textContent = code;
+    var clip = 'Код приглашения в ChaWo: ' + code;
+
+    function copy() {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(clip);
+      } catch (e) {}
+      var t = document.createElement('textarea');
+      t.value = clip; document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(t);
+      return Promise.resolve();
+    }
+
+    // Код кладём в буфер обмена до скачивания: после установки приложение
+    // само прочитает его при первом запуске.
+    document.getElementById('download').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var href = this.href;
+      Promise.resolve(copy()).catch(function () {}).then(function () { location.href = href; });
+    });
+    document.getElementById('open').href =
+      'intent://r/' + code + '#Intent;scheme=socialworld;package=ru.socialworld.app;S.browser_fallback_url=' +
+      encodeURIComponent(location.origin + '/updates/chawo.apk') + ';end';
+  })();
+</script>
+</body>
+</html>

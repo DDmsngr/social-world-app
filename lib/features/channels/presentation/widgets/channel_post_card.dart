@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/markdown_view.dart';
+import '../../../create/domain/article_parts.dart';
 import '../../data/channels_repository.dart';
 import 'channel_media.dart';
 
@@ -52,7 +53,7 @@ class ChannelPostCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: full || text.length <= 700
                     ? MarkdownView(data: text, selectable: full)
-                    : MarkdownView(data: '${text.substring(0, 700).trimRight()}…'),
+                    : MarkdownView(data: channelPostPreview(text)),
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 6, 4),
@@ -81,6 +82,33 @@ class ChannelPostCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Начало длинного поста для ленты канала. Статью режем по блокам, а не по
+/// символам: обрезка посреди `![фото](ссылка)` оставила бы в ленте обломок
+/// разметки. Показываем текст до ~600 знаков и первое фото/видео.
+String channelPostPreview(String text) {
+  final parts = parseArticle(text);
+  final out = <String>[];
+  var length = 0;
+  var media = false;
+  for (final part in parts) {
+    switch (part) {
+      case TextPart(text: final t):
+        if (t.trim().isEmpty) continue;
+        if (length >= 600) break;
+        final room = 600 - length;
+        final piece = t.length <= room ? t : '${t.substring(0, room).trimRight()}…';
+        out.add(piece);
+        length += piece.length;
+      case MediaPart(:final url, :final alt):
+        if (media) continue;
+        media = true;
+        out.add('![$alt]($url)');
+    }
+  }
+  final preview = out.join('\n\n');
+  return preview.length < text.length && !preview.endsWith('…') ? '$preview\n\n…' : preview;
 }
 
 String _when(DateTime time) {

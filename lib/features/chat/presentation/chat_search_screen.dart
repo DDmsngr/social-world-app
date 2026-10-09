@@ -160,7 +160,7 @@ class _ChatSearchScreenState extends ConsumerState<ChatSearchScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                'Введите хотя бы две буквы имени.',
+                'Введите хотя бы две буквы имени или @ник.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             )
@@ -183,7 +183,9 @@ class _ChatSearchScreenState extends ConsumerState<ChatSearchScreen> {
                 onTap: () => openProfile(context, person.id),
                 leading: UserAvatar(name: person.displayName, url: person.avatarUrl),
                 title: Text(person.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: person.followedByMe ? const Text('Вы подписаны') : null,
+                subtitle: person.username != null
+                    ? Text('@${person.username}')
+                    : (person.followedByMe ? const Text('Вы подписаны') : null),
                 trailing: IconButton(
                   onPressed: () => _write(person),
                   tooltip: 'Написать',

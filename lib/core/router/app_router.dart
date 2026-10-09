@@ -10,6 +10,7 @@ import '../session/session_reset.dart';
 
 import '../../features/auth/domain/entities/app_user.dart';
 import '../../features/calls/call_screen.dart';
+import '../../features/points/activity_points_screen.dart';
 import '../../features/referrals/presentation/share_app_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/chat/presentation/chats_soon_screen.dart';
@@ -18,6 +19,7 @@ import '../../features/chat/presentation/group_screens.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
+import '../../features/create/presentation/compose_screen.dart';
 import '../../features/create/presentation/create_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
 import '../../features/discover/presentation/place_screen.dart';
@@ -32,6 +34,7 @@ import '../../features/needs/domain/entities/need_request.dart';
 import '../../features/needs/presentation/create_need_screen.dart';
 import '../../features/needs/presentation/my_needs_screen.dart';
 import '../../features/needs/presentation/need_detail_screen.dart';
+import '../../features/notifications/notification_settings_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/channels/presentation/channel_catalog_screen.dart';
 import '../../features/chat/presentation/chat_search_screen.dart';
@@ -53,6 +56,8 @@ import '../text/hashtags.dart';
 import '../../features/profile/presentation/profile_menu_screen.dart';
 import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
+import '../../features/profile/presentation/security_screen.dart';
+import '../../features/shell/presentation/animated_branches.dart';
 import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/quests/domain/entities/quest.dart';
 import '../../features/quests/presentation/create_quest_screen.dart';
@@ -75,6 +80,9 @@ abstract final class Routes {
   /// Список событий открывается с карты («Пульс города»), вкладки у него нет.
   static const events = '/events';
   static const create = '/create';
+
+  /// Форма создания момента, статьи или события: `/compose/<вид>`.
+  static const compose = '/compose';
   static const chats = '/chats';
 
   /// Экран звонка поверх всего; открывает его CallController.
@@ -89,6 +97,7 @@ abstract final class Routes {
   static const blocked = '/profile/blocked';
   static const inviteContacts = '/profile/invite-contacts';
   static const shareApp = '/profile/share-app';
+  static const activityPoints = '/profile/points';
 
   /// Профиль любого человека: ${Routes.user}/id. Свой открывается тем же
   /// экраном и показывает действия владельца.
@@ -101,6 +110,8 @@ abstract final class Routes {
   /// Лента хэштега: ${Routes.hashtag}/<тег без #>.
   static const hashtag = '/tags';
   static const notifications = '/notifications';
+  static const notificationSettings = '/profile/settings/notifications';
+  static const security = '/profile/settings/security';
   static const places = '/places';
 
   /// Запись и просмотр маршрутов живут вне вкладок: во время прогулки нижняя
@@ -351,6 +362,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const BlockedUsersScreen(),
       ),
       GoRoute(path: Routes.shareApp, builder: (_, _) => const ShareAppScreen()),
+      GoRoute(path: Routes.activityPoints, builder: (_, _) => const ActivityPointsScreen()),
       GoRoute(
         path: Routes.inviteContacts,
         builder: (_, _) => const InviteContactsScreen(),
@@ -374,10 +386,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const SettingsScreen(),
       ),
       GoRoute(
+        path: Routes.notificationSettings,
+        builder: (_, _) => const NotificationSettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.security,
+        builder: (_, _) => const SecurityScreen(),
+      ),
+      GoRoute(
+        path: '${Routes.compose}/:kind',
+        builder: (_, state) => ComposeScreen(
+          kind: ComposeKind.fromSegment(state.pathParameters['kind']),
+        ),
+      ),
+      GoRoute(
         path: Routes.events,
         builder: (_, _) => const EventsScreen(),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
+        navigatorContainerBuilder: animatedBranchContainer,
         builder: (_, state, navigationShell) => HomeShell(
           navigationShell: navigationShell,
           location: state.uri.path,

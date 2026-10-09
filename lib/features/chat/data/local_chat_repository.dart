@@ -116,6 +116,43 @@ class LocalChatRepository implements ChatRepository {
     ),
   );
 
+  @override
+  Future<ChatMessage> sendAlbum({
+    required String conversationId,
+    required List<String> filePaths,
+    String? caption,
+    SendOptions options = SendOptions.none,
+  }) async {
+    ChatAttachment photo(String path) => ChatAttachment(
+      path: path,
+      size: 0,
+      name: path.split(RegExp(r'[\\/]')).last,
+      mime: 'image/jpeg',
+    );
+    final all = [for (final path in filePaths) photo(path)];
+    return _add(
+      ChatMessage(
+        id: 'local-msg-${_nextId++}',
+        conversationId: conversationId,
+        senderId: currentUserId(),
+        sentAt: DateTime.now(),
+        kind: MessageKind.image,
+        text: caption,
+        attachment: ChatAttachment(
+          path: all.first.path,
+          size: 0,
+          name: all.first.name,
+          mime: all.first.mime,
+          album: all.skip(1).toList(),
+        ),
+        status: MessageStatus.sent,
+        signatureValid: true,
+        replyTo: options.replyTo,
+        forwardedFrom: options.forwardedFrom,
+      ),
+    );
+  }
+
   /// Отложенные живут в памяти; уходят они только руками (см. [releaseScheduled]).
   final _scheduled = <ScheduledMessage>[];
 
@@ -251,6 +288,12 @@ class LocalChatRepository implements ChatRepository {
   @override
   Future<String> securityCode(String conversationId) async =>
       'Переписка ещё не шифруется';
+
+  @override
+  Future<bool> peerKeyChanged(String conversationId) async => false;
+
+  @override
+  Future<void> acceptPeerKey(String conversationId) async {}
 
   @override
   Future<String> openDirect(String peerId) async {

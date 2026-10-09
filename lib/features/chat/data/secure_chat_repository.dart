@@ -14,6 +14,7 @@ import '../domain/repositories/chat_repository.dart';
 import 'chat_media_cache.dart';
 import 'crypto/chat_crypto_service.dart';
 import 'crypto/chat_key_storage.dart';
+import 'crypto/peer_key_pins.dart';
 import 'live_feed.dart';
 import 'message_envelope.dart';
 
@@ -37,6 +38,7 @@ class SecureChatRepository implements ChatRepository {
     this._client, {
     required this.currentUserId,
     ChatKeyStorage? keyStorage,
+    this._pins = const PrefsPeerKeyPins(),
   }) : _keyStorage = keyStorage ?? SecureChatKeyStorage() {
     _ready = _initialize();
     // Ошибку публикации ключей получит тот, кто дождётся _ready; без
@@ -60,6 +62,11 @@ class SecureChatRepository implements ChatRepository {
   /// Опубликованные ключи не меняются без смены устройства; пустой ответ не
   /// кэшируется — собеседник может опубликовать ключи позже.
   final _keys = <String, ChatPublicKeys>{};
+
+  final PeerKeyPins _pins;
+
+  /// Собеседники, чей ключ на сервере не совпал с запомненным.
+  final _changedKeys = <String>{};
 
   @override
   bool get endToEndEncryptionEnabled => true;
@@ -180,6 +187,53 @@ class SecureChatRepository implements ChatRepository {
 
   Future<ConversationKind> _kind(String conversationId) async =>
       _kinds[conversationId] ?? (await loadConversation(conversationId)).kind;
+
+  /// Точка трансляции геопозиции (0060). В личном чате — шифротекст тем же
+  /// ключом пары, что и сообщения (поля ciphertext/nonce/mac/signature), в
+  /// группе — null: там точка уходит открыто, как и сами сообщения.
+  Future<Map<String, String>?> sealLiveLocation(String conversationId, String shareId, String json) async {
+    if (await _kind(conversationId) != ConversationKind.direct) return null;
+    final crypto = await _ready;
+    final keys = await _keysForSending(await _peerId(conversationId));
+    final payload = await crypto.encrypt(
+      conversationId: conversationId,
+      messageId: shareId,
+      senderId: currentUserId,
+      recipientExchangeKey: keys.exchangeKey,
+      text: json,
+    );
+    return {
+      'ciphertext': payload.ciphertext,
+      'nonce': payload.nonce,
+      'mac': payload.mac,
+      'signature': payload.signature,
+    };
+  }
+
+  /// Расшифровать точку трансляции из строки live_locations личного чата.
+  Future<String?> openLiveLocation(String conversationId, Map<String, dynamic> row) async {
+    final ciphertext = row['ciphertext'] as String?;
+    if (ciphertext == null) return null;
+    final crypto = await _ready;
+    final peerKeys = await _loadPublicKeys(await _peerId(conversationId));
+    if (peerKeys == null) return null;
+    final senderId = row['user_id'] as String;
+    final senderKeys = senderId == currentUserId ? await crypto.publicKeys : peerKeys;
+    final decrypted = await crypto.decrypt(
+      conversationId: conversationId,
+      messageId: row['id'] as String,
+      senderId: senderId,
+      peerExchangeKey: peerKeys.exchangeKey,
+      senderSigningKey: senderKeys.signingKey,
+      payload: EncryptedChatPayload(
+        ciphertext: ciphertext,
+        nonce: row['nonce'] as String,
+        mac: row['mac'] as String,
+        signature: row['signature'] as String,
+      ),
+    );
+    return decrypted.text;
+  }
 
   /// Сколько ждём ответа сети, прежде чем считать запрос зависшим. Без
   /// предела запрос на «мёртвом» после смены сети соединении висел минутами, и
@@ -344,11 +398,7 @@ class SecureChatRepository implements ChatRepository {
     if (await _kind(message.conversationId) == ConversationKind.direct) {
       // Тот же конверт, что при отправке: вложение с ключом, цитата и
       // пересылка остаются, меняется только текст.
-      final peerId = await _peerId(message.conversationId);
-      final keys = await _loadPublicKeys(peerId);
-      if (keys == null) {
-        throw StateError('Собеседник ещё не опубликовал ключи шифрования');
-      }
+      final keys = await _keysForSending(await _peerId(message.conversationId));
       final payload = await crypto.encrypt(
         conversationId: message.conversationId,
         messageId: message.id,
@@ -535,6 +585,107 @@ class SecureChatRepository implements ChatRepository {
   }
 
   @override
+  Future<ChatMessage> sendAlbum({
+    required String conversationId,
+    required List<String> filePaths,
+    String? caption,
+    SendOptions options = SendOptions.none,
+  }) async {
+    if (filePaths.length < 2 || filePaths.length > maxAlbumPhotos) {
+      throw ArgumentError('В альбоме от 2 до $maxAlbumPhotos фото');
+    }
+    await _ready;
+    final direct = await _kind(conversationId) == ConversationKind.direct;
+    final id = _uuid.v4();
+    final photos = <ChatAttachment>[];
+    final storagePaths = <String>[];
+
+    Future<void> removeUploaded() => _client.storage
+        .from(_bucket)
+        .remove(storagePaths)
+        .then((_) {})
+        .catchError((_) {});
+
+    try {
+      for (var i = 0; i < filePaths.length; i++) {
+        final clear = stripJpegMetadata(await File(filePaths[i]).readAsBytes());
+        if (clear.length > maxAttachmentBytes) throw const ChatAttachmentTooLarge();
+        final storagePath = '$conversationId/${i == 0 ? id : '$id-a$i'}';
+        String? key;
+        var upload = clear;
+        if (direct) {
+          final encrypted = await ChatCryptoService.encryptFile(clear);
+          upload = encrypted.bytes;
+          key = encrypted.key;
+        }
+        await _client.storage
+            .from(_bucket)
+            .uploadBinary(
+              storagePath,
+              upload,
+              fileOptions: FileOptions(
+                contentType: direct ? 'application/octet-stream' : 'image/jpeg',
+              ),
+            );
+        storagePaths.add(storagePath);
+        photos.add(
+          ChatAttachment(
+            path: storagePath,
+            size: clear.length,
+            name: filePaths[i].split(RegExp(r'[\\/]')).last,
+            mime: 'image/jpeg',
+            key: key,
+          ),
+        );
+      }
+
+      final first = photos.first;
+      final attachment = ChatAttachment(
+        path: first.path,
+        size: first.size,
+        name: first.name,
+        mime: first.mime,
+        key: first.key,
+        album: photos.skip(1).toList(),
+      );
+      final text = caption?.trim();
+      await _insert(
+        id: id,
+        conversationId: conversationId,
+        kind: MessageKind.image,
+        text: text == null || text.isEmpty ? null : text,
+        attachment: attachment,
+        options: options,
+      );
+      for (var i = 0; i < filePaths.length; i++) {
+        await ChatMediaCache.keepSent(
+          i == 0 ? id : '$id-a$i',
+          MessageKind.image,
+          filePaths[i],
+          photos[i].name,
+        ).catchError((_) {});
+      }
+      return ChatMessage(
+        id: id,
+        conversationId: conversationId,
+        senderId: currentUserId,
+        sentAt: DateTime.now(),
+        kind: MessageKind.image,
+        text: text == null || text.isEmpty ? null : text,
+        attachment: attachment,
+        status: MessageStatus.sent,
+        signatureValid: true,
+        replyTo: options.replyTo,
+        forwardedFrom: options.forwardedFrom,
+      );
+    } catch (_) {
+      // Сообщение не ушло целиком — загруженные файлы без него не нужны.
+      await removeUploaded();
+      rethrow;
+    }
+  }
+
+  @override
   Future<String> attachmentFile(ChatMessage message) async {
     final attachment = message.attachment;
     if (attachment == null) throw StateError('У сообщения нет вложения');
@@ -578,11 +729,7 @@ class SecureChatRepository implements ChatRepository {
       if (attachment != null) row['media'] = attachment.toJson(withKey: false);
       if (!options.meta.isEmpty) row['meta'] = options.meta.toJson();
     } else {
-      final peerId = await _peerId(conversationId);
-      final keys = await _loadPublicKeys(peerId);
-      if (keys == null) {
-        throw StateError('Собеседник ещё не опубликовал ключи шифрования');
-      }
+      final keys = await _keysForSending(await _peerId(conversationId));
       final payload = await crypto.encrypt(
         conversationId: conversationId,
         messageId: id,
@@ -923,6 +1070,8 @@ class SecureChatRepository implements ChatRepository {
   }
 
   Future<String> _peerId(String conversationId) async {
+    final cached = _peerIds[conversationId];
+    if (cached != null) return cached;
     final row = await _client
         .from('chat_members')
         .select('profile_id')
@@ -931,8 +1080,12 @@ class SecureChatRepository implements ChatRepository {
         .limit(1)
         .maybeSingle();
     if (row == null) throw StateError('Собеседник не найден');
-    return row['profile_id'] as String;
+    // Собеседник личного чата не меняется — точки трансляции геопозиции
+    // приходят каждые секунды и не должны каждый раз спрашивать сервер.
+    return _peerIds[conversationId] = row['profile_id'] as String;
   }
+
+  final _peerIds = <String, String>{};
 
   Future<DateTime?> _peerLastReadAt(String conversationId) async {
     final row = await _client
@@ -957,10 +1110,58 @@ class SecureChatRepository implements ChatRepository {
         row['protocol_version'] != ChatCryptoService.protocolVersion) {
       return null;
     }
-    return _keys[profileId] = ChatPublicKeys(
+    final keys = ChatPublicKeys(
       exchangeKey: row['x25519_public_key'] as String,
       signingKey: row['ed25519_public_key'] as String,
     );
+    await _checkPin(profileId, keys);
+    return _keys[profileId] = keys;
+  }
+
+  Future<void> _checkPin(String profileId, ChatPublicKeys keys) async {
+    final fingerprint = peerKeyFingerprint(keys);
+    try {
+      final pinned = await _pins.read(profileId);
+      if (pinned == null) {
+        await _pins.write(profileId, fingerprint);
+      } else if (pinned != fingerprint) {
+        _changedKeys.add(profileId);
+        AppLog.add('Ключ собеседника $profileId сменился');
+      } else {
+        _changedKeys.remove(profileId);
+      }
+    } catch (error) {
+      // Настройки недоступны — проверка просто не сработает, чат не встанет.
+      AppLog.add('Закреплённый ключ не прочитан: $error');
+    }
+  }
+
+  /// Ключи для шифрования исходящего: со сменившимся непринятым ключом не
+  /// шифруем, иначе подменённый сервером ключ прочитал бы новые сообщения.
+  Future<ChatPublicKeys> _keysForSending(String peerId) async {
+    final keys = await _loadPublicKeys(peerId);
+    if (keys == null) {
+      throw StateError('Собеседник ещё не опубликовал ключи шифрования');
+    }
+    if (_changedKeys.contains(peerId)) throw const PeerKeyChangedException();
+    return keys;
+  }
+
+  @override
+  Future<bool> peerKeyChanged(String conversationId) async {
+    if (await _kind(conversationId) != ConversationKind.direct) return false;
+    final peerId = await _peerId(conversationId);
+    await _loadPublicKeys(peerId);
+    return _changedKeys.contains(peerId);
+  }
+
+  @override
+  Future<void> acceptPeerKey(String conversationId) async {
+    final peerId = await _peerId(conversationId);
+    final keys = await _loadPublicKeys(peerId);
+    if (keys == null) return;
+    await _pins.write(peerId, peerKeyFingerprint(keys));
+    _changedKeys.remove(peerId);
   }
 
   DateTime? _date(Object? value) =>

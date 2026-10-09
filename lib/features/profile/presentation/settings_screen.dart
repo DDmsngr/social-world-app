@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_choice.dart';
 import '../../../core/update/update_controller.dart';
+import '../../../core/update/update_policy.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
@@ -68,24 +69,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 12),
           const _MapStartPicker(),
           const SizedBox(height: 26),
-          const SectionLabel('Приватность геолокации'),
+          const SectionLabel('Безопасность'),
           const SizedBox(height: 12),
-          const _GeoPrivacy(),
-          const SizedBox(height: 10),
           GlassCard(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            onTap: () => context.push(Routes.blocked),
+            onTap: () => context.push(Routes.security),
             child: Row(
               children: [
-                Icon(Icons.block_outlined, color: AppColors.primaryTint),
+                Icon(Icons.shield_outlined, color: AppColors.primaryTint),
                 const SizedBox(width: 14),
-                const Expanded(child: Text('Заблокированные и скрытые')),
+                const Expanded(
+                  child: Text('Номер, вход, видимость и блокировки'),
+                ),
                 Icon(Icons.chevron_right, color: AppColors.textFaint),
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          const _LastSeenSwitch(),
+          const SizedBox(height: 26),
+          const SectionLabel('Уведомления'),
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            onTap: () => context.push(Routes.notificationSettings),
+            child: Row(
+              children: [
+                Icon(Icons.notifications_none, color: AppColors.primaryTint),
+                const SizedBox(width: 14),
+                const Expanded(child: Text('Что присылать, звук и тихие часы')),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
           const SizedBox(height: 26),
           const SectionLabel('Чаты'),
           const SizedBox(height: 12),
@@ -100,7 +114,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Icon(Icons.qr_code_2, color: AppColors.primaryTint),
                 const SizedBox(width: 14),
-                const Expanded(child: Text('Поделиться приложением')),
+                const Expanded(child: Text('Пригласить в ChaWo')),
                 Icon(Icons.chevron_right, color: AppColors.textFaint),
               ],
             ),
@@ -135,6 +149,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SectionLabel('Приложение'),
           const SizedBox(height: 12),
           const UpdateSettingsRow(),
+          const SizedBox(height: 4),
+          const _UpdateMobileSwitch(),
           const SizedBox(height: 10),
           const _VersionRow(),
           const SizedBox(height: 26),
@@ -156,9 +172,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
             child: const Text('Выйти'),
           ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _deleteAccount,
+            style: TextButton.styleFrom(foregroundColor: AppColors.textDim),
+            child: const Text('Удалить аккаунт'),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить аккаунт?'),
+        content: const Text(
+          'Профиль, посты, комментарии, ваши сообщения, баллы и подписки будут '
+          'удалены без возможности восстановления. Личные чаты останутся у '
+          'собеседников, но без ваших сообщений.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      try {
+        await ref.read(discoverRepositoryProvider).clearPresence();
+      } catch (_) {}
+      await ref.read(pushServiceProvider).stop();
+      await ref.read(authRepositoryProvider).deleteAccount();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyError(error))),
+      );
+    }
   }
 }
 
@@ -187,14 +246,14 @@ enum _GeoMode {
 
 /// «В сети / был(а) …» в шапке чата. Как в Telegram: кто скрыл своё время,
 /// тот и чужого не видит. Позже здесь же появится расписание (премиум).
-class _LastSeenSwitch extends StatefulWidget {
-  const _LastSeenSwitch();
+class LastSeenSwitch extends StatefulWidget {
+  const LastSeenSwitch({super.key});
 
   @override
-  State<_LastSeenSwitch> createState() => _LastSeenSwitchState();
+  State<LastSeenSwitch> createState() => _LastSeenSwitchState();
 }
 
-class _LastSeenSwitchState extends State<_LastSeenSwitch> {
+class _LastSeenSwitchState extends State<LastSeenSwitch> {
   bool? _show;
 
   @override
@@ -332,14 +391,56 @@ class _SendSoundSwitchState extends State<_SendSoundSwitch> {
   }
 }
 
-class _GeoPrivacy extends ConsumerStatefulWidget {
-  const _GeoPrivacy();
+/// Разрешение качать обновления по мобильной сети. По умолчанию выключено:
+/// без него новая версия качается сама только по Wi-Fi.
+class _UpdateMobileSwitch extends ConsumerStatefulWidget {
+  const _UpdateMobileSwitch();
 
   @override
-  ConsumerState<_GeoPrivacy> createState() => _GeoPrivacyState();
+  ConsumerState<_UpdateMobileSwitch> createState() => _UpdateMobileSwitchState();
 }
 
-class _GeoPrivacyState extends ConsumerState<_GeoPrivacy> {
+class _UpdateMobileSwitchState extends ConsumerState<_UpdateMobileSwitch> {
+  bool? _on;
+
+  @override
+  void initState() {
+    super.initState();
+    UpdatePolicy.allowMobile().then((value) {
+      if (mounted) setState(() => _on = value);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = _on;
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 4, 8, 4),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        value: on ?? false,
+        onChanged: on == null
+            ? null
+            : (value) async {
+                setState(() => _on = value);
+                await UpdatePolicy.setAllowMobile(value);
+                if (value) await ref.read(updateControllerProvider.notifier).autoDownload();
+              },
+        title: const Text('Обновлять и по мобильной сети'),
+        subtitle: const Text('Иначе новая версия скачивается сама только по Wi-Fi'),
+      ),
+    );
+  }
+}
+
+class GeoPrivacy extends ConsumerStatefulWidget {
+  const GeoPrivacy({super.key});
+
+  @override
+  ConsumerState<GeoPrivacy> createState() => _GeoPrivacyState();
+}
+
+class _GeoPrivacyState extends ConsumerState<GeoPrivacy> {
   _GeoMode? _pending;
   var _saving = false;
 
@@ -571,7 +672,7 @@ class UpdateSettingsRow extends ConsumerWidget {
       ),
       UpdateStage.available => (
         'Есть обновления',
-        'Нажмите, чтобы скачать',
+        'Скачается само по Wi-Fi. Нажмите, чтобы скачать сейчас',
         controller.download,
       ),
       UpdateStage.downloading => (

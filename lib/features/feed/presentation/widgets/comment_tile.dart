@@ -1,9 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/media/photo_viewer.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../chat/presentation/widgets/emoji_panel.dart';
 import '../../domain/entities/comment.dart';
 
 /// Узел ветки: отступ по глубине, слева направляющая линия ветки — так же,
@@ -112,30 +114,60 @@ class CommentTile extends StatelessWidget {
               ),
             ),
             if (!collapsed) ...[
-              Text(
-                comment.deleted ? 'Комментарий удалён' : comment.body ?? '',
-                style: comment.deleted
-                    ? TextStyle(
-                        color: AppColors.textFaint,
-                        fontStyle: FontStyle.italic,
-                      )
-                    : Theme.of(context).textTheme.bodyLarge,
-              ),
-              // Фото и гифки в комментариях появятся позже — разбор и показ
-              // уже готовы, кнопки прикрепления ещё нет.
-              if (comment.hasMedia)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(AppRadius.field),
-                    child: CachedNetworkImage(
-                      imageUrl: comment.mediaUrls.first,
-                      height: 160,
-                      fit: BoxFit.cover,
+              if (comment.deleted || (comment.body ?? '').isNotEmpty)
+                Text(
+                  comment.deleted ? 'Комментарий удалён' : comment.body ?? '',
+                  style: comment.deleted
+                      ? TextStyle(
+                          color: AppColors.textFaint,
+                          fontStyle: FontStyle.italic,
+                        )
+                      // 1–3 эмодзи без текста — крупно, как стикер в чате.
+                      : switch (emojiOnlyCount(comment.body)) {
+                          1 => const TextStyle(fontSize: 48, height: 1.1),
+                          2 => const TextStyle(fontSize: 40, height: 1.1),
+                          3 => const TextStyle(fontSize: 32, height: 1.1),
+                          _ => Theme.of(context).textTheme.bodyLarge,
+                        },
+                ),
+              // Картинки и гифки целиком: уменьшаются под ширину и высоту
+              // ветки, но не обрезаются; тап открывает на весь экран.
+              if (comment.hasMedia && !comment.deleted)
+                for (var i = 0; i < comment.mediaUrls.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => showPhotoViewer(
+                          context,
+                          urls: comment.mediaUrls,
+                          initialIndex: i,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 260),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.field),
+                            child: Image(
+                              image: CachedNetworkImageProvider(comment.mediaUrls[i]),
+                              fit: BoxFit.contain,
+                              alignment: Alignment.centerLeft,
+                              errorBuilder: (_, _, _) => Container(
+                                width: 120,
+                                height: 80,
+                                color: AppColors.card,
+                                child: Icon(Icons.broken_image_outlined, color: AppColors.textFaint),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              Row(
+              // Wrap, а не Row: у вложенных ответов кнопки не помещаются в
+              // одну строку и раньше уезжали за край экрана.
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   _Action(
                     icon: comment.likedByMe
@@ -170,7 +202,6 @@ class CommentTile extends StatelessWidget {
                       color: AppColors.textFaint,
                       onTap: onDelete,
                     ),
-                  const Spacer(),
                   // Свернуть ветку явной кнопкой: раньше это было только
                   // тапом по шапке, и про него никто не знал.
                   _Action(

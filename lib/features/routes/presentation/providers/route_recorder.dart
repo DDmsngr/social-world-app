@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/debug/app_log.dart';
+import '../../../feed/domain/entities/post.dart';
 import '../../domain/entities/city_route.dart';
 
 enum RecordingStatus {
@@ -31,6 +34,7 @@ class RouteRecordingState {
     this.distanceMeters = 0,
     this.startedAt,
     this.elapsed = Duration.zero,
+    this.limit,
     this.error,
   });
 
@@ -40,6 +44,9 @@ class RouteRecordingState {
   final int distanceMeters;
   final DateTime? startedAt;
   final Duration elapsed;
+
+  /// Ограничение записи по времени; null — пишем, пока не остановят.
+  final Duration? limit;
   final String? error;
 
   bool get isActive =>
@@ -57,6 +64,8 @@ class RouteRecordingState {
     int? distanceMeters,
     DateTime? startedAt,
     Duration? elapsed,
+    Duration? limit,
+    bool clearLimit = false,
     String? error,
   }) => RouteRecordingState(
     status: status ?? this.status,
@@ -65,16 +74,77 @@ class RouteRecordingState {
     distanceMeters: distanceMeters ?? this.distanceMeters,
     startedAt: startedAt ?? this.startedAt,
     elapsed: elapsed ?? this.elapsed,
+    limit: clearLimit ? null : (limit ?? this.limit),
     error: error,
   );
+
+  Map<String, dynamic> toJson() => {
+    'path': [
+      for (final p in path) [p.latitude, p.longitude],
+    ],
+    'photos': [
+      for (final photo in photos)
+        {
+          'path': photo.localPath,
+          'lat': photo.latitude,
+          'lng': photo.longitude,
+          'at': photo.takenAt.toIso8601String(),
+        },
+    ],
+    'distance': distanceMeters,
+    'startedAt': startedAt?.toIso8601String(),
+    'elapsed': elapsed.inSeconds,
+  };
+
+  /// Черновик, восстановленный после перезапуска: на паузе, лимит снят.
+  static RouteRecordingState fromJson(Map<String, dynamic> json) =>
+      RouteRecordingState(
+        status: RecordingStatus.paused,
+        path: [
+          for (final p in (json['path'] as List).cast<List<dynamic>>())
+            RouteCoordinate((p[0] as num).toDouble(), (p[1] as num).toDouble()),
+        ],
+        photos: [
+          for (final raw in (json['photos'] as List? ?? const []).cast<Map<String, dynamic>>())
+            PendingRoutePhoto(
+              localPath: raw['path'] as String,
+              latitude: (raw['lat'] as num).toDouble(),
+              longitude: (raw['lng'] as num).toDouble(),
+              takenAt: DateTime.parse(raw['at'] as String),
+            ),
+        ],
+        distanceMeters: (json['distance'] as num?)?.toInt() ?? 0,
+        startedAt: json['startedAt'] == null
+            ? null
+            : DateTime.parse(json['startedAt'] as String),
+        elapsed: Duration(seconds: (json['elapsed'] as num?)?.toInt() ?? 0),
+      );
 }
+
+/// Варианты ограничения записи по времени; null — без ограничения.
+const routeLimitOptions = <Duration?>[
+  null,
+  Duration(minutes: 30),
+  Duration(hours: 1),
+  Duration(hours: 2),
+  Duration(hours: 4),
+];
+
+String routeLimitLabel(Duration? limit) => switch (limit) {
+  null => 'Без ограничения',
+  final d when d.inHours == 0 => '${d.inMinutes} мин',
+  final d => '${d.inHours} ч',
+};
 
 /// Запись маршрута.
 ///
-/// Только на переднем плане: фоновой службы нет и в первой версии не будет —
-/// это отдельный пласт работы (пермишены на background location, уведомление,
-/// расход батареи), а прогулка по городу и так проходит с телефоном в руках.
+/// Идёт в фоне: на Android поток координат держит служба переднего плана
+/// с уведомлением «Идёт запись маршрута», так что приложение можно свернуть
+/// или уйти на другие вкладки. Фоновое разрешение на геопозицию для этого не
+/// нужно — служба стартует, пока приложение открыто. Точки сохраняются по
+/// ходу: если Android выгрузит приложение, прогулка восстановится на паузе.
 class RouteRecorder extends Notifier<RouteRecordingState> {
+  static const _prefsKey = 'route_recording_draft';
   /// Точки ближе этого расстояния не пишем: GPS шумит стоя на месте, и без
   /// фильтра трек превращается в клубок вокруг одной точки, а дистанция
   /// накручивается сама по себе.
@@ -97,13 +167,14 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
       _disposed = true;
       _teardown();
     });
+    Future.microtask(_restore);
     return const RouteRecordingState();
   }
 
-  Future<void> start() async {
+  Future<void> start({Duration? limit}) async {
     if (state.status == RecordingStatus.recording) return;
 
-    state = const RouteRecordingState(status: RecordingStatus.preparing);
+    state = RouteRecordingState(status: RecordingStatus.preparing, limit: limit);
 
     final allowed = await _ensurePermission();
     // Например, resetSessionScopedProviders успел пересоздать провайдер
@@ -115,6 +186,7 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     state = RouteRecordingState(
       status: RecordingStatus.recording,
       startedAt: startedAt,
+      limit: limit,
     );
 
     _lastSampleAt = startedAt;
@@ -135,6 +207,7 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     _ticker?.cancel();
     _ticker = null;
     state = state.copyWith(status: RecordingStatus.paused);
+    _save();
     AppLog.add('RouteRecorder: пауза, точек ${state.path.length}');
   }
 
@@ -153,7 +226,13 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
       _positions!.resume();
     }
     _startTicker();
-    state = state.copyWith(status: RecordingStatus.recording);
+    // Продолжили после того, как вышло время, — дальше без ограничения,
+    // иначе запись тут же остановилась бы снова.
+    final limit = state.limit;
+    state = state.copyWith(
+      status: RecordingStatus.recording,
+      clearLimit: limit != null && state.elapsed >= limit,
+    );
   }
 
   /// Останавливает запись, но состояние сохраняет — из него собирается черновик
@@ -162,6 +241,7 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     _teardown();
     if (!state.isActive) return;
     state = state.copyWith(status: RecordingStatus.paused);
+    _save();
     AppLog.add(
       'RouteRecorder: стоп, ${state.path.length} точек, '
       '${state.distanceMeters} м',
@@ -171,6 +251,41 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
   void reset() {
     _teardown();
     state = const RouteRecordingState();
+    unawaited(
+      SharedPreferences.getInstance().then((prefs) => prefs.remove(_prefsKey)),
+    );
+  }
+
+  /// Черновик прогулки на диск: переживает выгрузку приложения системой.
+  void _save() {
+    if (!state.isActive || state.path.isEmpty) return;
+    final json = jsonEncode(state.toJson());
+    unawaited(
+      SharedPreferences.getInstance()
+          .then((prefs) => prefs.setString(_prefsKey, json))
+          .catchError((Object e) {
+            AppLog.add('RouteRecorder: черновик не сохранился — $e');
+            return false;
+          }),
+    );
+  }
+
+  Future<void> _restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefsKey);
+      if (raw == null || _disposed || state.status != RecordingStatus.idle) return;
+      final restored = RouteRecordingState.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+      if (restored.path.isEmpty) return;
+      state = restored.copyWith(
+        error: 'Запись прервалась, путь сохранён. Продолжите или опубликуйте.',
+      );
+      AppLog.add('RouteRecorder: черновик восстановлен, ${restored.path.length} точек');
+    } catch (e) {
+      AppLog.add('RouteRecorder: черновик не прочитался — $e');
+    }
   }
 
   void addPhoto(String localPath) {
@@ -188,6 +303,7 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
         ),
       ],
     );
+    _save();
   }
 
   void removePhoto(PendingRoutePhoto photo) {
@@ -199,13 +315,19 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
     );
   }
 
-  RouteDraft draft(String title) => RouteDraft(
+  RouteDraft draft(
+    String title, {
+    PostVisibility visibility = PostVisibility.everyone,
+    bool linkAccess = false,
+  }) => RouteDraft(
     title: title,
     path: state.path,
     distanceMeters: state.distanceMeters,
     duration: state.elapsed,
     startedAt: state.startedAt ?? DateTime.now(),
     photos: state.photos,
+    visibility: visibility,
+    linkAccess: linkAccess,
   );
 
   Future<bool> _ensurePermission() async {
@@ -270,13 +392,23 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
 
   void _listenToPositions() {
     _positions?.cancel();
-    _positions =
-        Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
+    // На Android поток держит служба переднего плана: запись идёт, когда
+    // приложение свёрнуто или открыта другая вкладка.
+    final settings = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+        ? AndroidSettings(
             accuracy: LocationAccuracy.high,
             distanceFilter: 5,
-          ),
-        ).listen(
+            foregroundNotificationConfig: const ForegroundNotificationConfig(
+              notificationTitle: 'ChaWo: идёт запись маршрута',
+              notificationText: 'Остановить или сохранить — на экране маршрута.',
+              notificationChannelName: 'Запись маршрута',
+              enableWakeLock: true,
+              setOngoing: true,
+            ),
+          )
+        : const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5);
+    _positions =
+        Geolocator.getPositionStream(locationSettings: settings).listen(
           _onPosition,
           onError: _onStreamError,
         );
@@ -343,6 +475,7 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
       path: [...state.path, RouteCoordinate(position.latitude, position.longitude)],
       distanceMeters: state.distanceMeters + moved.round(),
     );
+    _save();
   }
 
   void _startTicker() {
@@ -351,6 +484,15 @@ class RouteRecorder extends Notifier<RouteRecordingState> {
       final startedAt = state.startedAt;
       if (startedAt == null) return;
       state = state.copyWith(elapsed: state.elapsed + const Duration(seconds: 1));
+      final limit = state.limit;
+      if (limit != null && state.elapsed >= limit) {
+        stop();
+        state = state.copyWith(
+          error: 'Время записи вышло (${routeLimitLabel(limit)}). '
+              'Опубликуйте маршрут или продолжите запись.',
+        );
+        AppLog.add('RouteRecorder: остановлено по лимиту ${routeLimitLabel(limit)}');
+      }
     });
   }
 

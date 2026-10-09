@@ -71,6 +71,48 @@ Future<ForwardResult> forwardMessages({
           );
           continue;
         }
+        if (attachment.album.isNotEmpty) {
+          // Альбом: каждое фото качается один раз и уходит новым альбомом.
+          final all = attachment.all;
+          final paths = <String>[
+            for (var i = 0; i < all.length; i++)
+              files['${message.id}#$i'] ??= await repository.attachmentFile(
+                ChatMessage(
+                  id: i == 0 ? message.id : '${message.id}-a$i',
+                  conversationId: message.conversationId,
+                  senderId: message.senderId,
+                  sentAt: message.sentAt,
+                  kind: MessageKind.image,
+                  attachment: all[i],
+                ),
+              ),
+          ];
+          for (var start = 0; start < paths.length; start += maxAlbumPhotos) {
+            final end = start + maxAlbumPhotos > paths.length
+                ? paths.length
+                : start + maxAlbumPhotos;
+            final group = paths.sublist(start, end);
+            final caption = start == 0 ? message.text : null;
+            if (group.length == 1) {
+              await repository.sendAttachment(
+                conversationId: target.id,
+                kind: MessageKind.image,
+                filePath: group.first,
+                mime: 'image/jpeg',
+                caption: caption,
+                options: options,
+              );
+            } else {
+              await repository.sendAlbum(
+                conversationId: target.id,
+                filePaths: group,
+                caption: caption,
+                options: options,
+              );
+            }
+          }
+          continue;
+        }
         final path = files[message.id] ??= await repository.attachmentFile(
           message,
         );

@@ -227,8 +227,10 @@ Future<Object?> _showFloating(
   required bool withReactions,
   required List<MessageAction> actions,
   bool dim = true,
-}) {
+}) async {
   final anchor = _anchorOf(context);
+  await ReactionUsage.load();
+  if (!context.mounted) return null;
   return showGeneralDialog<Object>(
     context: context,
     useRootNavigator: true,
@@ -255,7 +257,7 @@ Future<Object?> _showFloating(
   );
 }
 
-class _FloatingMenu extends StatelessWidget {
+class _FloatingMenu extends StatefulWidget {
   const _FloatingMenu({
     required this.anchor,
     required this.mine,
@@ -269,6 +271,22 @@ class _FloatingMenu extends StatelessWidget {
   final String? myReaction;
   final bool withReactions;
   final List<MessageAction> actions;
+
+  @override
+  State<_FloatingMenu> createState() => _FloatingMenuState();
+}
+
+class _FloatingMenuState extends State<_FloatingMenu> {
+  Rect? get anchor => widget.anchor;
+  bool get mine => widget.mine;
+  String? get myReaction => widget.myReaction;
+  bool get withReactions => widget.withReactions;
+  List<MessageAction> get actions => widget.actions;
+
+  // Окно «⋯» с большим набором реакций вместо полосы и пунктов.
+  bool _expanded = false;
+  final _quick = ReactionUsage.quick();
+  final _all = ReactionUsage.extended();
 
   static const _barHeight = 54.0;
   static const _rowHeight = 50.0;
@@ -293,7 +311,67 @@ class _FloatingMenu extends StatelessWidget {
     final menuHeight = actions.isEmpty
         ? 0.0
         : actions.length * _rowHeight + (hasDelete ? 9 : 0) + 12;
-    final barWidth = quickReactions.length * 44.0 + 20;
+    final barWidth = (_quick.length + 1) * 44.0 + 20;
+
+    if (_expanded) {
+      const cols = 7;
+      final rows = (_all.length / cols).ceil();
+      final gridWidth = cols * 44.0 + 20;
+      final gridHeight = rows * 46.0 + 16;
+      var gridTop = rect.top - gridHeight - _gap;
+      if (gridTop < top) gridTop = rect.bottom + _gap;
+      if (gridTop + gridHeight > bottom) gridTop = bottom - gridHeight;
+      return Material(
+        type: MaterialType.transparency,
+        child: Stack(
+          children: [
+            Positioned(
+              top: gridTop < top ? top : gridTop,
+              left: mine ? size.width - 12 - gridWidth : 12,
+              child: Container(
+                width: gridWidth,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.ink2,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: AppColors.hair),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x40000000), blurRadius: 18, offset: Offset(0, 6)),
+                  ],
+                ),
+                child: Wrap(
+                  children: [
+                    for (final emoji in _all)
+                      SizedBox(
+                        width: 44,
+                        height: 46,
+                        child: Semantics(
+                          button: true,
+                          label: 'Реакция $emoji',
+                          child: InkResponse(
+                            onTap: () => Navigator.of(context).pop(_Reaction(emoji)),
+                            radius: 24,
+                            child: Container(
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: emoji == myReaction
+                                    ? AppColors.primary.withValues(alpha: 0.22)
+                                    : Colors.transparent,
+                              ),
+                              child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     double barTop;
     double menuTop = 0;
@@ -337,7 +415,7 @@ class _FloatingMenu extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    for (final emoji in quickReactions)
+                    for (final emoji in _quick)
                       Expanded(
                         child: Semantics(
                           button: true,
@@ -359,6 +437,25 @@ class _FloatingMenu extends StatelessWidget {
                           ),
                         ),
                       ),
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        label: 'Все реакции',
+                        child: InkResponse(
+                          onTap: () => setState(() => _expanded = true),
+                          radius: 24,
+                          child: Container(
+                            height: 40,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.hair,
+                            ),
+                            child: Icon(Icons.more_horiz, size: 22, color: AppColors.text),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -677,6 +774,27 @@ Future<void> _saveToGallery(
     }
     // В личных чатах файл на сервере зашифрован — в галерею уходит уже
     // расшифрованная копия с устройства.
+    final all = message.attachment?.all ?? const <ChatAttachment>[];
+    if (message.kind == MessageKind.image && all.length > 1) {
+      // Альбом сохраняется целиком, фото по одному.
+      for (var i = 0; i < all.length; i++) {
+        final path = await repository.attachmentFile(
+          ChatMessage(
+            id: i == 0 ? message.id : '${message.id}-a$i',
+            conversationId: message.conversationId,
+            senderId: message.senderId,
+            sentAt: message.sentAt,
+            kind: MessageKind.image,
+            attachment: all[i],
+          ),
+        );
+        await Gal.putImage(path, album: 'ChaWo');
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('Сохранено в галерею: ${all.length} фото')),
+      );
+      return;
+    }
     final path = await repository.attachmentFile(message);
     if (message.kind == MessageKind.image) {
       await Gal.putImage(path, album: 'ChaWo');

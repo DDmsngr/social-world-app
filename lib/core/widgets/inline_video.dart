@@ -39,6 +39,17 @@ class _InlineVideoState extends State<InlineVideo> {
     super.dispose();
   }
 
+  /// Экран ушёл из виду (другая вкладка, закрыт другим экраном) — не играем
+  /// за кадром.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = _controller;
+    if (!TickerMode.valuesOf(context).enabled && controller != null && controller.value.isPlaying) {
+      controller.pause();
+    }
+  }
+
   void _onChange() {
     if (mounted) setState(() {});
   }

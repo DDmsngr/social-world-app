@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/analytics/analytics.dart';
 import '../../core/config/env.dart';
 import '../../core/debug/app_log.dart';
 import '../../core/router/app_router.dart';
@@ -136,6 +137,7 @@ class CallController extends ChangeNotifier {
     required bool video,
   }) async {
     if (busy) return;
+    Analytics.event(video ? 'call_started_video' : 'call_started_audio');
     _reset();
     call = CallInfo(
       id: '',
@@ -501,8 +503,22 @@ class CallController extends ChangeNotifier {
     }
   }
 
+  static const _device = MethodChannel('chawo/device');
+
+  /// Сначала через системный Telecom (он держит маршрут звука звонка и
+  /// перебивает обычный AudioManager), затем WebRTC-способом — на случай,
+  /// если звонок идёт без Telecom.
   Future<void> _applySpeaker() async {
     if (kIsWeb) return;
+    final id = call?.id;
+    try {
+      if (id != null) {
+        final routed = await _device.invokeMethod<bool>('callAudioRoute', {'callId': id, 'speaker': speaker});
+        if (routed == true) return;
+      }
+    } catch (error) {
+      AppLog.add('Telecom: динамик не переключился: $error');
+    }
     try {
       await Helper.setSpeakerphoneOn(speaker);
     } catch (error) {
@@ -513,7 +529,13 @@ class CallController extends ChangeNotifier {
   // ── сигналы ─────────────────────────────────────────────────────────────
 
   void _listen(String id) {
-    final signals = _client.channel('call:$id');
+    // Приватный канал: сервер пускает в него только участников звонка
+    // (политика на realtime.messages, миграция 0067). Открытый канал читал и
+    // подделывал любой, кто знает id звонка.
+    final signals = _client.channel(
+      'call:$id',
+      opts: const RealtimeChannelConfig(private: true),
+    );
     _signals = signals;
     signals
         .onBroadcast(event: 'sig', callback: _onSignal)

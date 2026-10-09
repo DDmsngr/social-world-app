@@ -15,7 +15,10 @@ enum LinkTarget {
 
   /// Личный чат или группа — для ярлыка на рабочем столе. Чужой чат по такой
   /// ссылке не откроется: сервер его просто не отдаст.
-  chat('chat');
+  chat('chat'),
+
+  /// Операция в истории баллов (уведомления о приглашениях).
+  points('points');
 
   const LinkTarget(this.segment);
 
@@ -200,5 +203,6 @@ abstract final class DeepLinks {
             : '${Routes.questDetail}/$id?arrive=$arrivalCode',
         LinkTarget.need => '${Routes.needDetail}/$id',
         LinkTarget.chat => '${Routes.chats}/$id',
+        LinkTarget.points => Routes.activityPoints,
       };
 }

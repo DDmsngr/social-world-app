@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/env.dart';
 import '../debug/app_log.dart';
 import 'update_info.dart';
+import 'update_policy.dart';
 import 'update_service.dart';
 
 enum UpdateStage {
@@ -74,10 +75,11 @@ class UpdateState {
 /// Обновление приложения мимо Google Play: приложение раздаётся APK-файлом,
 /// поэтому магазин за нас этого не сделает.
 ///
-/// Сценарий: при входе проверяем манифест → показываем «лампочку» → человек
-/// жмёт «скачать» и продолжает пользоваться приложением, пока файл качается →
-/// по готовности предлагаем поставить сейчас или позже. Скачанный файл
-/// переживает перезапуск, чтобы «позже» не означало «качай заново».
+/// Сценарий: при входе проверяем манифест → по Wi-Fi (или по мобильной, если
+/// разрешено в настройках) файл качается сам, без нажатий → по готовности
+/// плашка «Обновление готово — Установить». Без подходящей сети горит
+/// «лампочка», и скачать можно вручную из настроек. Скачанный файл переживает
+/// перезапуск, чтобы «позже» не означало «качай заново».
 class UpdateController extends Notifier<UpdateState> {
   static const _prefsPathKey = 'pending_update_path';
   static const _prefsManifestKey = 'pending_update_manifest';
@@ -88,6 +90,58 @@ class UpdateController extends Notifier<UpdateState> {
   // Не final: при повторном build на том же объекте присваивание late final
   // упало бы LateInitializationError.
   late UpdateService _service;
+
+  DateTime? _lastCheck;
+
+  /// Приложение могут держать открытым сутками: при возврате на экран
+  /// проверяем снова, если с прошлой проверки прошло больше трёх часов, и
+  /// докачиваем найденное, если появился Wi-Fi.
+  Future<void> onResume() async {
+    final last = _lastCheck;
+    if (last == null || DateTime.now().difference(last) > const Duration(hours: 3)) {
+      await check();
+    } else {
+      await autoDownload();
+    }
+  }
+
+  /// Скачивание без нажатия: найденное (или сорвавшееся) обновление качается
+  /// само, если сеть подходит — Wi-Fi, а мобильная только с разрешения в
+  /// настройках. Готовое предлагается поставить плашкой (UpdateReadyBanner).
+  Future<void> autoDownload() async {
+    final canStart = switch (state.stage) {
+      UpdateStage.available => true,
+      UpdateStage.failed => state.info != null,
+      _ => false,
+    };
+    if (!canStart) return;
+    final ok = UpdatePolicy.shouldAutoDownload(
+      onWifi: await UpdatePolicy.onWifi(),
+      allowMobile: await UpdatePolicy.allowMobile(),
+    );
+    if (!ok) return;
+    await download();
+  }
+
+  /// Скрыта ли плашка «Обновление готово» до следующего запуска.
+  bool bannerDismissed = false;
+
+  void dismissBanner() {
+    bannerDismissed = true;
+    state = state.copyWith();
+  }
+
+  Future<void> _removeStaleApks({String? keep}) async {
+    try {
+      final directory = await getExternalStorageDirectory() ?? await getTemporaryDirectory();
+      final paths = directory.listSync().whereType<File>().map((f) => f.path);
+      for (final path in UpdatePolicy.staleApks(paths, keep: keep)) {
+        await File(path).delete();
+      }
+    } catch (error) {
+      AppLog.add('Уборка старых APK: $error');
+    }
+  }
 
   @override
   UpdateState build() {
@@ -107,8 +161,10 @@ class UpdateController extends Notifier<UpdateState> {
   /// «Вы используете последнюю версию» врёт при выключенной сети.
   Future<void> check({bool silent = true}) async {
     if (!_supported || !Env.isConfigured) return;
+    _lastCheck = DateTime.now();
 
     var pending = await _loadPending();
+    await _removeStaleApks(keep: pending?.path);
     if (pending != null) {
       // Вышла версия новее скачанной — старый файл ставить незачем. Раньше
       // «готовое» обновление перекрывало проверку, и человек застревал на нём.
@@ -140,6 +196,7 @@ class UpdateController extends Notifier<UpdateState> {
         return;
       }
       state = UpdateState(stage: UpdateStage.available, info: manifest);
+      await autoDownload();
     } catch (error) {
       AppLog.add('Проверка обновления не удалась: $error');
       state = silent

@@ -127,24 +127,35 @@ class SupabaseAuthRepository implements AuthRepository {
   Future<void> signOut() => _auth.signOut();
 
   @override
-  Future<AppUser> completeProfile({required String displayName}) async {
+  Future<void> deleteAccount() async {
+    await _client.rpc('delete_my_account');
+    // Пользователя в базе уже нет; локальную сессию просто стираем.
+    await _auth.signOut(scope: SignOutScope.local);
+  }
+
+  @override
+  Future<AppUser> completeProfile({
+    required String displayName,
+    required String city,
+    String? username,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw const AuthException('Нет активной сессии');
     }
 
+    final nick = username == null ? '' : Username.normalize(username);
     final myGeneration = ++_generation;
     // update, а не upsert: строку профиля уже создал handle_new_user при
     // регистрации (0001_init.sql), а после 0011 клиенту не выдано право
     // писать в id — INSERT ... ON CONFLICT DO UPDATE от upsert такое право
     // потребовал бы даже не трогая id по существу.
-    final row = await _client
-        .from('profiles')
-        .update({'display_name': displayName.trim()})
-        .eq('id', user.id)
-        .select()
-        .single()
-        .timeout(const Duration(seconds: 15));
+    final row = await _saveProfile(user.id, {
+      'display_name': displayName.trim(),
+      'city': city.trim(),
+      if (nick.isNotEmpty) 'username': nick,
+      'onboarded_at': DateTime.now().toUtc().toIso8601String(),
+    }, timeout: const Duration(seconds: 15));
 
     final merged = _merge(user, row);
     if (myGeneration == _generation) {
@@ -159,6 +170,7 @@ class SupabaseAuthRepository implements AuthRepository {
     String? displayName,
     String? bio,
     String? city,
+    String? username,
     String? avatarLocalPath,
   }) async {
     final user = _auth.currentUser;
@@ -168,6 +180,10 @@ class SupabaseAuthRepository implements AuthRepository {
     if (displayName != null) changes['display_name'] = displayName.trim();
     if (bio != null) changes['bio'] = bio.trim().isEmpty ? null : bio.trim();
     if (city != null) changes['city'] = city.trim().isEmpty ? null : city.trim();
+    if (username != null) {
+      final nick = Username.normalize(username);
+      changes['username'] = nick.isEmpty ? null : nick;
+    }
     if (avatarLocalPath != null) {
       // Файл уезжает в бакет `avatars` до записи в профиль: сорвавшаяся
       // загрузка не оставит в анкете ссылку на несуществующую картинку.
@@ -181,13 +197,11 @@ class SupabaseAuthRepository implements AuthRepository {
     final myGeneration = ++_generation;
     // Читаем обратно то, что реально записала база (после триггеров и
     // проверок), а не собираем профиль из того, что отправили.
-    final row = await _client
-        .from('profiles')
-        .update(changes)
-        .eq('id', user.id)
-        .select()
-        .single()
-        .timeout(const Duration(seconds: 20));
+    final row = await _saveProfile(
+      user.id,
+      changes,
+      timeout: const Duration(seconds: 20),
+    );
 
     final merged = _merge(user, row);
     if (myGeneration == _generation) {
@@ -221,6 +235,27 @@ class SupabaseAuthRepository implements AuthRepository {
   void dispose() {
     _authSub.cancel();
     _controller.close();
+  }
+
+  /// Пишет поля своего профиля и читает строку обратно. Повтор ника
+  /// (уникальный индекс profiles_username_key) — [UsernameTakenException].
+  Future<Map<String, dynamic>> _saveProfile(
+    String userId,
+    Map<String, dynamic> changes, {
+    required Duration timeout,
+  }) async {
+    try {
+      return await _client
+          .from('profiles')
+          .update(changes)
+          .eq('id', userId)
+          .select()
+          .single()
+          .timeout(timeout);
+    } on PostgrestException catch (error) {
+      if (error.code == '23505') throw const UsernameTakenException();
+      rethrow;
+    }
   }
 
   Future<AppUser> _withProfile(User user, {AppUser? fallbackTo}) async {
@@ -257,6 +292,7 @@ class SupabaseAuthRepository implements AuthRepository {
         id: user.id,
         email: user.email,
         phone: user.phone,
+        onboarded: false,
       );
 
   AppUser _merge(User user, Map<String, dynamic> row) => AppUser(
@@ -270,5 +306,7 @@ class SupabaseAuthRepository implements AuthRepository {
         city: row['city'] as String?,
         socialScore: (row['social_score'] as num?)?.toInt() ?? 0,
         locationBlurM: (row['location_blur_m'] as num?)?.toInt() ?? 500,
+        username: row['username'] as String?,
+        onboarded: row['onboarded_at'] != null,
       );
 }

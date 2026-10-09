@@ -29,9 +29,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   String? _error;
   String? _devCode;
 
-  // 406-ФЗ: для боевого продукта в РФ основной вход — VK ID/Яндекс ID,
-  // почта — служебный резервный путь, скрытый со стартового экрана.
-  bool _showEmailFlow = false;
+  // 406-ФЗ: для боевого продукта в РФ вход — VK ID/Яндекс ID. Вход по почте
+  // с 08.10.2026 отключён: на своём сервере писем нет. Поле почты осталось
+  // только для разработки без бэкенда (Env не настроен).
+  bool get _emailVisible => !Env.isConfigured;
 
   @override
   void dispose() {
@@ -53,10 +54,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
-  // Почта — служебный резервный путь: показываем её либо по запросу
-  // пользователя, либо когда бэкенд не настроен (дев-режим без Supabase).
-  bool get _emailVisible => _showEmailFlow || !Env.isConfigured;
 
   String _subtitle() {
     if (!_emailVisible) {
@@ -117,13 +114,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   onPressed: () =>
                       startOAuthSignIn(OAuthBridgeProvider.yandex),
                   child: const Text('Войти через Яндекс ID'),
-                ),
-                const SizedBox(height: 14),
-                Center(
-                  child: TextButton(
-                    onPressed: () => setState(() => _showEmailFlow = true),
-                    child: const Text('Войти по почте'),
-                  ),
                 ),
               ] else ...[
                 // Ключи обязательны: оба поля стоят в одной позиции дерева, и
@@ -209,12 +199,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               _codeController.clear();
                             }),
                     child: const Text('Другая почта'),
-                  ),
-                if (Env.isConfigured && !_codeSent)
-                  TextButton(
-                    onPressed: () =>
-                        setState(() => _showEmailFlow = false),
-                    child: const Text('Назад к VK ID / Яндекс ID'),
                   ),
               ],
               const Spacer(),

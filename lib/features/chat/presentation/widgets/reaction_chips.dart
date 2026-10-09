@@ -25,9 +25,9 @@ class ReactionChips extends StatelessWidget {
     if (reactions.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 2),
-      child: Align(
-        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-        child: Wrap(
+      // Без Align: он растягивался на всю ширину и раздувал пузырь.
+      child: Wrap(
+          alignment: mine ? WrapAlignment.end : WrapAlignment.start,
           spacing: 6,
           runSpacing: 4,
           children: [
@@ -59,7 +59,6 @@ class ReactionChips extends StatelessWidget {
                 ),
               ),
           ],
-        ),
       ),
     );
   }

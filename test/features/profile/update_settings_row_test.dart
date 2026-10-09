@@ -75,7 +75,7 @@ void main() {
     ),
     (
       'Есть обновления',
-      'Нажмите, чтобы скачать',
+      'Скачается само по Wi-Fi. Нажмите, чтобы скачать сейчас',
       const UpdateState(stage: UpdateStage.available, info: _info),
     ),
     (
@@ -106,7 +106,7 @@ void main() {
       const UpdateState(stage: UpdateStage.available, info: _info),
     );
     expect(find.text('Есть обновления'), findsOneWidget);
-    expect(find.text('Нажмите, чтобы скачать'), findsOneWidget);
+    expect(find.text('Скачается само по Wi-Fi. Нажмите, чтобы скачать сейчас'), findsOneWidget);
   });
 
   testWidgets('версия актуальна — обновлений нет, точки нет', (tester) async {

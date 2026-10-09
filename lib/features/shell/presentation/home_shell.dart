@@ -9,15 +9,24 @@ import '../../../core/config/feature_flags.dart';
 import '../../../core/debug/app_log.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/share/incoming_share.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/update/update_banner.dart';
 import '../../../core/update/update_controller.dart';
 import '../../../core/update/update_dot.dart';
 import '../../../core/widgets/glass_surface.dart';
 import '../../calls/call_controller.dart';
+import '../../referrals/invite_claimer.dart';
+import '../../chat/live_location/live_location.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
+import '../../chat/presentation/share_intake.dart';
 import '../../notifications/notifications.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
+import '../../routes/presentation/providers/route_recorder.dart';
+import '../../routes/presentation/route_recorder_screen.dart';
 import '../../saved/saved.dart';
+import 'app_tour.dart';
+import 'swipe_tabs.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({
@@ -53,6 +62,24 @@ class _HomeShellState extends ConsumerState<HomeShell>
   Timer? _poll;
   Timer? _presence;
   var _foreground = true;
+
+  /// Шаг проводника по вкладкам; null — проводник не показывается.
+  int? _tourStep;
+
+  void _tourGo(int step) {
+    final tab = AppTour.steps[step].tab;
+    if (tab != null) widget.navigationShell.goBranch(tab);
+    setState(() => _tourStep = step);
+  }
+
+  void _tourNext() {
+    final next = (_tourStep ?? 0) + 1;
+    if (next >= AppTour.steps.length) {
+      setState(() => _tourStep = null);
+    } else {
+      _tourGo(next);
+    }
+  }
 
   /// Раз в минуту, пока приложение открыто: «я в сети». По этой отметке
   /// сервер отправляет сообщения, отложенные «до появления в сети». Не чаще
@@ -91,7 +118,17 @@ class _HomeShellState extends ConsumerState<HomeShell>
       }
       ref.read(pushServiceProvider).start();
       ref.read(callControllerProvider).start();
+      // Всё, чем делились из других приложений, пока ChaWo был закрыт.
+      unawaited(ref.read(incomingShareProvider.notifier).start());
+      ref.read(inviteClaimerProvider).run();
+      // Своя трансляция геопозиции переживает перезапуск приложения.
+      ref.read(liveLocationSharerProvider).resumeMine();
       _touchPresence();
+      unawaited(
+        AppTour.takePending().then((pending) {
+          if (pending && mounted) _tourGo(0);
+        }),
+      );
     });
     _presence = Timer.periodic(
       const Duration(seconds: 60),
@@ -110,6 +147,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
     if (state == AppLifecycleState.resumed) {
       ref.read(notificationsProvider.notifier).refreshQuietly();
       _touchPresence();
+      unawaited(ref.read(updateControllerProvider.notifier).onResume());
     }
   }
 
@@ -155,6 +193,13 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   @override
   Widget build(BuildContext context) {
+    // Из другого приложения нажали «Поделиться → ChaWo»: показываем выбор
+    // чата. Состояние сразу сбрасываем, чтобы не показать повторно.
+    ref.listen(incomingShareProvider, (_, share) {
+      if (share == null || !Features.chat) return;
+      ref.read(incomingShareProvider.notifier).clear();
+      handleIncomingShare(context, ref, share);
+    });
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: _onBackAtRoot,
@@ -176,7 +221,38 @@ class _HomeShellState extends ConsumerState<HomeShell>
         // их отступы, кнопки и поля ввода (SafeArea) считают высоту панели из
         // MediaQuery.padding.
         extendBody: true,
-        body: widget.navigationShell,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: SwipeBetweenTabs(
+                shell: widget.navigationShell,
+                // В переписке жест у сообщений (свайп-ответ), с клавиатурой
+                // и панелью эмодзи — у текста; во время проводника — у него.
+                enabled: !inChat && !keyboard && _tourStep == null,
+                child: widget.navigationShell,
+              ),
+            ),
+            // В переписке плашки закрывали бы поле ввода.
+            if (!inChat)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: MediaQuery.paddingOf(context).bottom + 84,
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [UpdateReadyBanner(), _RouteRecordingBar()],
+                ),
+              ),
+            if (_tourStep != null)
+              Positioned.fill(
+                child: AppTourOverlay(
+                  step: _tourStep!,
+                  onNext: _tourNext,
+                  onClose: () => setState(() => _tourStep = null),
+                ),
+              ),
+          ],
+        ),
         // Именно null, а не пустой виджет: Scaffold с любой нижней панелью,
         // даже нулевой высоты, считает, что системную полосу внизу занимает
         // она, и убирает отступ из тела — поле ввода уезжало под системные
@@ -319,6 +395,53 @@ class GlassNavBar extends StatelessWidget {
                     ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Плашка «идёт запись маршрута» над нижней панелью: запись продолжается,
+/// пока человек на других вкладках, и по плашке к ней можно вернуться.
+class _RouteRecordingBar extends ConsumerWidget {
+  const _RouteRecordingBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(routeRecorderProvider);
+    if (!state.isActive) return const SizedBox.shrink();
+    final paused = state.status == RecordingStatus.paused;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: AppColors.ink2,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => context.push(Routes.routeRecorder),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  paused ? Icons.pause_circle_outline : Icons.fiber_manual_record,
+                  size: 16,
+                  color: paused ? AppColors.textDim : AppColors.danger,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${paused ? 'Маршрут на паузе' : 'Идёт запись маршрута'} · '
+                    '${formatRouteDuration(state.elapsed)} · '
+                    '${formatRouteDistance(state.distanceMeters)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.textFaint),
+              ],
+            ),
+          ),
         ),
       ),
     );

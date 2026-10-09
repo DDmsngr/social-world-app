@@ -8,6 +8,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/sw_widgets.dart';
+import '../../feed/domain/entities/post.dart';
+import '../../feed/domain/entities/publish_settings.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
 import 'providers/route_recorder.dart';
 import 'providers/routes_providers.dart';
@@ -37,6 +39,7 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
   final _picker = ImagePicker();
   bool _publishing = false;
   bool _confirmingExit = false;
+  Duration? _limit;
 
   Future<void> _addPhoto() async {
     final recorder = ref.read(routeRecorderProvider.notifier);
@@ -63,7 +66,7 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
       return;
     }
 
-    final title = await showModalBottomSheet<String>(
+    final choice = await showModalBottomSheet<_PublishChoice>(
       context: context, useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
@@ -71,14 +74,21 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
       builder: (_) => _PublishSheet(state: state),
     );
 
-    if (title == null || !mounted) return;
-    await _publish(title);
+    if (choice == null || !mounted) return;
+    await _publish(choice);
   }
 
-  Future<void> _publish(String title) async {
+  Future<void> _publish(_PublishChoice choice) async {
+    final title = choice.title;
     setState(() => _publishing = true);
     try {
-      final draft = ref.read(routeRecorderProvider.notifier).draft(title);
+      final draft = ref
+          .read(routeRecorderProvider.notifier)
+          .draft(
+            title,
+            visibility: choice.visibility,
+            linkAccess: choice.linkAccess,
+          );
       final route = await ref
           .read(routesRepositoryProvider)
           .publishRoute(draft);
@@ -87,7 +97,11 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
       // упадёт, маршрут не потеряется: он останется у автора в профиле.
       final post = await ref
           .read(feedRepositoryProvider)
-          .createPost(body: title, routeId: route.id);
+          .createPost(
+            body: title,
+            routeId: route.id,
+            settings: PublishSettings(visibility: choice.visibility),
+          );
 
       ref.read(routeRecorderProvider.notifier).reset();
       ref.read(feedProvider.notifier).prepend(post);
@@ -168,7 +182,9 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
             child: _ControlPanel(
               state: state,
               publishing: _publishing,
-              onStart: recorder.start,
+              limit: _limit,
+              onLimit: (value) => setState(() => _limit = value),
+              onStart: () => recorder.start(limit: _limit),
               onPause: recorder.pause,
               onResume: recorder.resume,
               onPhoto: _addPhoto,
@@ -189,29 +205,33 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
     // ещё не закрыт (двойное нажатие) — не открываем второй поверх первого.
     if (_confirmingExit) return;
 
-    if (!state.isActive || state.path.isEmpty) {
+    if (!state.isActive) {
       ref.read(routeRecorderProvider.notifier).reset();
       _leave();
       return;
     }
 
     _confirmingExit = true;
-    final bool? drop;
+    final _ExitChoice? choice;
     try {
-      drop = await showDialog<bool>(
+      choice = await showDialog<_ExitChoice>(
         context: context,
         builder: (context) => AlertDialog(
           backgroundColor: AppColors.ink2,
-          title: const Text('Прервать запись?'),
-          content: const Text('Записанный путь не сохранится.'),
+          title: const Text('Запись маршрута'),
+          content: const Text(
+            'Можно свернуть: запись продолжится, пока вы пользуетесь другими '
+            'вкладками или приложениями. Вернуться — по плашке внизу экрана '
+            'или из уведомления.',
+          ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Продолжить запись'),
+              onPressed: () => Navigator.of(context).pop(_ExitChoice.drop),
+              child: const Text('Прервать'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Прервать'),
+              onPressed: () => Navigator.of(context).pop(_ExitChoice.minimize),
+              child: const Text('Свернуть'),
             ),
           ],
         ),
@@ -220,8 +240,29 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
       _confirmingExit = false;
     }
 
-    if (drop != true || !mounted) return;
-    ref.read(routeRecorderProvider.notifier).reset();
+    if (choice == null || !mounted) return;
+    if (choice == _ExitChoice.drop) {
+      final sure = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.ink2,
+          title: const Text('Прервать запись?'),
+          content: const Text('Записанный путь не сохранится.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Нет'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Прервать'),
+            ),
+          ],
+        ),
+      );
+      if (sure != true || !mounted) return;
+      ref.read(routeRecorderProvider.notifier).reset();
+    }
     _leave();
   }
 
@@ -231,10 +272,14 @@ class _RouteRecorderScreenState extends ConsumerState<RouteRecorderScreen> {
   }
 }
 
+enum _ExitChoice { minimize, drop }
+
 class _ControlPanel extends StatelessWidget {
   const _ControlPanel({
     required this.state,
     required this.publishing,
+    required this.limit,
+    required this.onLimit,
     required this.onStart,
     required this.onPause,
     required this.onResume,
@@ -244,6 +289,8 @@ class _ControlPanel extends StatelessWidget {
 
   final RouteRecordingState state;
   final bool publishing;
+  final Duration? limit;
+  final ValueChanged<Duration?> onLimit;
   final VoidCallback onStart;
   final VoidCallback onPause;
   final VoidCallback onResume;
@@ -271,6 +318,37 @@ class _ControlPanel extends StatelessWidget {
               _Stat(label: 'Фото', value: '${state.photos.length}'),
             ],
           ),
+          if (state.isActive && state.limit != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Остановится сама через '
+              '${formatRouteDuration(state.limit! - state.elapsed)}',
+              style: TextStyle(color: AppColors.textDim, fontSize: 12),
+            ),
+          ],
+          if (!state.isActive && state.status != RecordingStatus.preparing) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Ограничение по времени',
+                style: TextStyle(color: AppColors.textDim, fontSize: 12),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final option in routeLimitOptions)
+                  ChoiceChip(
+                    label: Text(routeLimitLabel(option)),
+                    selected: option == limit,
+                    onSelected: (_) => onLimit(option),
+                  ),
+              ],
+            ),
+          ],
           const SizedBox(height: 16),
           if (publishing)
             Padding(
@@ -365,6 +443,14 @@ class _Stat extends StatelessWidget {
   );
 }
 
+class _PublishChoice {
+  const _PublishChoice(this.title, this.visibility, this.linkAccess);
+
+  final String title;
+  final PostVisibility visibility;
+  final bool linkAccess;
+}
+
 class _PublishSheet extends StatefulWidget {
   const _PublishSheet({required this.state});
 
@@ -376,12 +462,30 @@ class _PublishSheet extends StatefulWidget {
 
 class _PublishSheetState extends State<_PublishSheet> {
   final _controller = TextEditingController();
+  var _visibility = PostVisibility.everyone;
+  var _linkAccess = false;
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
+  static const _visibilityLabels = {
+    PostVisibility.everyone: 'Всем',
+    PostVisibility.followers: 'Подписчикам',
+    PostVisibility.onlyMe: 'Никому',
+  };
+
+  String get _visibilityHint => switch (_visibility) {
+    PostVisibility.everyone =>
+      'Маршрут появится в ленте: его увидят все, включая точки, '
+          'где были сделаны фото.',
+    PostVisibility.followers =>
+      'Маршрут и точки фото увидят только те, кто на тебя подписан.',
+    PostVisibility.onlyMe =>
+      'В ленте маршрута не будет, увидишь его только ты.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -395,7 +499,8 @@ class _PublishSheetState extends State<_PublishSheet> {
         top: AppSpacing.gutter,
       ),
       child: SheetCard(
-        child: Column(
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -420,20 +525,45 @@ class _PublishSheetState extends State<_PublishSheet> {
               ),
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Маршрут появится в ленте: его увидят все, включая точки, '
-              'где были сделаны фото.',
-              style: Theme.of(context).textTheme.bodyMedium,
+            const SizedBox(height: 10),
+            SegmentedButton<PostVisibility>(
+              showSelectedIcon: false,
+              segments: [
+                for (final entry in _visibilityLabels.entries)
+                  ButtonSegment(
+                    value: entry.key,
+                    label: Text(entry.value, style: const TextStyle(fontSize: 12.5)),
+                  ),
+              ],
+              selected: {_visibility},
+              onSelectionChanged: (selected) => setState(() {
+                _visibility = selected.first;
+                if (_visibility != PostVisibility.onlyMe) _linkAccess = false;
+              }),
             ),
+            const SizedBox(height: 8),
+            Text(_visibilityHint, style: Theme.of(context).textTheme.bodyMedium),
+            if (_visibility == PostVisibility.onlyMe)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Открывать по ссылке'),
+                subtitle: const Text(
+                  'Кто получит ссылку, откроет маршрут. В ленте его всё равно нет.',
+                ),
+                value: _linkAccess,
+                onChanged: (value) => setState(() => _linkAccess = value),
+              ),
             const SizedBox(height: 18),
             FilledButton(
               onPressed: canPublish
-                  ? () => Navigator.of(context).pop(_controller.text.trim())
+                  ? () => Navigator.of(context).pop(
+                      _PublishChoice(_controller.text.trim(), _visibility, _linkAccess),
+                    )
                   : null,
               child: const Text('Опубликовать'),
             ),
           ],
+          ),
         ),
       ),
     );

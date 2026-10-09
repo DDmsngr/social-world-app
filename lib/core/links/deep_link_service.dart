@@ -6,6 +6,8 @@ import 'package:flutter/widgets.dart' show RouterDelegate;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/presentation/providers/auth_providers.dart';
+import '../../features/referrals/invite_claimer.dart';
+import '../../features/referrals/invites.dart';
 import '../../features/referrals/presentation/providers/referrals_providers.dart';
 import '../debug/app_log.dart';
 import '../router/app_router.dart';
@@ -81,6 +83,14 @@ class DeepLinkService {
     _lastUri = uri.toString();
     _lastAt = now;
 
+    // Личное приглашение …/r/<код>: запоминаем до входа (регистрация может
+    // занять время), связываем с пригласившим, когда человек уже внутри.
+    final invite = InviteLinks.parse(uri);
+    if (invite != null) {
+      unawaited(PendingInvite.save(invite, 'link').then((_) => _ref.read(inviteClaimerProvider).run()));
+      return;
+    }
+
     final referral = DeepLinks.parseReferralCode(uri);
     if (referral != null) _pendingReferral = referral;
 
@@ -110,7 +120,14 @@ class DeepLinkService {
     if (Routes.authFlow.contains(current)) return;
 
     _pending = null;
-    router.push(link.location);
+    // Переписка (ярлык чата на рабочем столе) живёт во вкладке «Чаты»: go
+    // переключает вкладку. push клал её поверх Pulse — подсветка внизу
+    // оставалась на карте, переключение вкладок путалось.
+    if (link.location.startsWith('${Routes.chats}/')) {
+      router.go(link.location);
+    } else {
+      router.push(link.location);
+    }
   }
 
   /// Сбой — не повод мешать человеку: он просто не попал в статистику этого

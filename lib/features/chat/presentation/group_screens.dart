@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
@@ -13,7 +14,9 @@ import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../channels/presentation/providers/channel_providers.dart';
 import '../../profile/domain/profile_models.dart';
+import '../../profile/presentation/avatar_crop_screen.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
 import 'conversations_screen.dart';
 import 'providers/chat_providers.dart';
@@ -286,6 +289,7 @@ class _PeoplePickerState extends ConsumerState<PeoplePicker> {
                       url: hit.avatarUrl,
                     ),
                     title: Text(hit.displayName),
+                    subtitle: hit.username == null ? null : Text('@${hit.username}'),
                   );
                 },
               );
@@ -339,6 +343,50 @@ class GroupInfoScreen extends ConsumerWidget {
         ..invalidate(conversationsProvider);
     } catch (error) {
       if (context.mounted) _showError(context, error, 'Не удалось переименовать');
+    }
+  }
+
+  Future<void> _changeAvatar(BuildContext context, WidgetRef ref, bool hasAvatar) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: AppColors.ink2,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Выбрать фото'),
+              onTap: () => Navigator.of(sheet).pop('pick'),
+            ),
+            if (hasAvatar)
+              ListTile(
+                leading: Icon(Icons.delete_outline, color: AppColors.danger),
+                title: const Text('Убрать аватар'),
+                onTap: () => Navigator.of(sheet).pop('remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+    String? path;
+    if (choice == 'pick') {
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 90);
+      if (picked == null || !context.mounted) return;
+      path = await openAvatarCrop(context, source: picked.path);
+      if (path == null) return;
+    }
+    try {
+      await ref.read(channelsRepositoryProvider).setAvatar(conversationId, path);
+      ref
+        ..invalidate(conversationProvider(conversationId))
+        ..invalidate(conversationsProvider);
+    } catch (error) {
+      if (context.mounted) _showError(context, error, 'Не удалось сменить аватар');
     }
   }
 
@@ -426,6 +474,35 @@ class GroupInfoScreen extends ConsumerWidget {
           padding: AppSpacing.page(context, top: 12),
           children: [
             if (info != null) ...[
+              Center(
+                child: GestureDetector(
+                  onTap: manageable && owner
+                      ? () => _changeAvatar(context, ref, info.peerAvatarUrl != null)
+                      : null,
+                  child: Stack(
+                    children: [
+                      info.peerAvatarUrl != null
+                          ? UserAvatar(name: info.displayName, url: info.peerAvatarUrl, radius: 44)
+                          : CircleAvatar(
+                              radius: 44,
+                              backgroundColor: AppColors.ink,
+                              child: Icon(Icons.groups_outlined, size: 40, color: AppColors.primaryTint),
+                            ),
+                      if (manageable && owner)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: AppColors.primary,
+                            child: const Icon(Icons.camera_alt_outlined, size: 16, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(

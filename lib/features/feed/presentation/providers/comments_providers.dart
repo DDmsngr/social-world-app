@@ -47,10 +47,19 @@ class CommentsController extends AsyncNotifier<List<Comment>> {
 
   /// Новый комментарий встаёт на своё место в дереве сразу, без перезагрузки
   /// ветки: иначе экран прыгает в начало и теряет место, где человек читал.
-  Future<void> add(String body, {Comment? parent}) async {
+  Future<void> add(
+    String body, {
+    Comment? parent,
+    List<String> mediaPaths = const [],
+  }) async {
     final comment = await ref
         .read(commentsRepositoryProvider)
-        .addComment(postId: postId, body: body, parent: parent);
+        .addComment(
+          postId: postId,
+          body: body,
+          parent: parent,
+          mediaPaths: mediaPaths,
+        );
 
     state = AsyncValue.data(
       insertIntoThread(state.value ?? const [], comment),

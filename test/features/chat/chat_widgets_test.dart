@@ -11,6 +11,7 @@ import 'package:social_world/features/chat/domain/entities/conversation.dart';
 import 'package:social_world/features/chat/presentation/providers/chat_providers.dart';
 import 'package:social_world/features/chat/presentation/providers/hidden_messages_provider.dart';
 import 'package:social_world/features/chat/presentation/widgets/chat_composer.dart';
+import 'package:social_world/features/chat/presentation/widgets/emoji_panel.dart';
 import 'package:social_world/features/chat/presentation/widgets/message_bubble.dart';
 import 'package:social_world/features/chat/presentation/widgets/message_menu.dart';
 import 'package:social_world/features/shell/presentation/home_shell.dart';
@@ -67,12 +68,11 @@ void main() {
     );
     await tester.enterText(find.byType(TextField), 'Привет');
     await tester.tap(find.byTooltip('Эмодзи'));
-    await tester.pumpAndSettle();
-    // Панель открывается на стикерах — переходим к эмодзи.
-    await tester.tap(find.byKey(const ValueKey('emoji-tab-0')));
-    await tester.pumpAndSettle();
-    // 😀 — ещё и иконка вкладки, поэтому жмём соседний в первом ряду.
-    await tester.tap(find.text('😃'));
+    // Сетка эмодзи грузится в фоне и в тесте не дозагружается, поэтому
+    // выбор эмодзи имитируем вызовом обработчика панели.
+    await tester.pump(const Duration(milliseconds: 300));
+    final panel = tester.widget<EmojiPanel>(find.byType(EmojiPanel));
+    panel.onPick('😃');
     await tester.pump();
 
     final field = tester.widget<TextField>(find.byType(TextField));
@@ -81,7 +81,7 @@ void main() {
 
     // Панель закрывается обратно на клавиатуру той же кнопкой.
     await tester.tap(find.byTooltip('Клавиатура'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.byTooltip('Эмодзи'), findsOneWidget);
   });
 

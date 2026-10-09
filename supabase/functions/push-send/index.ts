@@ -75,6 +75,27 @@ Deno.serve(async (req) => {
 
 type Job = { recipients: string[]; push: Push };
 
+// Тихие часы человека: пуш приходит, но без звука и вибрации.
+const QUIET_CHANNEL = "messages_silent";
+
+// Кому из списка эта категория включена в настройках (миграция 0070) и у кого
+// сейчас тихие часы: id → тихо ли. Если миграция ещё не накатана, фильтра нет:
+// пуши идут всем и со звуком, как раньше.
+async function pushFilter(ids: string[], category: string): Promise<Map<string, boolean>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await db.rpc("notify_push_filter", {
+    in_profiles: ids,
+    in_category: category,
+  });
+  if (error) {
+    console.warn("notify_push_filter", error.message);
+    return new Map(ids.map((id) => [id, false]));
+  }
+  return new Map(
+    (data ?? []).map((row: { profile_id: string; quiet: boolean }) => [row.profile_id, row.quiet]),
+  );
+}
+
 async function forMessage(messageId: string): Promise<Job[]> {
   let { data: message, error } = await db
     .from("chat_messages")
@@ -111,9 +132,12 @@ async function forMessage(messageId: string): Promise<Job[]> {
     .select("blocker_id")
     .eq("blocked_id", message.sender_id);
   const blockedBy = new Set((blocks ?? []).map((b) => b.blocker_id));
-  const recipients = (members ?? [])
-    .map((m) => m.profile_id as string)
-    .filter((id) => !blockedBy.has(id));
+  // Категория «Сообщения» в настройках: выключил — пуша нет совсем.
+  const quiet = await pushFilter(
+    (members ?? []).map((m) => m.profile_id as string).filter((id) => !blockedBy.has(id)),
+    "messages",
+  );
+  const recipients = [...quiet.keys()];
 
   const senderName = sender?.display_name ?? "Кто-то";
   // «Отправить без звука» (0034): тот же пуш, но в тихом канале.
@@ -185,8 +209,9 @@ async function forMessage(messageId: string): Promise<Job[]> {
   const now = new Date();
   const byChannel = new Map<string, string[]>();
   for (const id of recipients) {
-    const picked = decide(prefs.get(id), silent, now, sounds.get(id));
+    let picked = decide(prefs.get(id), silent, now, sounds.get(id));
     if (!picked) continue;
+    if (quiet.get(id)) picked = QUIET_CHANNEL;
     byChannel.set(picked, [...(byChannel.get(picked) ?? []), id]);
   }
   return [...byChannel].map(([picked, ids]) => ({
@@ -238,8 +263,12 @@ async function forReaction(messageId: string, reactorId: string): Promise<Job[]>
     .eq("conversation_id", conversation.id)
     .eq("profile_id", message.sender_id)
     .maybeSingle();
-  const picked = decide((pref ?? undefined) as Prefs, false, new Date(), look?.sound as string | undefined);
+  let picked = decide((pref ?? undefined) as Prefs, false, new Date(), look?.sound as string | undefined);
   if (!picked) return [];
+  // Реакции — это «лайки» в настройках уведомлений.
+  const quiet = await pushFilter([message.sender_id as string], "likes");
+  if (!quiet.has(message.sender_id as string)) return [];
+  if (quiet.get(message.sender_id as string)) picked = QUIET_CHANNEL;
 
   const direct = !!conversation.direct_key;
   const title = direct ? who : (conversation.title ?? "Группа");
@@ -276,12 +305,18 @@ async function forNotification(notificationId: string): Promise<Job[]> {
     actor = data?.display_name ?? actor;
   }
 
+  // Строка уже создана с учётом настроек (add_notification), здесь только
+  // тихие часы.
+  const { data: category } = await db.rpc("notification_category", { in_kind: n.kind });
+  const quiet = await pushFilter([n.recipient_id as string], (category as string | null) ?? "other");
+  if (!quiet.has(n.recipient_id as string)) return [];
+
   return [{
     recipients: [n.recipient_id as string],
     push: {
       title: "ChaWo",
       body: notificationText(n.kind, actor, n.title),
-      channel: "activity",
+      channel: quiet.get(n.recipient_id as string) ? QUIET_CHANNEL : "activity",
       tag: `${n.kind}:${n.target_id}`,
       data: {
         type: "notification",
@@ -380,6 +415,7 @@ function notificationText(kind: string, who: string, title: string | null): stri
     case "comment": return `${who}: новый комментарий к вашей публикации${about}`;
     case "reply": return `${who}: ответ на ваш комментарий${about}`;
     case "reaction": return `${who}: реакция на вашу публикацию`;
+    case "mention": return `${who} упомянул(а) вас${about}`;
     case "event_join": return `${who} участвует в вашем событии${about}`;
     case "event_changed": return `Событие изменилось${about}`;
     case "event_cancelled": return `Событие отменено${about}`;
@@ -391,6 +427,15 @@ function notificationText(kind: string, who: string, title: string | null): stri
     case "quest_removed": return `Вас исключили из квеста${about}`;
     case "quest_cancelled": return `Квест отменён${about}`;
     case "need_response": return `${who} готов помочь с вашей просьбой${about}`;
+    case "referral_joined": return `${who} зарегистрировался по вашему приглашению`;
+    case "referral_reward": {
+      const [amount, level] = (title ?? "").split(":");
+      return level === "1"
+        ? `${who} зарегистрировался по вашему приглашению: +${amount} баллов`
+        : `Ваш реферал пригласил нового пользователя: +${amount} баллов`;
+    }
+    case "referral_confirmed": return `+${title ?? ""} баллов подтверждено`;
+    case "referral_cancelled": return `Начисление ${title ?? ""} баллов отменено`;
     default: return "Новое уведомление";
   }
 }

@@ -1,6 +1,7 @@
-// Удаление осиротевших файлов chat-media (очередь chat_media_trash, 0035).
-// Зовёт только база по pg_cron, с тем же общим секретом, что push-send,
-// поэтому деплоится с --no-verify-jwt.
+// Удаление осиротевших файлов из хранилища (очередь chat_media_trash, 0035,
+// с бакетом с 0064): вложения удалённых сообщений и групп, а также файлы
+// удалённых аккаунтов. Зовёт только база по pg_cron, с тем же общим секретом,
+// что push-send, поэтому деплоится с --no-verify-jwt.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SECRET = Deno.env.get("PUSH_WEBHOOK_SECRET") ?? "";
@@ -19,18 +20,35 @@ Deno.serve(async (req) => {
 
   const { data: rows, error } = await db
     .from("chat_media_trash")
-    .select("path")
+    .select("bucket, path")
     .order("queued_at")
     .limit(BATCH);
   if (error) return new Response(error.message, { status: 500 });
-  const paths = (rows ?? []).map((r) => r.path as string);
-  if (paths.length === 0) return Response.json({ removed: 0 });
+  if (!rows || rows.length === 0) return Response.json({ removed: 0 });
 
-  // Уже удалённый файл Storage просто не вернёт в ответе — это не ошибка,
-  // строку очереди всё равно убираем.
-  const { error: removeError } = await db.storage.from("chat-media").remove(paths);
-  if (removeError) return new Response(removeError.message, { status: 500 });
+  const byBucket = new Map<string, string[]>();
+  for (const row of rows) {
+    const list = byBucket.get(row.bucket as string) ?? [];
+    list.push(row.path as string);
+    byBucket.set(row.bucket as string, list);
+  }
 
-  await db.from("chat_media_trash").delete().in("path", paths);
-  return Response.json({ removed: paths.length });
+  let removed = 0;
+  const failures: string[] = [];
+  for (const [bucket, paths] of byBucket) {
+    // Уже удалённый файл Storage просто не вернёт в ответе — это не ошибка,
+    // строку очереди всё равно убираем.
+    const { error: removeError } = await db.storage.from(bucket).remove(paths);
+    if (removeError) {
+      failures.push(`${bucket}: ${removeError.message}`);
+      continue;
+    }
+    await db.from("chat_media_trash").delete().eq("bucket", bucket).in("path", paths);
+    removed += paths.length;
+  }
+
+  if (failures.length > 0) {
+    return new Response(failures.join("; "), { status: 500 });
+  }
+  return Response.json({ removed });
 });

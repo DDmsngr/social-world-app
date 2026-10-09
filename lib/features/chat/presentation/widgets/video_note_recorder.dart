@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -15,8 +16,8 @@ class VideoNoteResult {
   final Duration duration;
 }
 
-/// Запись кружка: фронтальная камера, круглое превью, до минуты. Запись
-/// начинается сразу при открытии, как в DDChat; «стоп» отправляет.
+/// Запись кружка: круглое превью, до минуты. Сначала человек выбирает камеру
+/// (по умолчанию фронтальная), потом нажимает запись; вторая кнопка отправляет.
 class VideoNoteRecorderScreen extends StatefulWidget {
   const VideoNoteRecorderScreen({super.key, this.maxDuration = const Duration(seconds: 60)});
 
@@ -36,6 +37,19 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   Timer? _ticker;
   String? _error;
   bool _finishing = false;
+  bool _switching = false;
+  bool _recording = false;
+  bool _canFlip = false;
+  var _cameras = <CameraDescription>[];
+  var _lens = CameraLensDirection.front;
+
+  // Зум: щипком по кружку или кнопками громкости.
+  var _zoom = 1.0;
+  var _minZoom = 1.0;
+  var _maxZoom = 1.0;
+  var _scaleBase = 1.0;
+  Timer? _zoomLabelTimer;
+  var _zoomLabel = false;
 
   @override
   void initState() {
@@ -47,26 +61,18 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw StateError('Камеры нет');
-      final front = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
+      _cameras = cameras;
+      _canFlip =
+          cameras.any((c) => c.lensDirection == CameraLensDirection.front) &&
+          cameras.any((c) => c.lensDirection == CameraLensDirection.back);
+      final description = cameras.firstWhere(
+        (c) => c.lensDirection == _lens,
         orElse: () => cameras.first,
       );
-      final camera = CameraController(front, ResolutionPreset.medium);
+      final camera = CameraController(description, ResolutionPreset.medium);
       await camera.initialize();
-      // Лёгкий зум убирает «рыбий глаз» фронталки (приём из DDChat).
-      try {
-        final maxZoom = await camera.getMaxZoomLevel();
-        await camera.setZoomLevel(1.25.clamp(1.0, maxZoom));
-      } catch (_) {}
-      await camera.startVideoRecording();
-      _stopwatch.start();
-      _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
-        if (_stopwatch.elapsed >= _max) {
-          _finish(send: true);
-        } else if (mounted) {
-          setState(() {});
-        }
-      });
+      _lens = description.lensDirection;
+      await _applyZoom(camera);
       if (mounted) {
         setState(() => _camera = camera);
       } else {
@@ -80,9 +86,126 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
     }
   }
 
+  /// Запись идёт только после нажатия: до этого человек выбирает камеру.
+  Future<void> _beginRecording() async {
+    final camera = _camera;
+    if (camera == null || _recording || _switching) return;
+    try {
+      await camera.startVideoRecording();
+    } catch (error) {
+      AppLog.add('Кружок не начал запись: $error');
+      if (mounted) setState(() => _error = 'Не удалось начать запись');
+      return;
+    }
+    _recording = true;
+    _stopwatch
+      ..reset()
+      ..start();
+    _ticker = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      if (_stopwatch.elapsed >= _max) {
+        _finish(send: true);
+      } else if (mounted) {
+        setState(() {});
+      }
+    });
+    if (mounted) setState(() {});
+  }
+
+  CameraLensDirection get _otherLens => _lens == CameraLensDirection.front
+      ? CameraLensDirection.back
+      : CameraLensDirection.front;
+
+  /// Смена камеры. Во время записи объектив переключается на лету, запись и
+  /// таймер продолжаются (CameraX держит запись при смене камеры). До записи
+  /// просто пересоздаётся превью.
+  Future<void> _flip() async {
+    final camera = _camera;
+    if (_finishing || _switching || camera == null) return;
+    _switching = true;
+    try {
+      if (_recording) {
+        final target = _cameras.firstWhere(
+          (c) => c.lensDirection == _otherLens,
+          orElse: () => camera.description,
+        );
+        await camera.setDescription(target);
+        _lens = target.lensDirection;
+        await _applyZoom(camera);
+        if (mounted) setState(() {});
+        return;
+      }
+      await camera.dispose();
+      if (!mounted) return;
+      setState(() => _camera = null);
+      _lens = _otherLens;
+      await _start();
+    } catch (error) {
+      AppLog.add('Смена камеры кружка: $error');
+      if (mounted) setState(() => _error = 'Не удалось сменить камеру');
+    } finally {
+      _switching = false;
+    }
+  }
+
+  // Лёгкий зум убирает «рыбий глаз» фронталки (приём из DDChat); у основной
+  // камеры зум не нужен.
+  Future<void> _applyZoom(CameraController camera) async {
+    try {
+      _minZoom = await camera.getMinZoomLevel();
+      _maxZoom = await camera.getMaxZoomLevel();
+      final wanted = _lens == CameraLensDirection.front ? 1.25 : 1.0;
+      _zoom = wanted.clamp(_minZoom, _maxZoom);
+      await camera.setZoomLevel(_zoom);
+    } catch (_) {}
+  }
+
+  /// Новый зум: ограничен возможностями камеры, на экране на секунду
+  /// показывается «1.8×».
+  Future<void> _setZoom(double value) async {
+    final camera = _camera;
+    if (camera == null || _maxZoom <= _minZoom) return;
+    final next = value.clamp(_minZoom, _maxZoom);
+    if ((next - _zoom).abs() < 0.01) return;
+    _zoom = next;
+    _zoomLabelTimer?.cancel();
+    setState(() => _zoomLabel = true);
+    _zoomLabelTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _zoomLabel = false);
+    });
+    try {
+      await camera.setZoomLevel(next);
+    } catch (error) {
+      AppLog.add('Зум кружка: $error');
+    }
+  }
+
+  /// Шаг зума на одно нажатие громкости: примерно двенадцатая часть диапазона.
+  double get _zoomStep => ((_maxZoom - _minZoom) / 12).clamp(0.15, 0.6);
+
+  /// Кнопки громкости: «плюс» приближает, «минус» отдаляет. Событие
+  /// съедается, поэтому системная громкость не меняется и не звучит.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
+      _setZoom(_zoom + _zoomStep);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
+      _setZoom(_zoom - _zoomStep);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   Future<void> _finish({required bool send}) async {
     final camera = _camera;
-    if (_finishing || camera == null) return;
+    if (_finishing || _switching || camera == null) return;
+    if (!_recording) {
+      // Запись не начиналась — отправлять нечего.
+      _finishing = true;
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
     _finishing = true;
     _ticker?.cancel();
     _stopwatch.stop();
@@ -105,6 +228,7 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _zoomLabelTimer?.cancel();
     _camera?.dispose();
     super.dispose();
   }
@@ -112,7 +236,10 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
   @override
   Widget build(BuildContext context) {
     final camera = _camera;
-    final size = MediaQuery.sizeOf(context).width * 0.8;
+    // Круг крупнее и выше: смотреть в камеру удобнее, когда лицо в кружке
+    // рядом с объективом, а не посреди экрана.
+    final screen = MediaQuery.sizeOf(context);
+    final size = (screen.width * 0.94).clamp(0.0, screen.height * 0.6);
     final progress =
         _stopwatch.elapsed.inMilliseconds / _max.inMilliseconds;
 
@@ -126,23 +253,35 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
           _finish(send: false);
         }
       },
-      child: Scaffold(
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: Scaffold(
         backgroundColor: Colors.black,
         body: SafeArea(
           child: Column(
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => camera == null
-                      ? Navigator.of(context).pop()
-                      : _finish(send: false),
-                  tooltip: 'Отменить',
-                  icon: const Icon(Icons.close, color: Colors.white),
-                ),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => camera == null
+                        ? Navigator.of(context).pop()
+                        : _finish(send: false),
+                    tooltip: 'Отменить',
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                  const Spacer(),
+                  if (_canFlip)
+                    IconButton(
+                      onPressed: camera == null || _switching ? null : _flip,
+                      tooltip: 'Сменить камеру',
+                      icon: const Icon(Icons.cameraswitch_outlined, color: Colors.white),
+                    ),
+                ],
               ),
               Expanded(
-                child: Center(
+                child: Align(
+                  alignment: Alignment.topCenter,
                   child: _error != null
                       ? Padding(
                           padding: const EdgeInsets.all(24),
@@ -152,7 +291,13 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                             style: const TextStyle(color: Colors.white),
                           ),
                         )
-                      : SizedBox.square(
+                      : GestureDetector(
+                          // Щипок по кружку — зум.
+                          onScaleStart: (_) => _scaleBase = _zoom,
+                          onScaleUpdate: (details) {
+                            if (details.pointerCount >= 2) _setZoom(_scaleBase * details.scale);
+                          },
+                          child: SizedBox.square(
                           dimension: size,
                           child: Stack(
                             alignment: Alignment.center,
@@ -183,29 +328,55 @@ class _VideoNoteRecorderScreenState extends State<VideoNoteRecorderScreen> {
                                   backgroundColor: Colors.white12,
                                 ),
                               ),
+                              Positioned(
+                                bottom: size * 0.12,
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 200),
+                                  opacity: _zoomLabel ? 1 : 0,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      child: Text(
+                                        '${_zoom.toStringAsFixed(1)}×',
+                                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
+                          ),
                           ),
                         ),
                 ),
               ),
               Text(
-                '${formatDuration(_stopwatch.elapsed)} / ${formatDuration(_max)}',
+                _recording
+                    ? '${formatDuration(_stopwatch.elapsed)} / ${formatDuration(_max)}'
+                    : 'Выберите камеру и нажмите запись',
                 style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 20),
               IconButton.filled(
-                onPressed: camera == null ? null : () => _finish(send: true),
-                tooltip: 'Отправить',
+                onPressed: camera == null || _switching
+                    ? null
+                    : (_recording ? () => _finish(send: true) : _beginRecording),
+                tooltip: _recording ? 'Отправить' : 'Начать запись',
                 style: IconButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
                   minimumSize: const Size(72, 72),
                 ),
-                icon: const Icon(Icons.send, size: 30),
+                icon: Icon(_recording ? Icons.send : Icons.fiber_manual_record, size: 30),
               ),
               const SizedBox(height: 32),
             ],
           ),
+        ),
         ),
       ),
     );

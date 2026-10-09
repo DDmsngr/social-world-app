@@ -66,6 +66,17 @@ abstract final class Cities {
   static City parse(String? id) =>
       all.firstWhere((city) => city.id == id, orElse: () => fallback);
 
+  /// Город из списка по названию, как оно записано в профиле; null — такого
+  /// в списке нет.
+  static City? byName(String? name) {
+    final needle = name?.trim().toLowerCase();
+    if (needle == null || needle.isEmpty) return null;
+    for (final city in all) {
+      if (city.name.toLowerCase() == needle) return city;
+    }
+    return null;
+  }
+
   /// Поиск по названию для списка выбора.
   static List<City> search(String query) {
     final needle = query.trim().toLowerCase();

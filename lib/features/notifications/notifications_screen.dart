@@ -31,6 +31,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     NotificationKind.follow => Icons.person_add_alt_outlined,
     NotificationKind.comment || NotificationKind.reply => Icons.mode_comment_outlined,
     NotificationKind.reaction => Icons.favorite_border,
+    NotificationKind.mention => Icons.alternate_email,
     NotificationKind.eventJoin => Icons.group_add_outlined,
     NotificationKind.eventChanged => Icons.edit_calendar_outlined,
     NotificationKind.eventCancelled => Icons.event_busy_outlined,
@@ -41,6 +42,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     NotificationKind.questRemoved ||
     NotificationKind.questCancelled => Icons.flag_circle_outlined,
     NotificationKind.needResponse => Icons.volunteer_activism_outlined,
+    NotificationKind.referralJoined => Icons.person_add_alt_1_outlined,
+    NotificationKind.referralReward || NotificationKind.referralConfirmed => Icons.stars_outlined,
+    NotificationKind.referralCancelled => Icons.remove_circle_outline,
   };
 
   @override

@@ -40,6 +40,8 @@ class SupabaseRoutesRepository implements RoutesRepository {
           'distance_m': draft.distanceMeters,
           'duration_s': draft.duration.inSeconds,
           'started_at': draft.startedAt.toUtc().toIso8601String(),
+          'visibility': draft.visibility.wire,
+          'link_access': draft.linkAccess,
         })
         .select()
         .single();

@@ -25,11 +25,15 @@ class UserProfile {
     this.followingCount = 0,
     this.followedByMe = false,
     this.blockKind,
+    this.username,
   });
 
   final String id;
   final String displayName;
   final String? avatarUrl;
+
+  /// @ник без «@»; null — не выбран.
+  final String? username;
 
   /// Видеоаватар. Сервер отдаёт его, только пока у владельца действует премиум.
   final String? avatarVideoUrl;
@@ -58,6 +62,7 @@ class UserProfile {
     followingCount: followingCount,
     followedByMe: followedByMe ?? this.followedByMe,
     blockKind: clearBlock ? null : (blockKind ?? this.blockKind),
+    username: username,
   );
 }
 
@@ -83,12 +88,16 @@ class ProfileHit {
     required this.displayName,
     this.avatarUrl,
     this.followedByMe = false,
+    this.username,
   });
 
   final String id;
   final String displayName;
   final String? avatarUrl;
   final bool followedByMe;
+
+  /// @ник без «@»; null — не выбран.
+  final String? username;
 }
 
 /// Какой список связей открыт: кто подписан на человека или на кого он.

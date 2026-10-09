@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/calls/call_background.dart';
 import '../../features/calls/call_controller.dart';
 import '../../features/chat/presentation/providers/chat_providers.dart';
+import '../../features/notifications/bell.dart';
 import '../../features/notifications/notifications.dart';
 import '../audio/incoming_click.dart';
 import '../config/env.dart';
@@ -38,8 +39,20 @@ class PushService {
   bool _localReady = false;
   String? _token;
 
-  /// Открытый сейчас чат: пуши о нём не показываются, человек и так его видит.
-  String? activeConversationId;
+  /// Открытые экраны чатов, верхний — последний. Пуши о верхнем не
+  /// показываются: человек и так его видит. Стек, а не одно поле: один и тот
+  /// же чат бывает открыт дважды (чат → профиль → «Написать»), и закрытие
+  /// верхнего раньше обнуляло отметку, хотя нижний оставался на экране.
+  final _openChats = <String>[];
+
+  String? get activeConversationId => _openChats.isEmpty ? null : _openChats.last;
+
+  void enterChat(String conversationId) => _openChats.add(conversationId);
+
+  void leaveChat(String conversationId) {
+    final i = _openChats.lastIndexOf(conversationId);
+    if (i >= 0) _openChats.removeAt(i);
+  }
 
   static const _messages = AndroidNotificationChannel(
     'messages',
@@ -181,6 +194,8 @@ class PushService {
     if (!_localReady) return;
     try {
       await _local.cancel(id: 0, tag: conversationId);
+      // Реакции этого чата приходят отдельным уведомлением (push-send).
+      await _local.cancel(id: 0, tag: '$conversationId:reaction');
     } catch (error) {
       AppLog.add('Не удалось убрать уведомление: $error');
     }
@@ -210,6 +225,10 @@ class PushService {
       if (data['conversation_id'] == activeConversationId) return;
     } else {
       _ref.read(notificationsProvider.notifier).refreshQuietly();
+      // Приложение открыто: вместо системного уведомления — колокольчик
+      // поверх экрана со своим звуком.
+      _ref.read(bellProvider.notifier).ping();
+      return;
     }
 
     final notification = message.notification;
@@ -268,10 +287,13 @@ class PushService {
       case 'message':
         final id = data['conversation_id'] as String?;
         if (id == null) return;
+        // go, а не push: переписка живёт во вкладке «Чаты». push клал её
+        // поверх текущей вкладки (обычно Pulse) — подсветка внизу оставалась
+        // на карте, а «назад» и вкладки вели себя криво.
         if (data['channel'] == '1') {
-          router.push(Routes.channel(id));
+          router.go(Routes.channel(id));
         } else {
-          router.push('${Routes.chats}/$id', extra: data['title'] as String?);
+          router.go('${Routes.chats}/$id', extra: data['title'] as String?);
         }
       case 'notification':
         final target = LinkTarget.fromSegment(data['target_type'] as String? ?? '');
@@ -279,7 +301,10 @@ class PushService {
         if (target == null || id == null || id.isEmpty) {
           router.push(Routes.notifications);
         } else {
-          router.push(DeepLinks.locationFor(target, id));
+          final location = DeepLinks.locationFor(target, id);
+          location.startsWith('${Routes.chats}/')
+              ? router.go(location)
+              : router.push(location);
         }
     }
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/env.dart';
@@ -38,7 +39,8 @@ class PeerPresence {
   }
 }
 
-/// Раз в минуту, пока шапка на экране: присутствие меняется не чаще.
+/// Раз в 20 секунд, пока шапка на экране (раньше раз в минуту — статус
+/// заметно отставал).
 final peerPresenceProvider = StreamProvider.autoDispose
     .family<PeerPresence?, String>((ref, conversationId) async* {
       if (!Env.isConfigured) {
@@ -66,7 +68,7 @@ final peerPresenceProvider = StreamProvider.autoDispose
         } catch (error) {
           AppLog.add('Присутствие собеседника: $error');
         }
-        await Future<void>.delayed(const Duration(seconds: 60));
+        await Future<void>.delayed(const Duration(seconds: 20));
       }
     });
 
@@ -156,5 +158,61 @@ Future<void> toggleReaction(
   ref.invalidate(chatReactionsProvider(conversationId));
 }
 
-/// Быстрые реакции в меню сообщения.
+/// Реакции по умолчанию: первые шесть — быстрая полоса, все вместе — окно «⋯».
+const popularReactions = [
+  '❤️', '👍', '😂', '😮', '😢', '🔥', '👎', '🙏', '👏', '🥰',
+  '😍', '🤔', '🤯', '😱', '😡', '🎉', '🤩', '🤮', '💩', '🤝',
+  '😎', '😁', '😭', '🥳', '😴', '💔', '💯', '👀', '🙌', '✨',
+  '😉', '🤗', '😅', '🤣', '👌',
+];
+
+/// Частота, с которой человек ставит реакции: от неё зависит порядок в панели.
+/// Хранится на устройстве, чтение синхронное после [load].
+class ReactionUsage {
+  ReactionUsage._();
+  static const _key = 'reaction_usage';
+  static final Map<String, int> _counts = {};
+  static bool _loaded = false;
+
+  static Future<void> load() async {
+    if (_loaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final line in prefs.getStringList(_key) ?? const <String>[]) {
+        final i = line.lastIndexOf('|');
+        final n = i < 0 ? null : int.tryParse(line.substring(i + 1));
+        if (n != null) _counts[line.substring(0, i)] = n;
+      }
+    } catch (_) {}
+    _loaded = true;
+  }
+
+  static Future<void> record(String emoji) async {
+    _counts[emoji] = (_counts[emoji] ?? 0) + 1;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_key, [for (final e in _counts.entries) '${e.key}|${e.value}']);
+    } catch (_) {}
+  }
+
+  /// Все популярные плюс те, что человек ставил сам, по убыванию частоты;
+  /// при равенстве — в исходном порядке.
+  static List<String> ranked() {
+    final all = [
+      ...popularReactions,
+      for (final e in _counts.keys) if (!popularReactions.contains(e)) e,
+    ];
+    final order = {for (var i = 0; i < all.length; i++) all[i]: i};
+    all.sort((a, b) {
+      final c = (_counts[b] ?? 0).compareTo(_counts[a] ?? 0);
+      return c != 0 ? c : order[a]!.compareTo(order[b]!);
+    });
+    return all;
+  }
+
+  static List<String> quick() => ranked().take(6).toList();
+  static List<String> extended() => ranked().take(35).toList();
+}
+
+/// Быстрые реакции в меню сообщения (по умолчанию, пока нет статистики).
 const quickReactions = ['❤️', '👍', '😂', '😮', '😢', '🔥'];

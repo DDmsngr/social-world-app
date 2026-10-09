@@ -18,6 +18,11 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../calls/call_controller.dart';
 import '../../calls/call_kit.dart';
+import '../../calls/call_log.dart';
+import '../domain/day_label.dart';
+import '../domain/timeline.dart';
+import '../live_location/live_location.dart';
+import '../live_location/live_location_screen.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
@@ -39,6 +44,7 @@ import 'widgets/message_bubble.dart';
 import 'widgets/message_menu.dart';
 import 'widgets/pinned_bar.dart';
 import 'widgets/reaction_chips.dart';
+import 'widgets/swipe_back.dart';
 import 'widgets/swipe_to_reply.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -72,9 +78,90 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   ChatReply? _replyTo;
 
   final _scroll = ScrollController();
+
+  /// Плашка с датой поверх ленты, пока её листают (как в Telegram).
+  final _listBox = GlobalKey();
+  List<ChatMessage> _shown = const [];
+  String? _floatingDay;
+  bool _floatingVisible = false;
+  Timer? _floatingHide;
+  DateTime _floatingChecked = DateTime(0);
   final _itemKeys = <String, GlobalKey>{};
   int _pinCursor = 0;
   String? _pendingJump;
+
+  /// Что было в ленте при прошлой отрисовке и какие сообщения только что
+  /// исчезли: они ещё мгновение остаются на своём месте и растворяются.
+  List<ChatMessage> _lastItems = const [];
+  final _ghosts = <String, ({ChatMessage message, String? after})>{};
+  static const _vanishFor = Duration(milliseconds: 600);
+
+  /// Сколько моих сообщений собеседник уже прочитал и когда это число выросло
+  /// в последний раз: по этому узнаём, что он прямо сейчас в чате.
+  int? _readCount;
+  DateTime? _peerReadAt;
+
+  void _noteRead(List<ChatMessage>? all, String myId) {
+    if (all == null) return;
+    final count = all.where((m) => m.senderId == myId && m.status == MessageStatus.read).length;
+    final before = _readCount;
+    _readCount = count;
+    if (before != null && count > before) {
+      _peerReadAt = DateTime.now();
+      // Через две минуты «в сети» должно само смениться на «был(а)».
+      Future<void>.delayed(const Duration(minutes: 2, seconds: 1), () {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  /// Свои только что отправленные сообщения: они вылетают снизу, от поля ввода.
+  final _arriving = <String>{};
+
+  void _trackArrived(List<ChatMessage> items, String myId) {
+    if (_lastItems.isEmpty) return;
+    final before = {for (final m in _lastItems) m.id};
+    for (final m in items) {
+      if (before.contains(m.id) || m.senderId != myId || _arriving.contains(m.id)) continue;
+      // Только свежие: история, подгруженная при переподключении, не «вылетает».
+      if (DateTime.now().difference(m.sentAt).abs() > const Duration(seconds: 20)) continue;
+      _arriving.add(m.id);
+      Future<void>.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) setState(() => _arriving.remove(m.id));
+      });
+    }
+  }
+
+  void _trackRemoved(List<ChatMessage> items) {
+    final now = {for (final m in items) m.id};
+    final gone = [
+      for (var i = 0; i < _lastItems.length; i++)
+        if (!now.contains(_lastItems[i].id) && !_ghosts.containsKey(_lastItems[i].id))
+          (message: _lastItems[i], after: i > 0 ? _lastItems[i - 1].id : null),
+    ];
+    // Очистка всего чата или пачка исчезнувших разом — без представления:
+    // три сотни растворяющихся пузырей не нужны.
+    if (gone.isNotEmpty && gone.length <= 6 && _lastItems.isNotEmpty) {
+      for (final g in gone) {
+        _ghosts[g.message.id] = g;
+        Future<void>.delayed(_vanishFor + const Duration(milliseconds: 80), () {
+          if (mounted) setState(() => _ghosts.remove(g.message.id));
+        });
+      }
+    }
+    _lastItems = items;
+  }
+
+  /// Лента с исчезающими сообщениями на их прежних местах.
+  List<ChatMessage> _withGhosts(List<ChatMessage> items) {
+    if (_ghosts.isEmpty) return items;
+    final result = [...items];
+    for (final ghost in _ghosts.values) {
+      final at = ghost.after == null ? 0 : result.indexWhere((m) => m.id == ghost.after) + 1;
+      result.insert(at, ghost.message);
+    }
+    return result;
+  }
 
   /// Подводит ленту к сообщению и ненадолго подсвечивает его. Лента ленивая:
   /// пока сообщение не построено, прыгаем по оценке положения и пробуем снова.
@@ -165,6 +252,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
+    // Чат остался открытым, пока приложение было свёрнуто: пришедшее за это
+    // время уведомление уже прочитано здесь — убираем его из шторки (раньше
+    // оно уходило, только если войти через само уведомление).
+    _push.clearConversation(widget.conversationId);
+    _markRead();
     ref.invalidate(messagesProvider(widget.conversationId));
     ref.invalidate(conversationProvider(widget.conversationId));
     ref.invalidate(scheduledMessagesProvider(widget.conversationId));
@@ -226,6 +318,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   Future<void> _react(String messageId, String emoji) async {
     HapticFeedback.selectionClick();
+    unawaited(ReactionUsage.record(emoji));
     try {
       await toggleReaction(ref, widget.conversationId, messageId, emoji);
     } catch (error) {
@@ -242,13 +335,38 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _push = ref.read(pushServiceProvider)
-      ..activeConversationId = widget.conversationId
+      ..enterChat(widget.conversationId)
       ..clearConversation(widget.conversationId);
     _pendingJump = widget.jumpToMessageId;
     _markRead();
+    unawaited(_warnIfPeerKeyChanged());
+  }
+
+  Future<void> _warnIfPeerKeyChanged() async {
+    try {
+      final changed = await ref
+          .read(chatRepositoryProvider)
+          .peerKeyChanged(widget.conversationId);
+      if (!changed || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 10),
+          content: const Text(
+            'Ключ шифрования собеседника сменился. Так бывает после '
+            'переустановки приложения, но может быть и подмена.',
+          ),
+          action: SnackBarAction(label: 'Проверить', onPressed: _showSecurityCode),
+        ),
+      );
+    } catch (error) {
+      AppLog.add('Проверка ключа собеседника: $error');
+    }
   }
 
   void _markRead() {
+    // Прочитал — значит в приложении: отметка присутствия не ждёт минутного
+    // таймера, и у собеседника сразу «в сети».
+    unawaited(ref.read(chatRepositoryProvider).touchPresence());
     ref
         .read(chatRepositoryProvider)
         .markRead(widget.conversationId)
@@ -259,10 +377,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _floatingHide?.cancel();
     _scroll.dispose();
-    if (_push.activeConversationId == widget.conversationId) {
-      _push.activeConversationId = null;
-    }
+    _push.leaveChat(widget.conversationId);
     super.dispose();
   }
 
@@ -302,11 +419,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // Кто-то пишет — вместо «в сети» смешная фраза («подбирает слова…»).
     final typing = ref.watch(typingEntriesProvider(widget.conversationId)).value ?? const <TypingEntry>[];
     final typingText = typingLabel(typing, direct: isDirect);
+    final liveShares = ref.watch(liveSharesProvider(widget.conversationId)).value ?? const <LiveShare>[];
+    // Звонки бывают только в личных переписках.
+    final calls = isDirect
+        ? ref.watch(chatCallsProvider(widget.conversationId)).value ?? const <CallLogEntry>[]
+        : const <CallLogEntry>[];
+    // Собеседник только что писал или печатал — он в сети, даже если отметка
+    // присутствия на сервере ещё не догнала (обновляется раз в минуту):
+    // раньше Вика писала, а в шапке висело «был(а) 13 мин назад».
+    final now = DateTime.now();
+    _noteRead(messages.value, myId);
+    final peerLastMessage = isDirect
+        ? messages.value?.lastWhere((m) => m.senderId != myId, orElse: () => _noMessage).sentAt
+        : null;
+    final peerActive = typing.isNotEmpty ||
+        (peerLastMessage != null && now.difference(peerLastMessage) < const Duration(minutes: 2)) ||
+        // Собеседник только что прочитал наше сообщение или посмотрел медиа:
+        // он в приложении, даже если отметка присутствия ещё не обновилась.
+        (_peerReadAt != null && now.difference(_peerReadAt!) < const Duration(minutes: 2));
     final subtitle = typingText.isNotEmpty
         ? typingText
         : info != null && !isDirect
         ? membersLabel(info.memberCount)
-        : presence?.label(DateTime.now());
+        : peerActive
+        ? 'в сети'
+        : presence?.label(now);
 
     return Scaffold(
       appBar: AppBar(
@@ -452,6 +589,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               conversationId: widget.conversationId,
               peerName: info?.displayName ?? widget.peerName,
             ),
+          if (liveShares.isNotEmpty)
+            _LiveBar(
+              shares: liveShares,
+              myId: myId,
+              peerName: info?.displayName,
+              onTap: () => Navigator.of(context, rootNavigator: true).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => LiveLocationScreen(conversationId: widget.conversationId),
+                ),
+              ),
+            ),
           if (pinned.isNotEmpty)
             PinnedBar(
               pins: pinned,
@@ -475,7 +623,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
           if (info != null && !isDirect) const _PlainTextNotice(),
           Expanded(
-            child: messages.when(
+            child: SwipeBackToExit(
+              onExit: () => context.canPop() ? context.pop() : context.go(Routes.chats),
+              child: messages.when(
               // Уже показанные сообщения не прячем за спиннером при
               // переподключении и ошибках сети: переписка остаётся на месте,
               // а о связи говорит тонкая полоска сверху.
@@ -499,7 +649,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         for (final m in all)
                           if (!hidden.contains(m.id) && (cleared == null || m.sentAt.isAfter(cleared))) m,
                       ];
-                if (items.isEmpty) {
+                _trackArrived(items, myId);
+                _trackRemoved(items);
+                final entries = mergeCallsIntoTimeline(_withGhosts(items), [
+                  for (final c in calls)
+                    if (cleared == null || c.createdAt.isAfter(cleared)) c,
+                ]);
+                if (entries.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.gutter),
@@ -523,6 +679,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     if (mounted) _jumpTo(id, items);
                   });
                 }
+                _shown = items;
                 final list = ListView.builder(
                   controller: _scroll,
                   reverse: true,
@@ -532,11 +689,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     AppSpacing.gutter,
                     14,
                   ),
-                  itemCount: items.length,
+                  itemCount: entries.length,
                   itemBuilder: (context, index) {
-                    final message = items[items.length - 1 - index];
+                    final position = entries.length - 1 - index;
+                    final entry = entries[position];
+                    // Первое сообщение (или звонок) дня — с подписью дня над ним.
+                    final newDay = position == 0 || !sameDay(entries[position - 1].at, entry.at);
+                    final call = entry.call;
+                    if (call != null) {
+                      final tile = _CallLogTile(
+                        call: call,
+                        mine: call.callerId == myId,
+                        onTap: info == null || info.peerId == null ? null : () => _call(info, video: call.video),
+                      );
+                      if (!newDay) return tile;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(child: _DayChip(chatDayLabel(entry.at, DateTime.now()))),
+                          tile,
+                        ],
+                      );
+                    }
+                    final message = entry.message!;
                     final mine = message.senderId == myId;
-                    return KeyedSubtree(
+                    // Удалённое сообщение ещё мгновение стоит на месте и
+                    // растворяется, а не пропадает рывком.
+                    if (_ghosts.containsKey(message.id)) {
+                      return _Vanish(
+                        key: ValueKey('vanish-${message.id}'),
+                        mine: mine,
+                        child: IgnorePointer(
+                          child: MessageBubble(
+                            message: message,
+                            mine: mine,
+                            showSender: !isDirect && !mine,
+                          ),
+                        ),
+                      );
+                    }
+                    final item = KeyedSubtree(
                       key: _itemKeys.putIfAbsent(message.id, GlobalKey.new),
                       child: Semantics(
                       customSemanticsActions: {
@@ -557,9 +749,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         onTap: isDirect &&
                                 message.status != MessageStatus.failed &&
                                 message.status != MessageStatus.sending
-                            ? () => _quickReact(context, message, myId)
+                            ? () => _quickReact(_itemKeys[message.id]?.currentContext ?? context, message, myId)
                             : null,
-                        onLongPress: () => _openMenu(context, message, myId),
+                        onLongPress: () =>
+                            _openMenu(_itemKeys[message.id]?.currentContext ?? context, message, myId),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
                           decoration: BoxDecoration(
@@ -581,11 +774,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                 showSender: !isDirect && !mine,
                                 onMediaMore: (viewerContext) =>
                                     _openMenu(viewerContext, message, myId),
-                              ),
-                              ReactionChips(
-                                reactions: reactions[message.id] ?? const [],
-                                mine: mine,
-                                onTap: (emoji) => _react(message.id, emoji),
+                                onQuoteTap: message.replyTo == null
+                                    ? null
+                                    : () => _jumpTo(message.replyTo!.messageId, items),
+                                reactions: (reactions[message.id] ?? const []).isEmpty
+                                    ? null
+                                    : ReactionChips(
+                                        reactions: reactions[message.id]!,
+                                        mine: false,
+                                        onTap: (emoji) => _react(message.id, emoji),
+                                      ),
                               ),
                             ],
                           ),
@@ -594,10 +792,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ),
                       ),
                     );
+                    final shown = _arriving.contains(message.id)
+                        ? _Arrive(key: ValueKey('arrive-${message.id}'), child: item)
+                        : item;
+                    if (!newDay) return shown;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(child: _DayChip(chatDayLabel(message.sentAt, DateTime.now()))),
+                        shown,
+                      ],
+                    );
                   },
                 );
-                return list;
+                return Stack(
+                  key: _listBox,
+                  children: [
+                    NotificationListener<ScrollNotification>(
+                      onNotification: _onListScroll,
+                      child: list,
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: 0,
+                      right: 0,
+                      child: IgnorePointer(
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 200),
+                          opacity: _floatingVisible && _floatingDay != null ? 1 : 0,
+                          child: Center(child: _DayChip(_floatingDay ?? '')),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
               },
+              ),
             ),
           ),
           if (messages.hasValue && (messages.isLoading || messages.hasError))
@@ -632,6 +862,50 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ),
       ),
     );
+  }
+
+  /// Листают — показываем дату верхнего видимого сообщения; перестали —
+  /// через секунду плашка уходит.
+  bool _onListScroll(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final now = DateTime.now();
+      if (now.difference(_floatingChecked) > const Duration(milliseconds: 120)) {
+        _floatingChecked = now;
+        final day = _topVisibleDay();
+        if (day != _floatingDay || !_floatingVisible) {
+          setState(() {
+            _floatingDay = day;
+            _floatingVisible = day != null;
+          });
+        }
+      }
+      _floatingHide?.cancel();
+    } else if (notification is ScrollEndNotification) {
+      _floatingHide?.cancel();
+      _floatingHide = Timer(const Duration(seconds: 1), () {
+        if (mounted && _floatingVisible) setState(() => _floatingVisible = false);
+      });
+    }
+    return false;
+  }
+
+  String? _topVisibleDay() {
+    final box = _listBox.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return null;
+    final top = box.localToGlobal(Offset.zero).dy;
+    ChatMessage? best;
+    var bestY = double.infinity;
+    for (final message in _shown) {
+      final itemBox = _itemKeys[message.id]?.currentContext?.findRenderObject() as RenderBox?;
+      if (itemBox == null || !itemBox.attached) continue;
+      final y = itemBox.localToGlobal(Offset.zero).dy;
+      // Верхнее из тех, чей низ ещё виден.
+      if (y + itemBox.size.height > top && y < bestY) {
+        bestY = y;
+        best = message;
+      }
+    }
+    return best == null ? null : chatDayLabel(best.sentAt, DateTime.now());
   }
 
   IconData _notifyIcon(ChatNotify notify) => switch (notify) {
@@ -743,9 +1017,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
   Future<void> _showSecurityCode() async {
-    final code = ref
-        .read(chatRepositoryProvider)
-        .securityCode(widget.conversationId);
+    final repository = ref.read(chatRepositoryProvider);
+    final code = repository.securityCode(widget.conversationId);
+    final changed = await repository
+        .peerKeyChanged(widget.conversationId)
+        .catchError((Object _) => false);
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context, useRootNavigator: true,
       backgroundColor: AppColors.ink2,
@@ -792,6 +1069,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   },
                 ),
               ),
+              if (changed) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Ключ собеседника сменился, и сообщения ему пока не '
+                  'отправляются. Спросите, переустанавливал ли он приложение, '
+                  'и сверьте новый код. Если код совпал, примите ключ.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () async {
+                    final navigator = Navigator.of(context);
+                    await repository.acceptPeerKey(widget.conversationId);
+                    navigator.pop();
+                  },
+                  child: const Text('Код совпал, принять новый ключ'),
+                ),
+              ],
             ],
           ),
         ),
@@ -977,6 +1272,214 @@ class _ConnectionBanner extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final _noMessage = ChatMessage(id: '', conversationId: '', senderId: '', sentAt: DateTime(2000));
+
+/// Плашка под шапкой, пока кто-то в чате транслирует геопозицию. Тап — карта.
+class _LiveBar extends StatelessWidget {
+  const _LiveBar({required this.shares, required this.myId, required this.onTap, this.peerName});
+
+  final List<LiveShare> shares;
+  final String myId;
+  final String? peerName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final mine = shares.where((s) => s.userId == myId).firstOrNull;
+    final others = shares.where((s) => s.userId != myId).toList();
+    final text = switch ((mine, others.length)) {
+      (final m?, 0) => 'Вы транслируете геопозицию · ${liveRemainingLabel(m, now)}',
+      (null, 1) => '${peerName ?? 'Собеседник'} делится геопозицией · ${liveRemainingLabel(others.first, now)}',
+      (_, final n) => mine != null ? 'Геопозицией делятся: вы и ещё $n' : 'Геопозицией делятся $n',
+    };
+    return Material(
+      color: AppColors.geo.withValues(alpha: 0.14),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.share_location, color: AppColors.geo, size: 20),
+              const SizedBox(width: 10),
+              Expanded(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              Text('Карта', style: TextStyle(color: AppColors.geo, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Звонок в ленте: с чьей стороны был вызов, состоялся ли и сколько длился.
+/// Тап — перезвонить тем же видом звонка.
+class _CallLogTile extends StatelessWidget {
+  const _CallLogTile({required this.call, required this.mine, this.onTap});
+
+  final CallLogEntry call;
+  final bool mine;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = !call.talked && call.status != 'ringing' && call.status != 'active';
+    final color = failed && !mine ? AppColors.danger : AppColors.primaryTint;
+    final icon = call.video
+        ? Icons.videocam_outlined
+        : failed && !mine
+        ? Icons.call_missed
+        : mine
+        ? Icons.call_made
+        : Icons.call_received;
+    final time = '${call.createdAt.hour.toString().padLeft(2, '0')}:${call.createdAt.minute.toString().padLeft(2, '0')}';
+    return Align(
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Material(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 16, 10),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: color.withValues(alpha: 0.15),
+                    child: Icon(icon, size: 20, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(callLogTitle(call, mine: mine), style: const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${callLogStatus(call, mine: mine)} · $time',
+                        style: TextStyle(fontSize: 13, color: failed && !mine ? AppColors.danger : AppColors.textDim),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Подпись дня в ленте и плашка с датой при прокрутке.
+/// Появление своего сообщения: вылетает снизу от поля ввода, слегка
+/// «проседает» и встаёт на место, как с конвейера.
+class _Arrive extends StatelessWidget {
+  const _Arrive({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 460),
+      curve: Curves.easeOutBack,
+      child: child,
+      builder: (context, t, child) => Opacity(
+        opacity: t.clamp(0.0, 1.0),
+        child: Transform.translate(
+          offset: Offset(0, (1 - t) * 70),
+          child: Transform.scale(
+            scale: 0.88 + 0.12 * t,
+            alignment: Alignment.bottomRight,
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Исчезновение удалённого сообщения: тает, слегка уменьшается, а место под
+/// ним схлопывается, и соседи плавно съезжаются.
+class _Vanish extends StatefulWidget {
+  const _Vanish({super.key, required this.child, required this.mine});
+
+  final Widget child;
+  final bool mine;
+
+  @override
+  State<_Vanish> createState() => _VanishState();
+}
+
+class _VanishState extends State<_Vanish> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _ChatScreenState._vanishFor,
+  )..forward();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fade = CurvedAnimation(parent: _controller, curve: const Interval(0, 0.7, curve: Curves.easeIn));
+    final collapse = CurvedAnimation(parent: _controller, curve: const Interval(0.45, 1, curve: Curves.easeInOut));
+    // Сообщение сжимается и уезжает к своему краю, а соседние сдвигаются следом.
+    return SizeTransition(
+      sizeFactor: ReverseAnimation(collapse),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: Offset.zero,
+          end: Offset(widget.mine ? 0.5 : -0.5, 0),
+        ).animate(fade),
+        child: FadeTransition(
+          opacity: ReverseAnimation(fade),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 1, end: 0.5).animate(fade),
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
           ),
         ),
       ),

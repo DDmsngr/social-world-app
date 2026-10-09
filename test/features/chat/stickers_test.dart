@@ -283,7 +283,7 @@ void main() {
         find.byKey(const ValueKey('sticker-pack-chao')),
       );
       final recent = tester.getCenter(
-        find.byKey(const ValueKey('emoji-tab-recent')),
+        find.byKey(const ValueKey('emoji-tab')),
       );
       expect(lastPack.dx, lessThan(recent.dx));
     });

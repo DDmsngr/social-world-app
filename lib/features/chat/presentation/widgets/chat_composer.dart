@@ -26,8 +26,11 @@ import '../providers/chat_providers.dart';
 import '../providers/chat_typing_providers.dart';
 import '../providers/sticker_providers.dart';
 import 'attachment_views.dart';
+import '../../live_location/live_location_screen.dart';
 import 'emoji_panel.dart';
+import 'photo_send_screen.dart';
 import 'scheduled_sheet.dart';
+import 'schedule_picker.dart';
 import 'sticker_views.dart';
 import 'video_note_recorder.dart';
 
@@ -38,6 +41,7 @@ class ChatComposer extends ConsumerStatefulWidget {
     super.key,
     required this.conversationId,
     this.isDirect = true,
+    this.isChannel = false,
     this.peerName,
     this.replyTo,
     this.onReplyCleared,
@@ -48,6 +52,9 @@ class ChatComposer extends ConsumerStatefulWidget {
   /// «Когда будет в сети» есть только в личных диалогах: в группе непонятно,
   /// кого ждать.
   final bool isDirect;
+
+  /// Пост канала: рядом с кнопкой отправки появляется «Отложить пост».
+  final bool isChannel;
   final String? peerName;
 
   /// Ответ, который уйдёт вместе со следующим сообщением.
@@ -273,27 +280,12 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   }
 
   Future<void> _scheduleLater() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: now,
-      lastDate: now.add(maxScheduleLead),
-      helpText: 'Когда отправить',
+    final at = await showSchedulePicker(
+      context,
+      title: widget.isChannel ? 'Отложить пост' : 'Отправить позже',
+      action: widget.isChannel ? 'Опубликовать' : 'Отправить',
     );
-    if (date == null || !mounted) return;
-    final soon = now.add(const Duration(hours: 1));
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: soon.hour, minute: soon.minute),
-    );
-    if (time == null || !mounted) return;
-    final at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    final problem = validateSendAt(at, DateTime.now());
-    if (problem != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem)));
-      return;
-    }
+    if (at == null || !mounted) return;
     await _schedule(sendAt: at);
   }
 
@@ -350,32 +342,111 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     String? mime,
     int? durationMs,
     List<double>? waveform,
+    String? caption,
+    List<String>? album,
   }) async {
-    final label = name ?? kind.preview;
+    final label = switch (kind) {
+      MessageKind.image => album == null ? 'фото' : 'фото (${album.length})',
+      MessageKind.video => 'видео',
+      MessageKind.videoNote => 'видеосообщение',
+      MessageKind.voice => 'голосовое',
+      _ => name == null ? 'файл' : 'файл «$name»',
+    };
     final reply = widget.replyTo;
     setState(() {
       _uploads.add(label);
       _error = null;
     });
+    // Пока файл уходит, у собеседника «отправляет видео…» вместо «печатает».
+    final hub = ref.read(typingHubProvider(widget.conversationId));
+    hub?.ping(activity: kind.wire);
+    final keepAlive = Timer.periodic(const Duration(seconds: 3), (_) => hub?.ping(activity: kind.wire));
     try {
-      await ref
-          .read(chatRepositoryProvider)
-          .sendAttachment(
-            conversationId: widget.conversationId,
-            kind: kind,
-            filePath: path,
-            name: name,
-            mime: mime,
-            durationMs: durationMs,
-            waveform: waveform,
-            options: SendOptions(replyTo: reply),
-          );
+      final repository = ref.read(chatRepositoryProvider);
+      if (album != null) {
+        await repository.sendAlbum(
+          conversationId: widget.conversationId,
+          filePaths: album,
+          caption: caption,
+          options: SendOptions(replyTo: reply),
+        );
+      } else {
+        await repository.sendAttachment(
+          conversationId: widget.conversationId,
+          kind: kind,
+          filePath: path,
+          name: name,
+          mime: mime,
+          durationMs: durationMs,
+          waveform: waveform,
+          caption: caption,
+          options: SendOptions(replyTo: reply),
+        );
+      }
       if (reply != null) widget.onReplyCleared?.call();
       _afterSend();
     } catch (error) {
       _fail(error, 'Не удалось отправить: $label');
     } finally {
+      keepAlive.cancel();
+      hub?.stop();
       if (mounted) setState(() => _uploads.remove(label));
+    }
+  }
+
+  /// Подпись к видео или файлу перед отправкой. null — передумали отправлять,
+  /// пустая строка — отправить без подписи.
+  Future<String?> _askCaption(String what) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(what),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 1000,
+          minLines: 1,
+          maxLines: 4,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(hintText: 'Подпись (необязательно)', counterText: ''),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Отправить'),
+          ),
+        ],
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
+  /// Фото одним сообщением (альбомом) по [maxAlbumPhotos] штук: что больше —
+  /// уходит следующим альбомом. Подпись — к первому сообщению. Одиночное фото
+  /// (в том числе остаток группы) уходит обычным вложением.
+  Future<void> _sendPhotos(PhotoSendResult chosen) async {
+    final paths = chosen.paths;
+    for (var start = 0; start < paths.length; start += maxAlbumPhotos) {
+      final end = start + maxAlbumPhotos > paths.length ? paths.length : start + maxAlbumPhotos;
+      final group = paths.sublist(start, end);
+      final caption = start == 0 && chosen.caption.isNotEmpty ? chosen.caption : null;
+      if (group.length == 1) {
+        await _upload(
+          kind: MessageKind.image,
+          path: group.first,
+          name: group.first.split(Platform.pathSeparator).last,
+          mime: 'image/jpeg',
+          caption: caption,
+        );
+      } else {
+        await _upload(
+          kind: MessageKind.image,
+          path: group.first,
+          album: group,
+          caption: caption,
+        );
+      }
     }
   }
 
@@ -394,6 +465,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               ('video', Icons.video_library_outlined, 'Видео из галереи'),
               ('file', Icons.attach_file, 'Файл'),
               ('videonote', Icons.radio_button_checked, 'Видеосообщение (кружок)'),
+              ('live', Icons.share_location, 'Геопозиция (трансляция)'),
             ])
               ListTile(
                 leading: Icon(icon, color: AppColors.textDim),
@@ -413,14 +485,10 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             maxWidth: 2560,
             maxHeight: 2560,
           );
-          for (final image in images) {
-            await _upload(
-              kind: MessageKind.image,
-              path: image.path,
-              name: image.name,
-              mime: 'image/jpeg',
-            );
-          }
+          if (images.isEmpty || !mounted) return;
+          // Перед отправкой — просмотр и правка (рисовать, обрезать, повернуть).
+          final chosen = await showPhotoSendScreen(context, [for (final i in images) i.path]);
+          if (chosen != null) await _sendPhotos(chosen);
         case 'camera':
           final image = await _picker.pickImage(
             source: ImageSource.camera,
@@ -428,35 +496,46 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             maxWidth: 2560,
             maxHeight: 2560,
           );
-          if (image != null) {
-            await _upload(
-              kind: MessageKind.image,
-              path: image.path,
-              name: image.name,
-              mime: 'image/jpeg',
-            );
-          }
+          if (image == null || !mounted) return;
+          final chosen = await showPhotoSendScreen(context, [image.path]);
+          if (chosen != null) await _sendPhotos(chosen);
         case 'video':
           final video = await _picker.pickVideo(source: ImageSource.gallery);
-          if (video != null) {
+          if (video != null && mounted) {
+            final caption = await _askCaption('Видео');
+            if (caption == null) return;
             await _upload(
               kind: MessageKind.video,
               path: video.path,
               name: video.name,
               mime: 'video/mp4',
+              caption: caption.isEmpty ? null : caption,
             );
           }
         case 'videonote':
           await _recordVideoNote();
+        case 'live':
+          if (!mounted) return;
+          final started = await startLiveSharing(context, ref, widget.conversationId);
+          if (started && mounted) {
+            await Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute<void>(
+                builder: (_) => LiveLocationScreen(conversationId: widget.conversationId),
+              ),
+            );
+          }
         case 'file':
           final file = await FilePicker.pickFile();
           final path = file?.path;
-          if (file != null && path != null) {
+          if (file != null && path != null && mounted) {
+            final caption = await _askCaption('Файл «${file.name}»');
+            if (caption == null) return;
             await _upload(
               kind: MessageKind.file,
               path: path,
               name: file.name,
               mime: mimeFromName(file.name),
+              caption: caption.isEmpty ? null : caption,
             );
           }
       }
@@ -596,7 +675,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Отправляется: ${_uploads.join(', ')}',
+                        'Отправляем ${_uploads.join(', ')}…',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -743,6 +822,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           ),
         ),
         const SizedBox(width: 8),
+        // В канале отложенный пост — обычное дело, а долгий тап по кнопке никто
+        // не находил: даём отдельную кнопку с часами.
+        if (hasText && widget.isChannel)
+          IconButton(
+            onPressed: _sendingText ? null : _scheduleLater,
+            tooltip: 'Отложить пост',
+            icon: Icon(Icons.schedule, color: AppColors.textDim),
+          ),
         if (hasText)
           // Без tooltip: его собственный долгий тап спорил бы с меню отправки.
           Semantics(

@@ -15,6 +15,7 @@ enum NotificationKind {
   comment,
   reply,
   reaction,
+  mention,
   eventJoin('event_join'),
   eventChanged('event_changed'),
   eventCancelled('event_cancelled'),
@@ -25,7 +26,11 @@ enum NotificationKind {
   questRejected('quest_rejected'),
   questRemoved('quest_removed'),
   questCancelled('quest_cancelled'),
-  needResponse('need_response');
+  needResponse('need_response'),
+  referralJoined('referral_joined'),
+  referralReward('referral_reward'),
+  referralConfirmed('referral_confirmed'),
+  referralCancelled('referral_cancelled');
 
   const NotificationKind([this._wire]);
 
@@ -79,6 +84,7 @@ class AppNotification {
       NotificationKind.comment => '$who: новый комментарий к вашей публикации$about',
       NotificationKind.reply => '$who: ответ на ваш комментарий$about',
       NotificationKind.reaction => '$who: реакция на вашу публикацию',
+      NotificationKind.mention => '$who упомянул(а) вас$about',
       NotificationKind.eventJoin => '$who участвует в вашем событии$about',
       NotificationKind.eventChanged => 'Событие изменилось$about',
       NotificationKind.eventCancelled => 'Событие отменено$about',
@@ -90,7 +96,21 @@ class AppNotification {
       NotificationKind.questRemoved => 'Вас исключили из квеста$about',
       NotificationKind.questCancelled => 'Квест отменён$about',
       NotificationKind.needResponse => '$who готов помочь с вашей просьбой$about',
+      NotificationKind.referralJoined => '$who зарегистрировался по вашему приглашению',
+      NotificationKind.referralReward => _rewardText(who),
+      NotificationKind.referralConfirmed => '+${title ?? ''} баллов подтверждено',
+      NotificationKind.referralCancelled => 'Начисление ${title ?? ''} баллов отменено',
     };
+  }
+
+  /// title — «сумма:уровень» (миграция 0059).
+  String _rewardText(String who) {
+    final parts = (title ?? '').split(':');
+    final amount = parts.first;
+    final level = parts.length > 1 ? parts[1] : '1';
+    return level == '1'
+        ? '$who зарегистрировался по вашему приглашению: +$amount баллов'
+        : 'Ваш реферал пригласил нового пользователя: +$amount баллов';
   }
 
   AppNotification asRead() => AppNotification(

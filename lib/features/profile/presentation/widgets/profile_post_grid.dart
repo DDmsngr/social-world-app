@@ -13,9 +13,13 @@ import '../../../feed/domain/entities/post.dart';
 /// Квадрат — первое фото; у видео и подборок значок в углу; пост без фото —
 /// плитка с началом текста. Нажатие открывает публикацию целиком.
 class ProfilePostGrid extends StatelessWidget {
-  const ProfilePostGrid({super.key, required this.posts});
+  const ProfilePostGrid({super.key, required this.posts, this.showVisibility = false});
 
   final List<Post> posts;
+
+  /// Подписи «только мне» и «подписчикам» нужны автору, чужому они ни к чему:
+  /// он видит пост, значит, ему он и предназначен.
+  final bool showVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +30,7 @@ class ProfilePostGrid extends StatelessWidget {
         crossAxisSpacing: 2,
       ),
       delegate: SliverChildBuilderDelegate(
-        (context, index) => _Tile(post: posts[index]),
+        (context, index) => _Tile(post: posts[index], showVisibility: showVisibility),
         childCount: posts.length,
       ),
     );
@@ -89,10 +93,60 @@ class _TextTile extends StatelessWidget {
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile({required this.post});
+/// Маршрут в сетке: тёмная плитка со значком пути и названием, чтобы его
+/// нельзя было принять за текстовый пост.
+class _RouteTile extends StatelessWidget {
+  const _RouteTile({required this.post});
 
   final Post post;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = (post.body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
+    return ColoredBox(
+      color: AppColors.ink2,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.route, size: 34, color: AppColors.primaryTint),
+            const SizedBox(height: 6),
+            Text(
+              'Маршрут',
+              style: TextStyle(
+                fontSize: 10.5,
+                letterSpacing: 0.6,
+                color: AppColors.textDim,
+              ),
+            ),
+            if (title.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.text,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({required this.post, required this.showVisibility});
+
+  final Post post;
+  final bool showVisibility;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +156,9 @@ class _Tile extends StatelessWidget {
     final photo = media.where((u) => !isVideoUrl(u)).firstOrNull;
 
     Widget content;
-    if (photo != null && photo.startsWith('http')) {
+    if (post.isRoute) {
+      content = _RouteTile(post: post);
+    } else if (photo != null && photo.startsWith('http')) {
       content = CachedNetworkImage(
         imageUrl: photo,
         fit: BoxFit.cover,
@@ -116,7 +172,9 @@ class _Tile extends StatelessWidget {
       content = _TextTile(post: post);
     }
 
-    final badge = video
+    final badge = post.isRoute
+        ? Icons.route
+        : video
         ? Icons.videocam
         : media.length > 1
         ? Icons.collections
@@ -143,7 +201,7 @@ class _Tile extends StatelessWidget {
             ),
           // Кому виден пост: «только мне» — замок, «подписчикам» — люди.
           // Публичные без значка. Чужие закрытые посты сюда и не приходят.
-          if (post.visibility != PostVisibility.everyone)
+          if (showVisibility && post.visibility != PostVisibility.everyone)
             Positioned(
               left: 6,
               bottom: 6,

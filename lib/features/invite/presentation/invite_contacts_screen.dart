@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
-import '../../../core/oauth/oauth_sign_in.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -22,6 +21,11 @@ const _downloadUrl =
     'https://api-socialworld.deepdrift.tech/updates/chawo.apk';
 
 enum _Phase { intro, loading, ready, denied, failed }
+
+/// Отдаёт ли VK номер телефона при входе. Пока право `phone` не одобрено в
+/// кабинете VK ID (и не добавлено в scope в oauth-vk-start), кнопка «Подтвердить
+/// через VK» ничего не меняла бы, поэтому её нет. Одобрили — поставить true.
+const vkReturnsPhone = false;
 
 /// Приглашение из записной книжки: сверху те, кто уже в ChaWo, ниже — остальные
 /// контакты с кнопкой «Пригласить». Номера контактов на сервер не уходят,
@@ -42,7 +46,6 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
   var _phase = _Phase.intro;
   var _permanentlyDenied = false;
   var _phone = PhoneStatus.verified;
-  var _providers = <String>{};
   ContactsMatch? _result;
   final _followed = <String>{};
   final _following = <String>{};
@@ -135,12 +138,10 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
 
       final result = await _repo.match(contacts);
       final phone = await _repo.phoneStatus();
-      final providers = await _repo.oauthProviders();
       if (!mounted) return;
       setState(() {
         _result = result;
         _phone = phone;
-        _providers = providers;
         _phase = _Phase.ready;
       });
     } catch (error) {
@@ -185,79 +186,6 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
     }
   }
 
-  Future<void> _editMyPhone() async {
-    final controller = TextEditingController();
-    final entered = await showDialog<String>(
-      context: context,
-      builder: (dialog) => AlertDialog(
-        title: const Text('Мой номер'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'По номеру друзья из записной книжки смогут найти вас в ChaWo. '
-              'Сам номер на сервере не хранится — только его хеш, и он '
-              'никому не показывается.',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.phone,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: '+7 900 123-45-67'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialog),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialog, controller.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (entered == null || !mounted) return;
-
-    try {
-      await _repo.setMyPhone(entered);
-      if (!mounted) return;
-      setState(() => _phone = PhoneStatus.self);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Номер привязан')),
-      );
-    } on FormatException {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Это не похоже на номер телефона')),
-      );
-    } catch (error) {
-      AppLog.add('Номер не сохранился: $error');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            friendlyError(error, fallback: 'Не удалось сохранить номер'),
-          ),
-        ),
-      );
-    }
-  }
-
-  Future<void> _removeMyPhone() async {
-    try {
-      await _repo.clearMyPhone();
-      if (mounted) setState(() => _phone = PhoneStatus.none);
-    } catch (error) {
-      AppLog.add('Номер не удалился: $error');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -269,18 +197,6 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
           tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
         ),
-        actions: [
-          // Подтверждённый номер связан со входом и тут не меняется.
-          if (_phase == _Phase.ready && _phone == PhoneStatus.self)
-            PopupMenuButton<String>(
-              onSelected: (value) =>
-                  value == 'change' ? _editMyPhone() : _removeMyPhone(),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'change', child: Text('Сменить мой номер')),
-                PopupMenuItem(value: 'remove', child: Text('Убрать мой номер')),
-              ],
-            ),
-        ],
       ),
       body: switch (_phase) {
         _Phase.intro => StateMessage(
@@ -311,54 +227,25 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
     );
   }
 
-  /// Подтвердить номер можно входом через Яндекс или VK: провайдер сам
-  /// отдаёт номер аккаунта. Кнопка только для того провайдера, которым человек
-  /// уже вошёл, иначе повторный вход создал бы другой аккаунт.
+  /// Номер и его подтверждение живут в разделе «Безопасность»; здесь только
+  /// подсказка, зачем он нужен для поиска друзей.
   Widget _phoneBanner() {
-    final via = [
-      if (_providers.contains('yandex')) (OAuthBridgeProvider.yandex, 'Яндекс'),
-      if (_providers.contains('vk')) (OAuthBridgeProvider.vk, 'VK'),
-    ];
-    final self = _phone == PhoneStatus.self;
     return GlassCard(
       padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      onTap: () => context.push(Routes.security),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(Icons.phone_outlined, color: AppColors.primaryTint),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  self
-                      ? 'Номер указан вручную и не подтверждён. Подтвердите '
-                            'его входом — тогда никто не сможет занять ваш номер.'
-                      : 'Добавьте свой номер, чтобы друзья из их записных '
-                            'книжек нашли вас в ChaWo.',
-                ),
-              ),
-            ],
+          Icon(Icons.phone_outlined, color: AppColors.primaryTint),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              _phone == PhoneStatus.none
+                  ? 'Добавьте свой номер, чтобы друзья из их записных книжек '
+                        'нашли вас в ChaWo. Это в разделе «Безопасность».'
+                  : 'Номер не подтверждён. Подтвердить его можно в разделе «Безопасность».',
+            ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final (provider, name) in via)
-                FilledButton.tonal(
-                  style: AppButtons.compact,
-                  onPressed: () => startOAuthSignIn(provider),
-                  child: Text('Подтвердить через $name'),
-                ),
-              if (!self)
-                OutlinedButton(
-                  style: AppButtons.compact,
-                  onPressed: _editMyPhone,
-                  child: const Text('Ввести вручную'),
-                ),
-            ],
-          ),
+          Icon(Icons.chevron_right, color: AppColors.textFaint),
         ],
       ),
     );
