@@ -83,8 +83,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   /// Плашка с датой поверх ленты, пока её листают (как в Telegram).
   final _listBox = GlobalKey();
   List<ChatMessage> _shown = const [];
-  String? _floatingDay;
-  bool _floatingVisible = false;
+  // Плавающая дата: через notifier, чтобы прокрутка не перестраивала весь чат
+  // (setState на каждом шаге давал подёргивание при листании).
+  final _floating = ValueNotifier<({String? day, bool visible})>((day: null, visible: false));
   Timer? _floatingHide;
   DateTime _floatingChecked = DateTime(0);
   final _itemKeys = <String, GlobalKey>{};
@@ -379,6 +380,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _floatingHide?.cancel();
+    _floating.dispose();
     _scroll.dispose();
     _farFromBottom.dispose();
     _push.leaveChat(widget.conversationId);
@@ -854,10 +856,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       left: 0,
                       right: 0,
                       child: IgnorePointer(
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 200),
-                          opacity: _floatingVisible && _floatingDay != null ? 1 : 0,
-                          child: Center(child: _DayChip(_floatingDay ?? '')),
+                        child: ValueListenableBuilder(
+                          valueListenable: _floating,
+                          builder: (context, state, _) => AnimatedOpacity(
+                            duration: const Duration(milliseconds: 200),
+                            opacity: state.visible && state.day != null ? 1 : 0,
+                            child: Center(child: _DayChip(state.day ?? '')),
+                          ),
                         ),
                       ),
                     ),
@@ -911,18 +916,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (now.difference(_floatingChecked) > const Duration(milliseconds: 120)) {
         _floatingChecked = now;
         final day = _topVisibleDay();
-        if (day != _floatingDay || !_floatingVisible) {
-          setState(() {
-            _floatingDay = day;
-            _floatingVisible = day != null;
-          });
+        final current = _floating.value;
+        if (day != current.day || !current.visible) {
+          _floating.value = (day: day, visible: day != null);
         }
       }
       _floatingHide?.cancel();
     } else if (notification is ScrollEndNotification) {
       _floatingHide?.cancel();
       _floatingHide = Timer(const Duration(seconds: 1), () {
-        if (mounted && _floatingVisible) setState(() => _floatingVisible = false);
+        final state = _floating.value;
+        if (mounted && state.visible) _floating.value = (day: state.day, visible: false);
       });
     }
     return false;

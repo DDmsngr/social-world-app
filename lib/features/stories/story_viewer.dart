@@ -11,6 +11,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/presentation/providers/auth_providers.dart';
+import '../chat/presentation/providers/chat_providers.dart';
 import 'stories.dart';
 
 /// Полноэкранный просмотр сторис: полоски сверху, нажатие справа — дальше,
@@ -427,6 +428,15 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                         ),
                     ],
                   ),
+                  if (!mine) ...[
+                    const SizedBox(height: 10),
+                    _StoryReply(
+                      key: ValueKey('reply-${story.id}'),
+                      onFocusChanged: (focused) => focused ? _pause() : _resume(),
+                      onSend: (text) => _reply(story, text),
+                      onLike: () => _reply(story, '❤️', quiet: true),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -434,6 +444,33 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
         ),
       ),
     );
+  }
+
+  /// Ответ на историю уходит автору в личный чат, как в Instagram.
+  Future<bool> _reply(Story story, String text, {bool quiet = false}) async {
+    try {
+      final repository = ref.read(chatRepositoryProvider);
+      final conversationId = await repository.openDirect(story.authorId);
+      await repository.send(
+        conversationId: conversationId,
+        text: 'Ответ на историю: $text',
+      );
+      ref.invalidate(conversationsProvider);
+      if (mounted && !quiet) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Отправлено в личные сообщения')),
+        );
+      }
+      return true;
+    } catch (error) {
+      AppLog.add('Ответ на историю: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось отправить'))),
+        );
+      }
+      return false;
+    }
   }
 
   Widget _content(Story story) {
@@ -484,6 +521,171 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
           ),
         );
     }
+  }
+}
+
+/// Внизу чужой истории: полупрозрачная капсула «есть что сказать?», по тапу
+/// она раскрывается в поле ответа (до 100 символов); рядом лайк.
+class _StoryReply extends StatefulWidget {
+  const _StoryReply({
+    super.key,
+    required this.onFocusChanged,
+    required this.onSend,
+    required this.onLike,
+  });
+
+  final ValueChanged<bool> onFocusChanged;
+  final Future<bool> Function(String text) onSend;
+  final Future<bool> Function() onLike;
+
+  @override
+  State<_StoryReply> createState() => _StoryReplyState();
+}
+
+class _StoryReplyState extends State<_StoryReply> {
+  final _controller = TextEditingController();
+  final _focus = FocusNode();
+  var _open = false;
+  var _liked = false;
+  var _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus && _open && _controller.text.isEmpty) {
+        setState(() => _open = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // Если закрыли историю с открытым полем, пауза должна сняться.
+    if (_open) widget.onFocusChanged(false);
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _expand() {
+    setState(() => _open = true);
+    widget.onFocusChanged(true);
+    _focus.requestFocus();
+  }
+
+  void _collapse() {
+    _focus.unfocus();
+    setState(() => _open = false);
+    widget.onFocusChanged(false);
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    final ok = await widget.onSend(text);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (ok) {
+      _controller.clear();
+      _collapse();
+    }
+  }
+
+  Future<void> _like() async {
+    if (_liked) return;
+    HapticFeedback.lightImpact();
+    setState(() => _liked = true);
+    if (!await widget.onLike() && mounted) setState(() => _liked = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const glass = Color(0x59FFFFFF);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.bottomCenter,
+            child: _open
+                ? Container(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 6, 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            focusNode: _focus,
+                            maxLength: 100,
+                            maxLines: 3,
+                            minLines: 1,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: const TextStyle(color: Colors.white, fontSize: 15),
+                            cursorColor: Colors.white,
+                            decoration: const InputDecoration(
+                              hintText: 'Ответить…',
+                              hintStyle: TextStyle(color: Colors.white54),
+                              counterStyle: TextStyle(color: Colors.white54),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: false,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _busy || _controller.text.trim().isEmpty ? null : _send,
+                          tooltip: 'Отправить',
+                          icon: const Icon(Icons.send_rounded, color: Colors.white),
+                        ),
+                      ],
+                    ),
+                  )
+                : Semantics(
+                    button: true,
+                    label: 'Ответить на историю',
+                    child: GestureDetector(
+                      onTap: _expand,
+                      child: Container(
+                        height: 44,
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        decoration: BoxDecoration(
+                          color: glass,
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Text(
+                          'есть что сказать?',
+                          style: TextStyle(color: Colors.white, fontSize: 15),
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: _like,
+          tooltip: 'Нравится',
+          style: IconButton.styleFrom(backgroundColor: glass),
+          icon: Icon(
+            _liked ? Icons.favorite : Icons.favorite_border,
+            color: _liked ? const Color(0xFFFF4D6D) : Colors.white,
+          ),
+        ),
+      ],
+    );
   }
 }
 

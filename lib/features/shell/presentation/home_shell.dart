@@ -282,6 +282,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
 /// Вкладка нижней панели. Порядок должен совпадать с порядком веток роутера.
 typedef _Tab = ({IconData icon, IconData selected, String label, bool update});
 
+const _chatsTab = 3;
+
 const _tabs = <_Tab>[
   // Тестовые имена вкладок; позже уйдут в перевод по выбору языка.
   (icon: Icons.photo_library_outlined, selected: Icons.photo_library, label: 'Flow', update: false),
@@ -357,6 +359,24 @@ class GlassNavBar extends StatelessWidget {
       color: color,
     );
     if (tab.update) icon = UpdateDot(child: icon);
+    if (index == _chatsTab) {
+      final plain = icon;
+      icon = Consumer(
+        builder: (context, ref, _) {
+          // Крошка на «Чатах»: сколько личных чатов ждут прочтения.
+          final unread = (ref.watch(conversationsProvider).value ?? const [])
+              .where((c) => c.isDirect && c.unreadCount > 0)
+              .length;
+          return Badge(
+            isLabelVisible: unread > 0,
+            label: Text(unread > 9 ? '9+' : '$unread'),
+            backgroundColor: AppColors.primary,
+            offset: const Offset(6, -4),
+            child: plain,
+          );
+        },
+      );
+    }
 
     return Semantics(
       selected: selected,
