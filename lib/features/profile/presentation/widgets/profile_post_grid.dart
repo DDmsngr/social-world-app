@@ -71,23 +71,32 @@ class _TextTile extends StatelessWidget {
           colors: colors,
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Center(
-          child: Text(
-            text.isEmpty ? '·' : text,
-            textAlign: TextAlign.center,
-            maxLines: 6,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: size,
-              height: 1.2,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              shadows: const [Shadow(blurRadius: 3, color: Color(0x33000000))],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Слово не должно рваться посреди: шрифт подбирается под самое
+          // длинное слово (жирная кириллица ≈ 0,62 кегля на букву).
+          final longest = text.split(' ').fold<int>(1, (m, w) => w.length > m ? w.length : m);
+          final fit = (constraints.maxWidth - 20) / (longest * 0.62);
+          final fontSize = fit < size ? fit.clamp(9.0, size) : size;
+          return Padding(
+            padding: const EdgeInsets.all(10),
+            child: Center(
+              child: Text(
+                text.isEmpty ? '·' : text,
+                textAlign: TextAlign.center,
+                maxLines: 6,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  shadows: const [Shadow(blurRadius: 3, color: Color(0x33000000))],
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

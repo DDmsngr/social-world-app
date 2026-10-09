@@ -489,16 +489,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (subtitle != null)
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          color: typingText.isNotEmpty || (presence?.online ?? false)
-                              ? AppColors.primaryTint
-                              : AppColors.textDim,
+                      // Строка «вспоминает, как пишет…» длинная: если не помещается,
+                      // сжимается целиком, а не обрезается многоточием.
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          subtitle,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w400,
+                            color: typingText.isNotEmpty || (presence?.online ?? false)
+                                ? AppColors.primaryTint
+                                : AppColors.textDim,
+                          ),
                         ),
                       ),
                   ],

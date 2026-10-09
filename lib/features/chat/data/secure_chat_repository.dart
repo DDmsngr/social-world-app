@@ -338,13 +338,22 @@ class SecureChatRepository implements ChatRepository {
         if (row['deleted_at'] == null) row,
     ];
     if (feed.direct) {
+      // Если собеседник сам написал после моего сообщения, он его видел, даже
+      // когда его отметка «прочитано» ещё не дошла (или его приложение
+      // старой версии и вовсе её не двигает).
+      var peerSeen = feed.peerLastReadAt;
+      for (final row in rows) {
+        if (row['sender_id'] == currentUserId) continue;
+        final at = DateTime.tryParse('${row['sent_at']}');
+        if (at != null && (peerSeen == null || at.isAfter(peerSeen))) peerSeen = at;
+      }
       return Future.wait([
         for (final row in rows)
           _decodeDirect(
             row: row,
             conversationId: conversationId,
             peerKeys: feed.keys!,
-            peerLastReadAt: feed.peerLastReadAt,
+            peerLastReadAt: peerSeen,
           ),
       ]);
     }
