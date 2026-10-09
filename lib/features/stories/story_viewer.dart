@@ -11,6 +11,8 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/presentation/providers/auth_providers.dart';
+import '../chat/domain/entities/chat_message.dart';
+import '../chat/domain/entities/chat_meta.dart';
 import '../chat/presentation/providers/chat_providers.dart';
 import 'stories.dart';
 
@@ -451,9 +453,24 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     try {
       final repository = ref.read(chatRepositoryProvider);
       final conversationId = await repository.openDirect(story.authorId);
+      // Историю показываем цитатой над ответом: цитата едет внутри сообщения,
+      // поэтому её увидит и собеседник на старой версии.
+      final caption = story.body?.trim() ?? '';
       await repository.send(
         conversationId: conversationId,
-        text: 'Ответ на историю: $text',
+        text: text,
+        options: SendOptions(
+          replyTo: ChatReply(
+            messageId: 'story-${story.id}',
+            senderName: story.authorName,
+            preview: caption.isEmpty ? 'История' : 'История · $caption',
+            kind: switch (story.kind) {
+              StoryKind.photo => MessageKind.image,
+              StoryKind.video => MessageKind.video,
+              StoryKind.text => MessageKind.text,
+            },
+          ),
+        ),
       );
       ref.invalidate(conversationsProvider);
       if (mounted && !quiet) {
