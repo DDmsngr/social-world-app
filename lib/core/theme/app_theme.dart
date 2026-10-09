@@ -183,6 +183,9 @@ abstract final class AppTheme {
         backgroundColor: p.ink2,
         contentTextStyle: TextStyle(color: p.text),
         behavior: SnackBarBehavior.floating,
+        // Поднято над полем ввода чата и нижней панелью: раньше плашки
+        // закрывали ровно то, чем человек пользуется.
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
       ),
     );
   }

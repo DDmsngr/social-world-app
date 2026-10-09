@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/chat_meta.dart';
 import '../../domain/schedule_format.dart';
 import '../providers/chat_providers.dart';
+import 'schedule_picker.dart';
 
 /// Строка над полем ввода: «Запланировано: 2». Без неё отложенные сообщения
 /// после отправки просто исчезали бы из виду.
@@ -75,6 +76,76 @@ class _ScheduledSheet extends ConsumerWidget {
       ? 'Когда ${peerName ?? 'собеседник'} появится в сети'
       : 'Отправится ${formatScheduledAt(m.sendAt!.toLocal(), DateTime.now())}';
 
+  /// Правка отложенного: новый текст и (если не «когда в сети») время. На
+  /// сервере сообщение лежит готовым шифротекстом, поэтому правка — это
+  /// отмена старого и новое с теми же настройками.
+  Future<void> _edit(BuildContext context, WidgetRef ref, ScheduledMessage m) async {
+    final controller = TextEditingController(text: m.text);
+    var sendAt = m.sendAt?.toLocal();
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialog) => StatefulBuilder(
+        builder: (dialog, setState) => AlertDialog(
+          title: const Text('Изменить сообщение'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: controller,
+                autofocus: true,
+                minLines: 1,
+                maxLines: 6,
+                maxLength: 4000,
+                buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+              ),
+              if (sendAt != null) ...[
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () async {
+                    final picked = await showSchedulePicker(
+                      dialog,
+                      title: 'Отправить позже',
+                      action: 'Готово',
+                    );
+                    if (picked != null) setState(() => sendAt = picked);
+                  },
+                  icon: const Icon(Icons.schedule, size: 18),
+                  label: Text(formatScheduledAt(sendAt!, DateTime.now())),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Отмена')),
+            TextButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Сохранить')),
+          ],
+        ),
+      ),
+    );
+    final text = controller.text.trim();
+    controller.dispose();
+    if (saved != true || text.isEmpty) return;
+    if (text == m.text && sendAt == m.sendAt?.toLocal()) return;
+    try {
+      final repository = ref.read(chatRepositoryProvider);
+      await repository.scheduleText(
+        conversationId: conversationId,
+        text: text,
+        sendAt: m.whenOnline ? null : sendAt,
+        whenOnline: m.whenOnline,
+        options: SendOptions(silent: m.silent),
+      );
+      await repository.cancelScheduled(m.id);
+    } catch (error) {
+      AppLog.add('Правка отложенного: $error');
+      messenger.showSnackBar(const SnackBar(content: Text('Не удалось изменить')));
+    }
+    ref.invalidate(scheduledMessagesProvider(conversationId));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheduled = ref.watch(scheduledMessagesProvider(conversationId));
@@ -122,6 +193,7 @@ class _ScheduledSheet extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final m = items[index];
                     return ListTile(
+                      onTap: () => _edit(context, ref, m),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.gutter,
                       ),
@@ -140,28 +212,38 @@ class _ScheduledSheet extends ConsumerWidget {
                         '${_when(m)}${m.silent ? ' · без звука' : ''}',
                         style: TextStyle(color: AppColors.textDim),
                       ),
-                      trailing: IconButton(
-                        tooltip: 'Отменить отправку',
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          color: AppColors.danger,
-                        ),
-                        onPressed: () async {
-                          final messenger = ScaffoldMessenger.of(context);
-                          try {
-                            await ref
-                                .read(chatRepositoryProvider)
-                                .cancelScheduled(m.id);
-                          } catch (error) {
-                            AppLog.add('Отмена отложенного: $error');
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Не удалось отменить'),
-                              ),
-                            );
-                          }
-                          ref.invalidate(scheduledMessagesProvider(conversationId));
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Изменить',
+                            icon: Icon(Icons.edit_outlined, color: AppColors.textDim),
+                            onPressed: () => _edit(context, ref, m),
+                          ),
+                          IconButton(
+                            tooltip: 'Отменить отправку',
+                            icon: Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.danger,
+                            ),
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              try {
+                                await ref
+                                    .read(chatRepositoryProvider)
+                                    .cancelScheduled(m.id);
+                              } catch (error) {
+                                AppLog.add('Отмена отложенного: $error');
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Не удалось отменить'),
+                                  ),
+                                );
+                              }
+                              ref.invalidate(scheduledMessagesProvider(conversationId));
+                            },
+                          ),
+                        ],
                       ),
                     );
                   },

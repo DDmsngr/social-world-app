@@ -680,6 +680,30 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     return (height * 0.35 / 24).floor().clamp(4, 12);
   }
 
+  /// Часы рядом со смайлом: очередь отложенных сообщений этого чата. Видны,
+  /// когда в очереди что-то есть, с числом.
+  Widget _scheduledButton() {
+    final count =
+        ref.watch(scheduledMessagesProvider(widget.conversationId)).value?.length ?? 0;
+    return IconButton(
+      onPressed: () => showScheduledSheet(
+        context,
+        conversationId: widget.conversationId,
+        peerName: widget.peerName,
+      ),
+      tooltip: 'Отложенные сообщения',
+      icon: Badge(
+        isLabelVisible: count > 0,
+        label: Text('$count'),
+        backgroundColor: AppColors.primary,
+        child: Icon(
+          Icons.schedule,
+          color: count > 0 ? AppColors.primaryTint : AppColors.textDim,
+        ),
+      ),
+    );
+  }
+
   /// По макету «Диалог»: «+» (все вложения, включая кружок) — поле-пилюля с
   /// эмодзи внутри — красный микрофон, а при наборе текста — отправка.
   Widget _inputRow(bool hasText) {
@@ -740,15 +764,21 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                 border: _fieldBorder(Colors.transparent),
                 enabledBorder: _fieldBorder(Colors.transparent),
                 focusedBorder: _fieldBorder(AppColors.hairStrong),
-                suffixIcon: IconButton(
-                  onPressed: _toggleEmoji,
-                  tooltip: _emojiOpen ? 'Клавиатура' : 'Эмодзи',
-                  icon: Icon(
-                    _emojiOpen
-                        ? Icons.keyboard_alt_outlined
-                        : Icons.emoji_emotions_outlined,
-                    color: _emojiOpen ? AppColors.primaryTint : AppColors.textDim,
-                  ),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _scheduledButton(),
+                    IconButton(
+                      onPressed: _toggleEmoji,
+                      tooltip: _emojiOpen ? 'Клавиатура' : 'Эмодзи',
+                      icon: Icon(
+                        _emojiOpen
+                            ? Icons.keyboard_alt_outlined
+                            : Icons.emoji_emotions_outlined,
+                        color: _emojiOpen ? AppColors.primaryTint : AppColors.textDim,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
