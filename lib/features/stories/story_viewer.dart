@@ -13,6 +13,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../auth/presentation/providers/auth_providers.dart';
+import '../chat/data/reply_preview.dart';
 import '../chat/domain/entities/chat_message.dart';
 import '../chat/domain/entities/chat_meta.dart';
 import '../chat/presentation/providers/chat_providers.dart';
@@ -489,7 +490,10 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
             messageId: 'story-${story.id}',
             senderName: story.authorName,
             preview: caption.isEmpty ? 'История' : 'История · $caption',
-            thumbUrl: story.kind == StoryKind.photo ? story.mediaUrl : null,
+            thumbUrl: story.kind == StoryKind.text ? null : story.mediaUrl,
+            thumbB64: story.kind == StoryKind.video && story.mediaUrl != null
+                ? await ReplyPreview.forVideoUrl(story.mediaUrl!)
+                : null,
             kind: switch (story.kind) {
               StoryKind.photo => MessageKind.image,
               StoryKind.video => MessageKind.video,

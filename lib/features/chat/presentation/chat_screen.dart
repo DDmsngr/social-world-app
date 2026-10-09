@@ -23,6 +23,7 @@ import '../domain/day_label.dart';
 import '../domain/timeline.dart';
 import '../live_location/live_location.dart';
 import '../live_location/live_location_screen.dart';
+import '../data/reply_preview.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
 import '../domain/entities/conversation.dart';
@@ -240,12 +241,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
   void _startReply(ChatMessage message, String myId) {
     final info = ref.read(conversationProvider(widget.conversationId)).value;
-    setState(
-      () => _replyTo = ChatReply.of(
-        message,
-        senderName: _nameOf(message, myId, info),
-      ),
-    );
+    final reply = ChatReply.of(message, senderName: _nameOf(message, myId, info));
+    setState(() => _replyTo = reply);
+    // Превью фото/видео дорисовывается следом: файл читается с диска.
+    ReplyPreview.forMessage(message).then((b64) {
+      if (b64 == null || !mounted || _replyTo?.messageId != reply.messageId) return;
+      setState(() => _replyTo = reply.withThumb(b64));
+    });
   }
 
   /// После сворачивания приложения сокеты нередко «мёртвые»: переподключаем

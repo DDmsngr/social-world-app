@@ -120,6 +120,27 @@ Future<void> storyFromPost(BuildContext context, WidgetRef ref, Post post) async
     _toast(context, 'Истории доступны только при подключении к серверу');
     return;
   }
+  final published = await _openComposer(context, _draftForPost(post));
+  if (published == true && context.mounted) _toast(context, 'История опубликована');
+}
+
+/// Тот же пост сразу историей, без редактора: для тумблера «Ещё и в историях».
+Future<void> publishPostAsStory(WidgetRef ref, Post post) async {
+  final repo = ref.read(storiesRepositoryProvider);
+  if (!repo.available) return;
+  final draft = _draftForPost(post);
+  await repo.create(
+    kind: draft.kind,
+    audience: draft.audience,
+    mediaUrl: draft.remoteUrl,
+    body: draft.text,
+    bg: draft.bg,
+    postId: draft.postId,
+  );
+  await ref.read(storiesProvider.notifier).refresh();
+}
+
+StoryDraft _draftForPost(Post post) {
   final title = post.title?.trim();
   final raw = (title != null && title.isNotEmpty)
       ? title
@@ -131,7 +152,7 @@ Future<void> storyFromPost(BuildContext context, WidgetRef ref, Post post) async
 
   final photo = post.photoUrls.isEmpty ? null : post.photoUrls.first;
   final video = post.mediaUrls.where(isVideoUrl).firstOrNull;
-  final draft = photo != null
+  return photo != null
       ? StoryDraft(
           kind: StoryKind.photo,
           remoteUrl: photo,
@@ -154,8 +175,6 @@ Future<void> storyFromPost(BuildContext context, WidgetRef ref, Post post) async
           postId: post.id,
           audience: audience,
         );
-  final published = await _openComposer(context, draft);
-  if (published == true && context.mounted) _toast(context, 'История опубликована');
 }
 
 class StoryComposerScreen extends ConsumerStatefulWidget {

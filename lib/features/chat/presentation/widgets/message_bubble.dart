@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/link_text.dart';
+import '../../../../core/widgets/video_poster.dart';
 import '../../../channels/presentation/widgets/channel_media.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_meta.dart';
@@ -277,6 +280,40 @@ class _QuoteBlock extends StatelessWidget {
   final ChatReply reply;
   final bool mine;
 
+  /// Превью оригинала: зашитое в цитату, иначе по ссылке (фото истории или
+  /// кадр видео). Для видео поверх — значок «играть».
+  Widget? _thumb() {
+    final isVideo = reply.kind == MessageKind.video || reply.kind == MessageKind.videoNote;
+    Widget? image;
+    final b64 = reply.thumbB64;
+    if (b64 != null) {
+      try {
+        image = Image.memory(base64Decode(b64), fit: BoxFit.cover, gaplessPlayback: true);
+      } catch (_) {
+        image = null;
+      }
+    }
+    final url = reply.thumbUrl;
+    if (image == null && url != null) {
+      image = isVideo
+          ? VideoPoster(url: url, showPlay: false, maxWidth: 160)
+          : Image(
+              image: CachedNetworkImageProvider(url),
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            );
+    }
+    if (image == null) return null;
+    if (!isVideo) return image;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        image,
+        const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 22)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dim = mine
@@ -293,18 +330,12 @@ class _QuoteBlock extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (reply.thumbUrl != null)
+          if (_thumb() case final thumb?)
             Padding(
               padding: const EdgeInsets.only(right: 10),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Image(
-                  image: CachedNetworkImageProvider(reply.thumbUrl!),
-                  width: 44,
-                  height: 64,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const SizedBox(width: 44, height: 64),
-                ),
+                child: SizedBox(width: 44, height: 56, child: thumb),
               ),
             ),
           Expanded(

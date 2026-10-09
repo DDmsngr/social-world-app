@@ -11,10 +11,23 @@ class ChatReply {
     required this.preview,
     this.kind = MessageKind.text,
     this.thumbUrl,
+    this.thumbB64,
   });
 
   /// Картинка-превью в цитате (например, кадр истории, на которую отвечают).
   final String? thumbUrl;
+
+  /// Крошечное превью фото/видео, зашитое в саму цитату (base64).
+  final String? thumbB64;
+
+  ChatReply withThumb(String? b64) => ChatReply(
+    messageId: messageId,
+    senderName: senderName,
+    preview: preview,
+    kind: kind,
+    thumbUrl: thumbUrl,
+    thumbB64: b64 ?? thumbB64,
+  );
 
   /// Сколько символов цитаты берём: хватает, чтобы узнать сообщение.
   static const previewLength = 140;
@@ -43,6 +56,7 @@ class ChatReply {
     't': preview,
     if (kind != MessageKind.text) 'k': kind.wire,
     if (thumbUrl != null) 'u': thumbUrl,
+    if (thumbB64 != null) 'b': thumbB64,
   };
 
   static ChatReply? fromJson(Object? raw) {
@@ -54,6 +68,9 @@ class ChatReply {
       senderName: raw['n'] as String? ?? '',
       preview: raw['t'] as String? ?? '',
       kind: MessageKind.parse(raw['k']),
+      thumbB64: raw['b'] is String && (raw['b'] as String).length < 40000
+          ? raw['b'] as String
+          : null,
       thumbUrl: switch (raw['u']) {
         final String url when url.startsWith('https://') => url,
         _ => null,

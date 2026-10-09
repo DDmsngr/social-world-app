@@ -21,6 +21,7 @@ import '../../feed/domain/repositories/feed_repository.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
 import '../../feed/presentation/providers/publish_settings_provider.dart';
 import '../../feed/presentation/widgets/publish_settings_panel.dart';
+import '../../stories/story_composer.dart';
 import 'widgets/article_editor.dart';
 import 'widgets/article_media.dart';
 import 'widgets/composer_parts.dart';
@@ -81,6 +82,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   DateTime? _startsAt;
   var _routePoints = <EventRoutePoint>[];
   bool _busy = false;
+  bool _alsoStory = false;
 
   /// Больше четырёх карточка в ленте всё равно не покажет внятно, а вес
   /// публикации растёт линейно.
@@ -158,6 +160,15 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       await ref.read(publishSettingsProvider.notifier).rememberAsDefault();
     } catch (error) {
       AppLog.add('Настройки публикации не запомнились: $error');
+    }
+
+    if (_alsoStory && !isArticle) {
+      // Пост уже опубликован: сбой истории не должен выглядеть как провал поста.
+      try {
+        await publishPostAsStory(ref, post);
+      } catch (error) {
+        AppLog.add('История из момента не опубликовалась: $error');
+      }
     }
 
     ref.read(feedProvider.notifier).prepend(post);
@@ -488,6 +499,13 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
                   ),
                 ),
               ],
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _alsoStory,
+                onChanged: (value) => setState(() => _alsoStory = value),
+                title: const Text('Ещё и в историях'),
+                subtitle: const Text('Момент появится и в ленте, и в кружках сверху на сутки'),
+              ),
             ],
             if (_kind == ComposeKind.article) ...[
               TextField(
