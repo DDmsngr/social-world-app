@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gal/gal.dart';
@@ -238,6 +239,7 @@ Future<Object?> _showFloating(
     transitionDuration: const Duration(milliseconds: 140),
     pageBuilder: (dialog, _, _) => _FloatingMenu(
       anchor: anchor,
+      anchorContext: context,
       mine: mine,
       myReaction: myReaction,
       withReactions: withReactions,
@@ -258,6 +260,7 @@ Future<Object?> _showFloating(
 class _FloatingMenu extends StatefulWidget {
   const _FloatingMenu({
     required this.anchor,
+    required this.anchorContext,
     required this.mine,
     required this.myReaction,
     required this.withReactions,
@@ -265,6 +268,10 @@ class _FloatingMenu extends StatefulWidget {
   });
 
   final Rect? anchor;
+
+  /// Откуда взято сообщение: по нему панель следит за его положением, если
+  /// список сдвинулся (пришли новые сообщения), пока меню открыто.
+  final BuildContext anchorContext;
   final bool mine;
   final String? myReaction;
   final bool withReactions;
@@ -275,7 +282,30 @@ class _FloatingMenu extends StatefulWidget {
 }
 
 class _FloatingMenuState extends State<_FloatingMenu> {
-  Rect? get anchor => widget.anchor;
+  Rect? _live;
+
+  Rect? get anchor => _live ?? widget.anchor;
+
+  @override
+  void initState() {
+    super.initState();
+    _follow();
+  }
+
+  /// После каждого кадра сверяем, где сейчас сообщение: пришли новые, список
+  /// сдвинулся — панель идёт за ним. Кадры сам не запрашивает, поэтому в покое
+  /// ничего не крутится.
+  void _follow() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.anchorContext.mounted) {
+        final now = _anchorOf(widget.anchorContext);
+        if (now != null && now != _live) setState(() => _live = now);
+      }
+      _follow();
+    });
+  }
+
   bool get mine => widget.mine;
   String? get myReaction => widget.myReaction;
   bool get withReactions => widget.withReactions;
