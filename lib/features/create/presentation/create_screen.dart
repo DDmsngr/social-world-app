@@ -33,7 +33,7 @@ class CreateScreen extends ConsumerWidget {
       _Option(
         icon: Icons.article_outlined,
         title: 'Статья',
-        text: 'Длинный текст с фото: обзор места, история, маршрут выходных',
+        text: 'Длинный текст с фото: обзор, история, маршрут',
         onTap: () => open('${Routes.compose}/${ComposeKind.article.segment}'),
       ),
       _Option(
@@ -69,9 +69,9 @@ class CreateScreen extends ConsumerWidget {
         children: [
           Semantics(
             header: true,
-            child: Text('Что создаём?', style: AppTypography.serif(32)),
+            child: Text('Что создаём?', style: AppTypography.serif(26)),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           // Запись маршрута может идти свёрнутой: напоминаем о ней сверху, чтобы
           // не начинать вторую.
           if (recording) ...[
@@ -80,7 +80,7 @@ class CreateScreen extends ConsumerWidget {
           ],
           for (final option in options) ...[
             option,
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
           ],
         ],
       ),
@@ -121,8 +121,8 @@ class _Option extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.card),
           child: Container(
-            constraints: const BoxConstraints(minHeight: 76),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            constraints: const BoxConstraints(minHeight: 64),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(AppRadius.card),
               border: primary ? null : Border.all(color: AppColors.hair),
@@ -130,27 +130,26 @@ class _Option extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: primary
                         ? AppColors.onPrimary.withValues(alpha: 0.18)
                         : AppColors.primary.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: primary ? AppColors.onPrimary : AppColors.primaryTint),
+                  child: Icon(icon, size: 22, color: primary ? AppColors.onPrimary : AppColors.primaryTint),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
-                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: foreground),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: foreground),
                       ),
-                      const SizedBox(height: 2),
-                      Text(text, style: TextStyle(fontSize: 13, height: 1.3, color: secondary)),
+                      Text(text, style: TextStyle(fontSize: 12.5, height: 1.25, color: secondary)),
                     ],
                   ),
                 ),

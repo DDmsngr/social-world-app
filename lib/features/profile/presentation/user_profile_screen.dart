@@ -17,6 +17,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/update/update_dot.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
+import '../../referrals/presentation/widgets/referral_code_sheet.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
@@ -231,7 +232,9 @@ enum _PostFilter {
   article(Icons.article_outlined, 'Статьи'),
   route(Icons.route_outlined, 'Маршруты'),
   text(Icons.notes, 'Заметки'),
-  stories(Icons.amp_stories_outlined, 'Блики');
+  stories(Icons.amp_stories_outlined, 'Блики'),
+  // Только в своём профиле: приглашения друзей и ввод кода места.
+  invites(Icons.person_add_alt_1_outlined, 'Приглашения');
 
   const _PostFilter(this.icon, this.label);
   final IconData icon;
@@ -245,6 +248,7 @@ enum _PostFilter {
     route => post.isRoute,
     text => !post.isArticle && !post.isRoute && !post.hasMedia,
     stories => false,
+    invites => false,
   };
 }
 
@@ -519,14 +523,17 @@ class _BodyState extends ConsumerState<_Body> {
                 // — только те, что у человека есть.
                 final available = [
                   for (final f in _PostFilter.values)
-                    if (isMe ||
-                        f == _PostFilter.all ||
-                        (f == _PostFilter.stories ? storyGroup != null : items.any(f.matches)))
+                    if (f == _PostFilter.invites
+                        ? isMe
+                        : isMe ||
+                              f == _PostFilter.all ||
+                              (f == _PostFilter.stories ? storyGroup != null : items.any(f.matches)))
                       f,
                 ];
                 final filter = available.contains(_filter) ? _filter : _PostFilter.all;
                 final shown = [for (final p in items) if (filter.matches(p)) p];
                 final emptyStories = filter == _PostFilter.stories && storyGroup == null;
+                final invites = filter == _PostFilter.invites;
                 return [
                   if (isMe || available.length > 2)
                     SliverToBoxAdapter(
@@ -536,7 +543,9 @@ class _BodyState extends ConsumerState<_Body> {
                         onSelected: (f) => setState(() => _filter = f),
                       ),
                     ),
-                  if (emptyStories || (filter != _PostFilter.stories && shown.isEmpty))
+                  if (invites)
+                    const SliverToBoxAdapter(child: _InvitesPanel())
+                  else if (emptyStories || (filter != _PostFilter.stories && shown.isEmpty))
                     message(
                       Text(
                         '${filter.label ?? 'Публикаций'}: пока нет.',
@@ -553,6 +562,41 @@ class _BodyState extends ConsumerState<_Body> {
             ),
           ] else
             SliverToBoxAdapter(child: SizedBox(height: bottom)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Вкладка «Приглашения» своего профиля: раньше эти три пункта лежали в
+/// настройках.
+class _InvitesPanel extends StatelessWidget {
+  const _InvitesPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget row(IconData icon, String label, VoidCallback onTap) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        onTap: onTap,
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.primaryTint),
+            const SizedBox(width: 14),
+            Expanded(child: Text(label)),
+            Icon(Icons.chevron_right, color: AppColors.textFaint),
+          ],
+        ),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 4, AppSpacing.gutter, 0),
+      child: Column(
+        children: [
+          row(Icons.qr_code_2, 'Пригласить в ChaWo', () => context.push(Routes.shareApp)),
+          row(Icons.contacts_outlined, 'Пригласить из контактов', () => context.push(Routes.inviteContacts)),
+          row(Icons.pin_outlined, 'Ввести код места', () => showReferralCodeSheet(context)),
         ],
       ),
     );

@@ -766,22 +766,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                             : null,
                         onLongPress: () =>
                             _openMenu(_itemKeys[message.id]?.currentContext ?? context, message, myId),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          decoration: BoxDecoration(
-                            color: _selectedId == message.id
-                                ? AppColors.hair
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(
-                              AppRadius.card,
-                            ),
-                          ),
+                        // Подсветка (переход к сообщению, выделение для меню) идёт
+                        // по самому пузырю: фон на всю строку торчал за ним кривым
+                        // прямоугольником.
+                        child: SizedBox(
+                          width: double.infinity,
                           child: Column(
                             crossAxisAlignment: mine
                                 ? CrossAxisAlignment.end
                                 : CrossAxisAlignment.start,
                             children: [
                               MessageBubble(
+                                highlighted: _selectedId == message.id,
                                 message: message,
                                 mine: mine,
                                 showSender: !isDirect && !mine,

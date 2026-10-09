@@ -24,7 +24,11 @@ class MessageBubble extends StatelessWidget {
     this.onMediaMore,
     this.onQuoteTap,
     this.reactions,
+    this.highlighted = false,
   });
+
+  /// Подсветка при переходе к сообщению и при выделении для меню.
+  final bool highlighted;
 
   /// Плашки реакций живут внутри пузыря, над временем.
   final Widget? reactions;
@@ -164,8 +168,15 @@ class MessageBubble extends StatelessWidget {
         decoration: bare
             ? null
             : BoxDecoration(
-                color: mine ? AppColors.bubbleMine : AppColors.card,
-                border: mine ? null : Border.all(color: AppColors.hair),
+                color: highlighted
+                    ? Color.alphaBlend(
+                        AppColors.primary.withValues(alpha: 0.38),
+                        mine ? AppColors.bubbleMine : AppColors.card,
+                      )
+                    : (mine ? AppColors.bubbleMine : AppColors.card),
+                border: highlighted
+                    ? Border.all(color: AppColors.primaryTint)
+                    : (mine ? null : Border.all(color: AppColors.hair)),
                 borderRadius: BorderRadius.only(
                   topLeft: radius,
                   topRight: radius,

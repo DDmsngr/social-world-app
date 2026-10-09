@@ -19,7 +19,6 @@ import '../../auth/presentation/providers/auth_providers.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
 import '../../discover/presentation/providers/map_start.dart';
 import '../../discover/presentation/providers/presence_publisher.dart';
-import '../../referrals/presentation/widgets/referral_code_sheet.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -104,47 +103,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SectionLabel('Чаты'),
           const SizedBox(height: 12),
           const _SendSoundSwitch(),
-          const SizedBox(height: 18),
-          const SectionLabel('Приглашение'),
-          const SizedBox(height: 8),
-          GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            onTap: () => context.push(Routes.shareApp),
-            child: Row(
-              children: [
-                Icon(Icons.qr_code_2, color: AppColors.primaryTint),
-                const SizedBox(width: 14),
-                const Expanded(child: Text('Пригласить в ChaWo')),
-                Icon(Icons.chevron_right, color: AppColors.textFaint),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            onTap: () => context.push(Routes.inviteContacts),
-            child: Row(
-              children: [
-                Icon(Icons.contacts_outlined, color: AppColors.primaryTint),
-                const SizedBox(width: 14),
-                const Expanded(child: Text('Пригласить из контактов')),
-                Icon(Icons.chevron_right, color: AppColors.textFaint),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            onTap: () => showReferralCodeSheet(context),
-            child: Row(
-              children: [
-                Icon(Icons.qr_code_2, color: AppColors.primaryTint),
-                const SizedBox(width: 14),
-                const Expanded(child: Text('Ввести код места')),
-                Icon(Icons.chevron_right, color: AppColors.textFaint),
-              ],
-            ),
-          ),
           const SizedBox(height: 18),
           const SectionLabel('Приложение'),
           const SizedBox(height: 12),
