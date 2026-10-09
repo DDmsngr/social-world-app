@@ -22,6 +22,7 @@ import '../../feed/presentation/providers/feed_providers.dart';
 import '../../feed/presentation/providers/publish_settings_provider.dart';
 import '../../feed/presentation/widgets/publish_settings_panel.dart';
 import '../../stories/story_composer.dart';
+import '../data/post_drafts.dart';
 import 'widgets/article_editor.dart';
 import 'widgets/article_media.dart';
 import 'widgets/composer_parts.dart';
@@ -57,9 +58,12 @@ String _formatStartsAt(DateTime time) {
 /// всё второстепенное — свёрнутыми строками «Место», «Кому видно»; кнопка
 /// «Опубликовать» всегда на виду в шапке, а не в конце длинной формы.
 class ComposeScreen extends ConsumerStatefulWidget {
-  const ComposeScreen({super.key, required this.kind});
+  const ComposeScreen({super.key, required this.kind, this.draft});
 
   final ComposeKind kind;
+
+  /// Черновик, с которого продолжаем.
+  final PostDraft? draft;
 
   @override
   ConsumerState<ComposeScreen> createState() => _ComposeScreenState();
@@ -88,12 +92,40 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   /// публикации растёт линейно.
   static const _maxAttachments = 4;
 
+  /// id черновика, который сейчас правим (null — новый).
+  String? _draftId;
+
   @override
   void initState() {
     super.initState();
     _article.addListener(() {
       if (mounted) setState(() {});
     });
+    final draft = widget.draft;
+    if (draft != null) {
+      _draftId = draft.id;
+      _titleController.text = draft.title;
+      if (draft.isArticle) {
+        _article.load(draft.body);
+      } else {
+        _bodyController.text = draft.body;
+      }
+      _attachments.addAll([for (final path in draft.attachmentPaths) XFile(path)]);
+    }
+  }
+
+  bool get _canDraft => _kind != ComposeKind.event;
+
+  Future<void> _saveDraft() async {
+    final isArticle = _kind == ComposeKind.article;
+    _draftId = await PostDrafts.save(
+      id: _draftId,
+      kind: _kind.segment,
+      title: isArticle ? _titleController.text : '',
+      body: isArticle ? _article.markdown : _bodyController.text,
+      attachmentPaths: [for (final file in _attachments) file.path],
+    );
+    ref.invalidate(postDraftsProvider);
   }
 
   @override
@@ -169,6 +201,13 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       } catch (error) {
         AppLog.add('История из момента не опубликовалась: $error');
       }
+    }
+
+    // Опубликовано — черновик больше не нужен.
+    final draftId = _draftId;
+    if (draftId != null) {
+      await PostDrafts.delete(draftId);
+      ref.invalidate(postDraftsProvider);
     }
 
     ref.read(feedProvider.notifier).prepend(post);
@@ -307,25 +346,41 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
     };
   }
 
+  /// Спрашивает, что делать с написанным. true — можно уходить (черновик при
+  /// этом уже сохранён, если выбрали его).
   Future<bool> _confirmDiscard() async {
-    final leave = await showDialog<bool>(
+    final choice = await showDialog<String>(
       context: context,
       builder: (dialog) => AlertDialog(
         title: const Text('Выйти без публикации?'),
-        content: const Text('Написанное пропадёт.'),
+        content: Text(_canDraft ? 'Можно сохранить написанное как черновик.' : 'Написанное пропадёт.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialog, false),
+            onPressed: () => Navigator.pop(dialog, 'stay'),
             child: const Text('Остаться'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(dialog, true),
-            child: const Text('Выйти'),
+            onPressed: () => Navigator.pop(dialog, 'drop'),
+            child: Text(_canDraft ? 'Не сохранять' : 'Выйти'),
           ),
+          if (_canDraft)
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog, 'save'),
+              child: const Text('В черновики'),
+            ),
         ],
       ),
     );
-    return leave == true;
+    if (choice == 'save') {
+      await _saveDraft();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Черновик сохранён')),
+        );
+      }
+      return true;
+    }
+    return choice == 'drop';
   }
 
   Future<void> _pickPlace(List<Place> places) async {
@@ -434,6 +489,20 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
             icon: const Icon(Icons.arrow_back),
           ),
           actions: [
+            if (_canDraft)
+              TextButton(
+                onPressed: _dirty && !_busy
+                    ? () async {
+                        await _saveDraft();
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Черновик сохранён')),
+                        );
+                        context.canPop() ? context.pop() : context.go(Routes.create);
+                      }
+                    : null,
+                child: const Text('Черновик'),
+              ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: FilledButton(

@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../routes/presentation/providers/route_recorder.dart';
+import '../data/post_drafts.dart';
 import 'compose_screen.dart';
 
 /// Вкладка «+»: только выбор, что создать. Каждая карточка ведёт на свой
@@ -19,6 +20,7 @@ class CreateScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final recording = ref.watch(routeRecorderProvider).isActive;
+    final drafts = ref.watch(postDraftsProvider).value?.length ?? 0;
 
     void open(String location) => context.push(location);
 
@@ -77,6 +79,18 @@ class CreateScreen extends ConsumerWidget {
           if (recording) ...[
             _RecordingCard(onTap: () => open(Routes.routeRecorder)),
             const SizedBox(height: 12),
+          ],
+          if (drafts > 0) ...[
+            _Option(
+              icon: Icons.edit_note,
+              title: 'Черновики · $drafts',
+              text: 'Недописанные моменты и статьи',
+              onTap: () async {
+                await context.push(Routes.drafts);
+                ref.invalidate(postDraftsProvider);
+              },
+            ),
+            const SizedBox(height: 8),
           ],
           for (final option in options) ...[
             option,

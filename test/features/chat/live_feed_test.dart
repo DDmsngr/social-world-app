@@ -128,7 +128,10 @@ void main() {
     expect(errors, isNotEmpty, reason: 'экран сразу узнаёт о проблеме');
     expect(seen, isEmpty);
 
-    await wait(8);
+    // Не фиксированная пауза: на загруженной машине CI таймеры запаздывают.
+    for (var i = 0; i < 100 && seen.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
     expect(attempts, greaterThanOrEqualTo(2), reason: 'следующий проход пробует снова');
     expect(seen.last, ['a'], reason: 'и поток не закрылся — данные пришли');
     await sub.cancel();

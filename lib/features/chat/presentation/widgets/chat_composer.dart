@@ -689,6 +689,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   Widget _scheduledButton() {
     final count =
         ref.watch(scheduledMessagesProvider(widget.conversationId)).value?.length ?? 0;
+    // Часы нужны только пока в очереди что-то есть.
+    if (count == 0) return const SizedBox.shrink();
     return IconButton(
       onPressed: () => showScheduledSheet(
         context,
@@ -696,14 +698,13 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
         peerName: widget.peerName,
       ),
       tooltip: 'Отложенные сообщения',
+      // Узкая кнопка: часы стоят вплотную к смайлу.
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 34, minHeight: 40),
       icon: Badge(
-        isLabelVisible: count > 0,
         label: Text('$count'),
         backgroundColor: AppColors.primary,
-        child: Icon(
-          Icons.schedule,
-          color: count > 0 ? AppColors.primaryTint : AppColors.textDim,
-        ),
+        child: Icon(Icons.schedule, color: AppColors.primaryTint),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -112,43 +114,162 @@ class _RouteTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = (post.body ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
-    return ColoredBox(
-      color: AppColors.ink2,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 12, 8, 10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.route, size: 34, color: AppColors.primaryTint),
-            const SizedBox(height: 6),
-            Text(
-              'Маршрут',
-              style: TextStyle(
-                fontSize: 10.5,
-                letterSpacing: 0.6,
-                color: AppColors.textDim,
-              ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Нарисованный «образ карты»: у каждого маршрута свой из пяти вариантов.
+        CustomPaint(
+          painter: MapArtPainter(
+            variant: post.id.hashCode.abs() % 5,
+            street: AppColors.textDim,
+            accent: AppColors.primaryTint,
+            base: AppColors.ink2,
+          ),
+        ),
+        // Затемнение под текстом, чтобы читался на любой «карте».
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0x33000000), Color(0xB3000000)],
             ),
-            if (title.isNotEmpty) ...[
-              const SizedBox(height: 4),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
               Text(
-                title,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                'МАРШРУТ',
                 style: TextStyle(
-                  fontSize: 12.5,
-                  height: 1.2,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.text,
+                  fontSize: 10,
+                  letterSpacing: 0.8,
+                  color: AppColors.primaryTint,
                 ),
               ),
+              if (title.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
+}
+
+/// Условный «план города»: улицы, кварталы, река и линия маршрута. Один и
+/// тот же вариант всегда рисуется одинаково (генератор с зерном).
+class MapArtPainter extends CustomPainter {
+  const MapArtPainter({
+    required this.variant,
+    required this.street,
+    required this.accent,
+    required this.base,
+  });
+
+  final int variant;
+  final Color street;
+  final Color accent;
+  final Color base;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rnd = math.Random(variant * 7919 + 13);
+    final w = size.width;
+    final h = size.height;
+    canvas.drawRect(Offset.zero & size, Paint()..color = base);
+
+    // Кварталы.
+    final block = Paint()..color = street.withValues(alpha: 0.07);
+    for (var i = 0; i < 9; i++) {
+      final bw = w * (0.12 + rnd.nextDouble() * 0.2);
+      final bh = h * (0.1 + rnd.nextDouble() * 0.2);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(rnd.nextDouble() * (w - bw), rnd.nextDouble() * (h - bh), bw, bh),
+          const Radius.circular(3),
+        ),
+        block,
+      );
+    }
+
+    // Река.
+    final river = Path()
+      ..moveTo(-10, h * (0.2 + rnd.nextDouble() * 0.6))
+      ..cubicTo(
+        w * 0.3, h * rnd.nextDouble(),
+        w * 0.6, h * rnd.nextDouble(),
+        w + 10, h * (0.2 + rnd.nextDouble() * 0.6),
+      );
+    canvas.drawPath(
+      river,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = w * 0.07
+        ..color = const Color(0xFF5B8DEF).withValues(alpha: 0.16),
+    );
+
+    // Улицы: две семьи линий под прямым углом и пара магистралей.
+    final angle = rnd.nextDouble() * math.pi;
+    final thin = Paint()
+      ..strokeWidth = 1
+      ..color = street.withValues(alpha: 0.16);
+    final main = Paint()
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round
+      ..color = street.withValues(alpha: 0.28);
+    final center = Offset(w / 2, h / 2);
+    final reach = w + h;
+    for (var family = 0; family < 2; family++) {
+      final a = angle + family * math.pi / 2;
+      final dir = Offset(math.cos(a), math.sin(a));
+      final normal = Offset(-dir.dy, dir.dx);
+      for (var i = -6; i <= 6; i++) {
+        final shift = normal * (i * (w * 0.16) + rnd.nextDouble() * 6);
+        canvas.drawLine(center + shift - dir * reach, center + shift + dir * reach, i % 4 == 0 ? main : thin);
+      }
+    }
+
+    // Маршрут: плавная линия из угла в угол с отметками начала и конца.
+    final start = Offset(w * (0.12 + rnd.nextDouble() * 0.2), h * (0.65 + rnd.nextDouble() * 0.25));
+    final end = Offset(w * (0.68 + rnd.nextDouble() * 0.2), h * (0.1 + rnd.nextDouble() * 0.25));
+    final route = Path()
+      ..moveTo(start.dx, start.dy)
+      ..cubicTo(
+        w * rnd.nextDouble(), h * (0.3 + rnd.nextDouble() * 0.5),
+        w * rnd.nextDouble(), h * (0.2 + rnd.nextDouble() * 0.5),
+        end.dx, end.dy,
+      );
+    canvas.drawPath(
+      route,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.2
+        ..strokeCap = StrokeCap.round
+        ..color = accent.withValues(alpha: 0.95),
+    );
+    canvas.drawCircle(start, 4.5, Paint()..color = Colors.white);
+    canvas.drawCircle(end, 4.5, Paint()..color = accent);
+  }
+
+  @override
+  bool shouldRepaint(MapArtPainter old) =>
+      old.variant != variant || old.street != street || old.accent != accent || old.base != base;
 }
 
 class _Tile extends StatelessWidget {

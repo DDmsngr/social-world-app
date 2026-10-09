@@ -52,8 +52,13 @@ abstract final class LinkPreviewFetcher {
     final client = http.Client();
     try {
       final request = http.Request('GET', uri)
-        ..headers['User-Agent'] = 'Mozilla/5.0 (compatible; ChaWoLinkPreview/1.0)'
-        ..headers['Accept'] = 'text/html,application/xhtml+xml';
+        // Многие сайты (Кинопоиск, Озон) не отдают страницу «ботам»: идём как
+        // обычный мобильный браузер.
+        ..headers['User-Agent'] =
+            'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/124.0.0.0 Mobile Safari/537.36'
+        ..headers['Accept'] = 'text/html,application/xhtml+xml'
+        ..headers['Accept-Language'] = 'ru-RU,ru;q=0.9,en;q=0.5';
       final response = await client.send(request);
       final type = response.headers['content-type'] ?? '';
       if (response.statusCode != 200 || !type.contains('html')) return null;

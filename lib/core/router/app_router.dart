@@ -19,7 +19,9 @@ import '../../features/chat/presentation/group_screens.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
+import '../../features/create/data/post_drafts.dart';
 import '../../features/create/presentation/compose_screen.dart';
+import '../../features/create/presentation/drafts_screen.dart';
 import '../../features/create/presentation/create_screen.dart';
 import '../../features/discover/presentation/discover_screen.dart';
 import '../../features/discover/presentation/place_screen.dart';
@@ -83,6 +85,9 @@ abstract final class Routes {
 
   /// Форма создания момента, статьи или события: `/compose/<вид>`.
   static const compose = '/compose';
+
+  /// Черновики момента и статьи.
+  static const drafts = '/drafts';
   static const chats = '/chats';
 
   /// Экран звонка поверх всего; открывает его CallController.
@@ -397,7 +402,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '${Routes.compose}/:kind',
         builder: (_, state) => ComposeScreen(
           kind: ComposeKind.fromSegment(state.pathParameters['kind']),
+          draft: state.extra is PostDraft ? state.extra! as PostDraft : null,
         ),
+      ),
+      GoRoute(
+        path: Routes.drafts,
+        builder: (_, _) => const DraftsScreen(),
       ),
       GoRoute(
         path: Routes.events,
