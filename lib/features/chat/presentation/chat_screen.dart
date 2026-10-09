@@ -402,7 +402,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // Пока экран открыт, входящие сразу считаются прочитанными.
     ref.listen(messagesProvider(widget.conversationId), (previous, next) {
       final before = previous?.value?.length ?? 0;
-      if ((next.value?.length ?? 0) > before && before > 0) {
+      // Прочитанным считается и всё, что пришло, пока ответ ещё не ушёл: без
+      // before > 0 первая подгрузка после открытия тоже отмечается.
+      if ((next.value?.length ?? 0) > before) {
         _markRead();
         // Отложенное могло как раз уйти — список «запланировано» устарел.
         ref.invalidate(scheduledMessagesProvider(widget.conversationId));

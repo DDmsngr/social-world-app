@@ -180,7 +180,12 @@ class SecureChatRepository implements ChatRepository {
       isAdmin: row['my_role'] == 'admin',
       closed: row['closed'] as bool? ?? false,
       lastMessage: last,
-      unreadCount: (row['unread_count'] as num?)?.toInt() ?? 0,
+      // Если последнее сообщение моё, значит чат уже открыт и прочитан: ответ
+      // нельзя написать, не увидев входящего. Сервер считает от last_read_at и
+      // мог не успеть его сдвинуть.
+      unreadCount: last != null && last.senderId == currentUserId
+          ? 0
+          : (row['unread_count'] as num?)?.toInt() ?? 0,
       encrypted: kind == ConversationKind.direct && peerKeys != null,
     );
   }
