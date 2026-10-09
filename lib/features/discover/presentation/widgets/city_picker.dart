@@ -25,8 +25,10 @@ Future<City?> chooseCity(BuildContext context, {City? selected}) {
     useSafeArea: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => Padding(
-      padding: const EdgeInsets.all(AppSpacing.gutter),
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.all(AppSpacing.gutter).copyWith(
+        bottom: AppSpacing.gutter + MediaQuery.paddingOf(sheetContext).bottom,
+      ),
       child: SheetCard(child: _CityList(selected: selected)),
     ),
   );

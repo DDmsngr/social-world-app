@@ -10,7 +10,11 @@ class ChatReply {
     required this.senderName,
     required this.preview,
     this.kind = MessageKind.text,
+    this.thumbUrl,
   });
+
+  /// Картинка-превью в цитате (например, кадр истории, на которую отвечают).
+  final String? thumbUrl;
 
   /// Сколько символов цитаты берём: хватает, чтобы узнать сообщение.
   static const previewLength = 140;
@@ -38,6 +42,7 @@ class ChatReply {
     'n': senderName,
     't': preview,
     if (kind != MessageKind.text) 'k': kind.wire,
+    if (thumbUrl != null) 'u': thumbUrl,
   };
 
   static ChatReply? fromJson(Object? raw) {
@@ -49,6 +54,10 @@ class ChatReply {
       senderName: raw['n'] as String? ?? '',
       preview: raw['t'] as String? ?? '',
       kind: MessageKind.parse(raw['k']),
+      thumbUrl: switch (raw['u']) {
+        final String url when url.startsWith('https://') => url,
+        _ => null,
+      },
     );
   }
 }

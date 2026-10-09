@@ -491,7 +491,10 @@ Future<void> showMapFiltersSheet(BuildContext context, List<Place> allPlaces) {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.all(AppSpacing.gutter),
+      // useSafeArea не защищает низ: без этого окно уезжает под системные кнопки.
+      padding: EdgeInsets.all(AppSpacing.gutter).copyWith(
+        bottom: AppSpacing.gutter + MediaQuery.paddingOf(sheetContext).bottom,
+      ),
       child: SheetCard(
         child: Consumer(
           builder: (context, ref, _) {
@@ -625,7 +628,9 @@ Future<void> showNearbySheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.all(AppSpacing.gutter),
+      padding: EdgeInsets.all(AppSpacing.gutter).copyWith(
+        bottom: AppSpacing.gutter + MediaQuery.paddingOf(sheetContext).bottom,
+      ),
       child: SheetCard(
         child: Consumer(
           builder: (context, ref, _) {

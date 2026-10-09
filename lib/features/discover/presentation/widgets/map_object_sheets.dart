@@ -32,8 +32,10 @@ Future<void> _show(BuildContext context, Widget child) =>
       useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.gutter),
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.all(AppSpacing.gutter).copyWith(
+          bottom: AppSpacing.gutter + MediaQuery.paddingOf(sheetContext).bottom,
+        ),
         child: SheetCard(child: child),
       ),
     );

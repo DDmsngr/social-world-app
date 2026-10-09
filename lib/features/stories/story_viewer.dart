@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -98,6 +100,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   @override
   void dispose() {
     _token++;
+    _touchHold?.cancel();
     _progress.dispose();
     _releaseVideo();
     super.dispose();
@@ -180,6 +183,18 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   void _resume() {
     if (_holds > 0) _holds--;
     if (_holds == 0 && _ready) _play();
+  }
+
+  Timer? _touchHold;
+  var _touchPaused = false;
+
+  void _releaseTouch() {
+    _touchHold?.cancel();
+    _touchHold = null;
+    if (_touchPaused) {
+      _touchPaused = false;
+      _resume();
+    }
   }
 
   void _close() => Navigator.of(context).maybePop();
@@ -312,16 +327,26 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
           children: [
             GestureDetector(
               behavior: HitTestBehavior.opaque,
+              // Удержание ставит историю на паузу сразу (через 0,2 с), а не
+              // после системной задержки долгого нажатия; отпустили — идёт дальше.
+              onTapDown: (_) {
+                _touchHold?.cancel();
+                _touchHold = Timer(const Duration(milliseconds: 200), () {
+                  _touchHold = null;
+                  _touchPaused = true;
+                  _pause();
+                });
+              },
+              onTapCancel: _releaseTouch,
               onTapUp: (details) {
+                if (_touchPaused) return _releaseTouch();
+                _releaseTouch();
                 if (details.localPosition.dx < media.size.width * 0.3) {
                   _prev();
                 } else {
                   _next();
                 }
               },
-              onLongPressStart: (_) => _pause(),
-              onLongPressEnd: (_) => _resume(),
-              onLongPressCancel: _resume,
               onVerticalDragEnd: (details) {
                 if ((details.primaryVelocity ?? 0) > 400) _close();
               },
@@ -464,6 +489,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
             messageId: 'story-${story.id}',
             senderName: story.authorName,
             preview: caption.isEmpty ? 'История' : 'История · $caption',
+            thumbUrl: story.kind == StoryKind.photo ? story.mediaUrl : null,
             kind: switch (story.kind) {
               StoryKind.photo => MessageKind.image,
               StoryKind.video => MessageKind.video,
