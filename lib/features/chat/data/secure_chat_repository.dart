@@ -387,6 +387,7 @@ class SecureChatRepository implements ChatRepository {
           attachment: ChatAttachment.fromJson(row['media']),
           replyTo: ChatMeta.fromJson(row['meta']).reply,
           forwardedFrom: ChatMeta.fromJson(row['meta']).forwardedFrom,
+          linkPreview: ChatMeta.fromJson(row['meta']).linkPreview,
           editedAt: _editedAt(row),
         ),
     ];
@@ -419,7 +420,11 @@ class SecureChatRepository implements ChatRepository {
           kind: message.kind,
           text: clean.isEmpty ? null : clean,
           attachment: message.attachment,
-          meta: ChatMeta(reply: message.replyTo, forwardedFrom: message.forwardedFrom),
+          meta: ChatMeta(
+            reply: message.replyTo,
+            forwardedFrom: message.forwardedFrom,
+            linkPreview: message.linkPreview,
+          ),
         ),
       );
       params.addAll({
@@ -506,6 +511,7 @@ class SecureChatRepository implements ChatRepository {
       signatureValid: true,
       replyTo: options.replyTo,
       forwardedFrom: options.forwardedFrom,
+      linkPreview: options.linkPreview,
     );
   }
 
@@ -1063,6 +1069,7 @@ class SecureChatRepository implements ChatRepository {
         signatureValid: decrypted.signatureValid,
         replyTo: meta.reply,
         forwardedFrom: meta.forwardedFrom,
+        linkPreview: meta.linkPreview,
         editedAt: _editedAt(row),
       );
     } catch (_) {

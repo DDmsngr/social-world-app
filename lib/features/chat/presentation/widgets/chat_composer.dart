@@ -27,6 +27,7 @@ import 'attachment_views.dart';
 import '../../live_location/live_location_screen.dart';
 import 'emoji_panel.dart';
 import 'photo_send_screen.dart';
+import '../../data/link_preview_fetcher.dart';
 import 'scheduled_sheet.dart';
 import 'schedule_picker.dart';
 import 'video_note_recorder.dart';
@@ -148,12 +149,15 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       _error = null;
     });
     try {
+      // Каналы и обычные чаты: карточка ссылки достаётся здесь, на телефоне
+      // отправителя, и едет внутри сообщения. Не вышло — уходит просто текст.
+      final preview = await LinkPreviewFetcher.fetch(text);
       await ref
           .read(chatRepositoryProvider)
           .send(
             conversationId: widget.conversationId,
             text: text,
-            options: SendOptions(replyTo: widget.replyTo, silent: silent),
+            options: SendOptions(replyTo: widget.replyTo, silent: silent, linkPreview: preview),
           )
           .timeout(sendTimeout);
       _controller.clear();

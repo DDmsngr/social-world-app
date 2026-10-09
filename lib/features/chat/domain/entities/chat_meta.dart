@@ -82,7 +82,7 @@ class ChatReply {
 /// Служебное содержимое сообщения: ответ и пересылка. В группах лежит в
 /// открытой колонке `meta`, в личных диалогах — внутри шифротекста.
 class ChatMeta {
-  const ChatMeta({this.reply, this.forwardedFrom});
+  const ChatMeta({this.reply, this.forwardedFrom, this.linkPreview});
 
   static const empty = ChatMeta();
 
@@ -92,11 +92,16 @@ class ChatMeta {
   /// остаётся первый автор, как в Telegram.
   final String? forwardedFrom;
 
-  bool get isEmpty => reply == null && forwardedFrom == null;
+  /// Карточка ссылки из текста. Страницу открывал телефон отправителя, а не
+  /// получателя: чужие сайты не узнают, кто читает сообщение.
+  final LinkPreview? linkPreview;
+
+  bool get isEmpty => reply == null && forwardedFrom == null && linkPreview == null;
 
   Map<String, Object?> toJson() => {
     if (reply != null) 'r': reply!.toJson(),
     if (forwardedFrom != null) 'f': forwardedFrom,
+    if (linkPreview != null) 'l': linkPreview!.toJson(),
   };
 
   static ChatMeta fromJson(Object? raw) {
@@ -107,25 +112,60 @@ class ChatMeta {
       forwardedFrom: forwarded is String && forwarded.isNotEmpty
           ? forwarded
           : null,
+      linkPreview: LinkPreview.fromJson(raw['l']),
+    );
+  }
+}
+
+/// Превью ссылки: заголовок, описание и маленькая картинка (base64).
+class LinkPreview {
+  const LinkPreview({required this.url, this.title, this.description, this.imageB64});
+
+  final String url;
+  final String? title;
+  final String? description;
+  final String? imageB64;
+
+  bool get hasContent => (title?.isNotEmpty ?? false) || (description?.isNotEmpty ?? false);
+
+  Map<String, Object?> toJson() => {
+    'u': url,
+    if (title != null) 't': title,
+    if (description != null) 'd': description,
+    if (imageB64 != null) 'i': imageB64,
+  };
+
+  static LinkPreview? fromJson(Object? raw) {
+    if (raw is! Map) return null;
+    final url = raw['u'];
+    if (url is! String || !url.startsWith('http')) return null;
+    final image = raw['i'];
+    return LinkPreview(
+      url: url,
+      title: raw['t'] as String?,
+      description: raw['d'] as String?,
+      imageB64: image is String && image.length < 40000 ? image : null,
     );
   }
 }
 
 /// Как отправить: с ответом, пересылкой, без звука.
 class SendOptions {
-  const SendOptions({this.replyTo, this.forwardedFrom, this.silent = false});
+  const SendOptions({this.replyTo, this.forwardedFrom, this.silent = false, this.linkPreview});
 
   static const none = SendOptions();
 
   final ChatReply? replyTo;
   final String? forwardedFrom;
+  final LinkPreview? linkPreview;
 
   /// Без звука: сообщение обычное, но у получателя пуш приходит тихим.
   /// Флаг открытый (сервер должен выбрать канал уведомления) — это не
   /// содержимое, а настройка доставки.
   final bool silent;
 
-  ChatMeta get meta => ChatMeta(reply: replyTo, forwardedFrom: forwardedFrom);
+  ChatMeta get meta =>
+      ChatMeta(reply: replyTo, forwardedFrom: forwardedFrom, linkPreview: linkPreview);
 }
 
 /// Отложенное сообщение: лежит на сервере и уходит в [sendAt] либо когда

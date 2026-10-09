@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -138,6 +140,8 @@ class MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+        if (message.linkPreview != null && !bare)
+          _LinkPreviewCard(preview: message.linkPreview!, mine: mine),
         if (reactions != null)
           Align(alignment: Alignment.centerLeft, widthFactor: 1, child: reactions),
         const SizedBox(height: 4),
@@ -274,6 +278,98 @@ class _ForwardedLabel extends StatelessWidget {
 }
 
 /// Цитата сообщения, на которое это — ответ.
+/// Карточка ссылки под текстом: заголовок, описание, маленькая картинка.
+class _LinkPreviewCard extends StatelessWidget {
+  const _LinkPreviewCard({required this.preview, required this.mine});
+
+  final LinkPreview preview;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final dim = mine ? AppColors.onBubbleMine.withValues(alpha: 0.75) : AppColors.textDim;
+    final image = preview.imageB64;
+    Uint8List? bytes;
+    if (image != null) {
+      try {
+        bytes = base64Decode(image);
+      } catch (_) {
+        bytes = null;
+      }
+    }
+    return Semantics(
+      button: true,
+      label: 'Открыть ссылку: ${preview.title ?? preview.url}',
+      child: GestureDetector(
+        onTap: () {
+          final uri = Uri.tryParse(preview.url);
+          if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+        },
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+          decoration: BoxDecoration(
+            color: AppColors.ink.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(10),
+            border: Border(left: BorderSide(color: AppColors.primaryTint, width: 3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      Uri.tryParse(preview.url)?.host.replaceFirst('www.', '') ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.5, color: dim),
+                    ),
+                    if (preview.title != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          preview.title!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: mine ? AppColors.onBubbleMine : AppColors.text,
+                          ),
+                        ),
+                      ),
+                    if (preview.description != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          preview.description!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12.5, height: 1.3, color: dim),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (bytes != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.memory(bytes, width: 56, height: 56, fit: BoxFit.cover, gaplessPlayback: true),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _QuoteBlock extends StatelessWidget {
   const _QuoteBlock({required this.reply, required this.mine});
 

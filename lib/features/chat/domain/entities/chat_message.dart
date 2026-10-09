@@ -121,7 +121,11 @@ class ChatMessage {
     this.replyTo,
     this.forwardedFrom,
     this.editedAt,
+    this.linkPreview,
   });
+
+  /// Карточка ссылки из текста (см. [LinkPreview]).
+  final LinkPreview? linkPreview;
 
   final String id;
   final String conversationId;
@@ -191,5 +195,6 @@ class ChatMessage {
         replyTo: replyTo,
         forwardedFrom: forwardedFrom,
         editedAt: editedAt ?? this.editedAt,
+        linkPreview: linkPreview,
       );
 }
