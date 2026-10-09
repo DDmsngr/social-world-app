@@ -55,9 +55,12 @@ Future<ForwardResult> forwardMessages({
   for (final target in targets) {
     try {
       for (final message in messages) {
-        final options = withAuthor
-            ? SendOptions(forwardedFrom: authorOf(message))
-            : SendOptions.none;
+        final options = SendOptions(
+          forwardedFrom: withAuthor ? authorOf(message) : null,
+          sticker: message.kind == MessageKind.sticker
+              ? message.stickerId
+              : null,
+        );
         final attachment = message.attachment;
         if (attachment == null || message.kind == MessageKind.sticker) {
           await repository.send(

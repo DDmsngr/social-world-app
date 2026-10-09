@@ -320,6 +320,9 @@ class SecureChatRepository implements ChatRepository {
           replyTo: ChatMeta.fromJson(row['meta']).reply,
           forwardedFrom: ChatMeta.fromJson(row['meta']).forwardedFrom,
           editedAt: _editedAt(row),
+          stickerId: row['kind'] == MessageKind.sticker.wire
+              ? ChatMeta.fromJson(row['meta']).sticker
+              : null,
         ),
     ];
   }
@@ -442,6 +445,7 @@ class SecureChatRepository implements ChatRepository {
       signatureValid: true,
       replyTo: options.replyTo,
       forwardedFrom: options.forwardedFrom,
+      stickerId: options.sticker,
     );
   }
 
@@ -903,6 +907,7 @@ class SecureChatRepository implements ChatRepository {
         replyTo: meta.reply,
         forwardedFrom: meta.forwardedFrom,
         editedAt: _editedAt(row),
+        stickerId: kind == MessageKind.sticker ? meta.sticker : null,
       );
     } catch (_) {
       return ChatMessage(

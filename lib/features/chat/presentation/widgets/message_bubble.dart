@@ -5,8 +5,10 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/link_text.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_meta.dart';
+import '../../domain/stickers.dart';
 import 'attachment_views.dart';
 import 'emoji_panel.dart';
+import 'sticker_views.dart';
 
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
@@ -38,9 +40,15 @@ class MessageBubble extends StatelessWidget {
     };
     // С ответом или пересылкой сообщению нужен пузырь: в нём живёт цитата.
     final hasMeta = message.replyTo != null || message.forwardedFrom != null;
+    // Фирменный стикер — картинка; незнакомый id (стикер из версии новее
+    // этой) — эмодзи-заменитель из текста, как у старых «стикеров».
+    final stickerPath = message.kind == MessageKind.sticker
+        ? stickerAsset(message.stickerId)
+        : null;
     final bigEmoji = emojiCount > 0 && !hasMeta;
     final bare =
         bigEmoji ||
+        (stickerPath != null && !hasMeta) ||
         (!hasMeta &&
             message.kind == MessageKind.videoNote &&
             message.attachment != null);
@@ -71,7 +79,13 @@ class MessageBubble extends StatelessWidget {
           _ForwardedLabel(name: message.forwardedFrom!, mine: mine),
         if (message.replyTo != null)
           _QuoteBlock(reply: message.replyTo!, mine: mine),
-        if (bigEmoji)
+        if (stickerPath != null)
+          StickerImage(
+            asset: stickerPath,
+            fallback: caption,
+            size: 148,
+          )
+        else if (bigEmoji)
           Text(
             caption,
             style: TextStyle(
@@ -85,7 +99,9 @@ class MessageBubble extends StatelessWidget {
           )
         else if (hasAttachment)
           AttachmentView(message: message, mine: mine, onMore: onMediaMore),
-        if (!bare && (!hasAttachment || caption.isNotEmpty)) ...[
+        if (!bare &&
+            stickerPath == null &&
+            (!hasAttachment || caption.isNotEmpty)) ...[
           if (hasAttachment) const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerLeft,

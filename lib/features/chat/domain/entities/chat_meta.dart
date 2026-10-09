@@ -53,10 +53,10 @@ class ChatReply {
   }
 }
 
-/// Служебное содержимое сообщения: ответ и пересылка. В группах лежит в
-/// открытой колонке `meta`, в личных диалогах — внутри шифротекста.
+/// Служебное содержимое сообщения: ответ, пересылка, id стикера. В группах
+/// лежит в открытой колонке `meta`, в личных диалогах — внутри шифротекста.
 class ChatMeta {
-  const ChatMeta({this.reply, this.forwardedFrom});
+  const ChatMeta({this.reply, this.forwardedFrom, this.sticker});
 
   static const empty = ChatMeta();
 
@@ -66,40 +66,56 @@ class ChatMeta {
   /// остаётся первый автор, как в Telegram.
   final String? forwardedFrom;
 
-  bool get isEmpty => reply == null && forwardedFrom == null;
+  /// Id фирменного стикера (`<пак>.<ключ>`). Текст такого сообщения —
+  /// эмодзи-заменитель: его и покажут версии, которые стикеров не знают.
+  final String? sticker;
+
+  bool get isEmpty => reply == null && forwardedFrom == null && sticker == null;
 
   Map<String, Object?> toJson() => {
     if (reply != null) 'r': reply!.toJson(),
     if (forwardedFrom != null) 'f': forwardedFrom,
+    if (sticker != null) 's': sticker,
   };
 
   static ChatMeta fromJson(Object? raw) {
     if (raw is! Map) return empty;
     final forwarded = raw['f'];
+    final sticker = raw['s'];
     return ChatMeta(
       reply: ChatReply.fromJson(raw['r']),
       forwardedFrom: forwarded is String && forwarded.isNotEmpty
           ? forwarded
           : null,
+      sticker: sticker is String && sticker.isNotEmpty ? sticker : null,
     );
   }
 }
 
-/// Как отправить: с ответом, пересылкой, без звука.
+/// Как отправить: с ответом, пересылкой, без звука, стикером.
 class SendOptions {
-  const SendOptions({this.replyTo, this.forwardedFrom, this.silent = false});
+  const SendOptions({
+    this.replyTo,
+    this.forwardedFrom,
+    this.silent = false,
+    this.sticker,
+  });
 
   static const none = SendOptions();
 
   final ChatReply? replyTo;
   final String? forwardedFrom;
 
+  /// Id стикера для сообщения с [MessageKind.sticker].
+  final String? sticker;
+
   /// Без звука: сообщение обычное, но у получателя пуш приходит тихим.
   /// Флаг открытый (сервер должен выбрать канал уведомления) — это не
   /// содержимое, а настройка доставки.
   final bool silent;
 
-  ChatMeta get meta => ChatMeta(reply: replyTo, forwardedFrom: forwardedFrom);
+  ChatMeta get meta =>
+      ChatMeta(reply: replyTo, forwardedFrom: forwardedFrom, sticker: sticker);
 }
 
 /// Отложенное сообщение: лежит на сервере и уходит в [sendAt] либо когда

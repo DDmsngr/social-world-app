@@ -77,6 +77,7 @@ class LocalChatRepository implements ChatRepository {
       signatureValid: true,
       replyTo: options.replyTo,
       forwardedFrom: options.forwardedFrom,
+      stickerId: options.sticker,
     ),
   );
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../domain/stickers.dart';
+import 'sticker_views.dart';
 
 /// Эмодзи для поля ввода: вставляются в текст на место курсора и ничего не
 /// отправляют. Раньше на этом месте были «стикеры» — те же эмодзи, которые
@@ -265,17 +267,24 @@ TextEditingValue deleteBeforeSelection(TextEditingValue value) {
   );
 }
 
-/// Панель на месте клавиатуры: недавние, категории, кнопка «стереть».
+/// Панель на месте клавиатуры: недавние, категории эмодзи, паки стикеров,
+/// кнопка «стереть». Эмодзи вставляются в текст, стикер уходит сразу.
 class EmojiPanel extends StatefulWidget {
   const EmojiPanel({
     super.key,
     required this.onPick,
     required this.onBackspace,
+    this.stickerPacks = const [],
+    this.onSticker,
     this.height = 280,
   });
 
   final ValueChanged<String> onPick;
   final VoidCallback onBackspace;
+
+  /// Паки стикеров — вкладками после эмодзи.
+  final List<StickerPack> stickerPacks;
+  final ValueChanged<Sticker>? onSticker;
   final double height;
 
   /// Недавние живут, пока запущено приложение, — этого хватает, чтобы
@@ -298,9 +307,27 @@ class _EmojiPanelState extends State<EmojiPanel> {
     widget.onPick(emoji);
   }
 
+  void _pickSticker(Sticker sticker) {
+    HapticFeedback.selectionClick();
+    widget.onSticker?.call(sticker);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final emojis = _tab == 0 ? EmojiPanel.recent : emojiCategories[_tab - 1].$2;
+    final packs = [
+      for (final pack in widget.stickerPacks)
+        if (pack.stickers.isNotEmpty) pack,
+    ];
+    // Вкладки: 0 — недавние, дальше категории эмодзи, за ними паки.
+    final packIndex = _tab - emojiCategories.length - 1;
+    final pack = packIndex >= 0 && packIndex < packs.length
+        ? packs[packIndex]
+        : null;
+    final emojis = pack != null
+        ? const <String>[]
+        : _tab == 0 || _tab > emojiCategories.length
+        ? EmojiPanel.recent
+        : emojiCategories[_tab - 1].$2;
 
     return Container(
       height: widget.height,
@@ -336,6 +363,20 @@ class _EmojiPanelState extends State<EmojiPanel> {
                             style: const TextStyle(fontSize: 20),
                           ),
                         ),
+                      for (var i = 0; i < packs.length; i++)
+                        _Tab(
+                          key: ValueKey('sticker-pack-${packs[i].id}'),
+                          selected: _tab == emojiCategories.length + 1 + i,
+                          onTap: () => setState(
+                            () => _tab = emojiCategories.length + 1 + i,
+                          ),
+                          child: StickerImage(
+                            asset: packs[i].stickers.first.asset,
+                            fallback: packs[i].stickers.first.emoji,
+                            size: 28,
+                            semanticLabel: 'Стикеры «${packs[i].title}»',
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -353,7 +394,9 @@ class _EmojiPanelState extends State<EmojiPanel> {
           ),
           Divider(height: 1, color: AppColors.hair),
           Expanded(
-            child: emojis.isEmpty
+            child: pack != null
+                ? StickerGrid(stickers: pack.stickers, onPick: _pickSticker)
+                : emojis.isEmpty
                 ? Center(
                     child: Text(
                       'Здесь появятся недавние',
@@ -385,6 +428,7 @@ class _EmojiPanelState extends State<EmojiPanel> {
 
 class _Tab extends StatelessWidget {
   const _Tab({
+    super.key,
     required this.selected,
     required this.onTap,
     required this.child,

@@ -120,6 +120,12 @@ flutter:
     - .env
     - assets/images/
     - assets/sounds/
+    # Фирменные стикеры: картинки по пакам и manifest.json с тегами поиска.
+    - assets/stickers/
+    - assets/stickers/basic/
+    - assets/stickers/more/
+    - assets/stickers/city/
+    - assets/stickers/chao/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

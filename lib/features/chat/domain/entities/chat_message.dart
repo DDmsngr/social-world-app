@@ -121,6 +121,7 @@ class ChatMessage {
     this.replyTo,
     this.forwardedFrom,
     this.editedAt,
+    this.stickerId,
   });
 
   final String id;
@@ -153,6 +154,9 @@ class ChatMessage {
 
   /// Когда автор последний раз правил текст; null — не правил.
   final DateTime? editedAt;
+
+  /// Id фирменного стикера; [text] у такого сообщения — эмодзи-заменитель.
+  final String? stickerId;
 
   /// Строка для списка чатов.
   String get preview {
@@ -190,5 +194,6 @@ class ChatMessage {
         replyTo: replyTo,
         forwardedFrom: forwardedFrom,
         editedAt: editedAt ?? this.editedAt,
+        stickerId: stickerId,
       );
 }
