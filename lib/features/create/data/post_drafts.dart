@@ -17,9 +17,11 @@ class PostDraft {
     required this.body,
     required this.attachmentPaths,
     required this.updatedAt,
+    this.tags = const [],
   });
 
   final String id;
+  final List<String> tags;
 
   /// `moment` или `article` (как сегмент маршрута создания).
   final String kind;
@@ -45,6 +47,7 @@ class PostDraft {
     'title': title,
     'body': body,
     'files': attachmentPaths,
+    'tags': tags,
     'at': updatedAt.toIso8601String(),
   };
 
@@ -63,6 +66,10 @@ class PostDraft {
           if (p is String && File(p).existsSync()) p,
       ],
       updatedAt: DateTime.tryParse('${raw['at']}') ?? DateTime.now(),
+      tags: [
+        for (final t in (raw['tags'] as List? ?? const []))
+          if (t is String) t,
+      ],
     );
   }
 }
@@ -94,6 +101,7 @@ abstract final class PostDrafts {
     required String title,
     required String body,
     required List<String> attachmentPaths,
+    List<String> tags = const [],
   }) async {
     final draft = PostDraft(
       id: id ?? _uuid.v4(),
@@ -101,6 +109,7 @@ abstract final class PostDrafts {
       title: title,
       body: body,
       attachmentPaths: attachmentPaths,
+      tags: tags,
       updatedAt: DateTime.now(),
     );
     final all = [for (final d in await load()) if (d.id != draft.id) d, draft];

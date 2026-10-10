@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +26,7 @@ import '../../feed/presentation/widgets/publish_settings_panel.dart';
 import '../../stories/story_composer.dart';
 import '../data/post_drafts.dart';
 import 'widgets/article_editor.dart';
+import 'widgets/tag_row.dart';
 import 'widgets/article_media.dart';
 import 'widgets/composer_parts.dart';
 import 'widgets/post_body_editor.dart';
@@ -95,9 +98,15 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   /// id черновика, который сейчас правим (null — новый).
   String? _draftId;
 
+  final _tags = <String>[];
+  var _recentTags = const <String>[];
+
   @override
   void initState() {
     super.initState();
+    TagHistory.load().then((recent) {
+      if (mounted) setState(() => _recentTags = recent);
+    });
     _article.addListener(() {
       if (mounted) setState(() {});
     });
@@ -111,6 +120,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
         _bodyController.text = draft.body;
       }
       _attachments.addAll([for (final path in draft.attachmentPaths) XFile(path)]);
+      _tags.addAll(draft.tags);
     }
   }
 
@@ -124,6 +134,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       title: isArticle ? _titleController.text : '',
       body: isArticle ? _article.markdown : _bodyController.text,
       attachmentPaths: [for (final file in _attachments) file.path],
+      tags: [..._tags],
     );
     ref.invalidate(postDraftsProvider);
   }
@@ -144,6 +155,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       _descriptionController.text.trim().isNotEmpty ||
       _article.markdown.trim().isNotEmpty ||
       _attachments.isNotEmpty ||
+      _tags.isNotEmpty ||
       _startsAt != null;
 
   Future<void> _publish() async {
@@ -173,8 +185,12 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
     final isArticle = _kind == ComposeKind.article;
     final settings = ref.read(publishSettingsProvider).current;
 
+    // Теги уходят в конце текста обычными #тегами: так их уже понимают поиск,
+    // «по тегу» в ленте и сервер.
+    final tagLine = _tags.map((t) => '#$t').join(' ');
+    final text = isArticle ? _article.markdown : _bodyController.text;
     final post = await ref.read(feedRepositoryProvider).createPost(
-      body: isArticle ? _article.markdown : _bodyController.text,
+      body: tagLine.isEmpty ? text : '${text.trimRight()}\n\n$tagLine',
       postType: isArticle ? PostType.article : PostType.moment,
       title: isArticle ? _titleController.text : null,
       bodyFormat: isArticle ? BodyFormat.markdown : BodyFormat.plain,
@@ -202,6 +218,8 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
         AppLog.add('История из момента не опубликовалась: $error');
       }
     }
+
+    unawaited(TagHistory.remember(_tags));
 
     // Опубликовано — черновик больше не нужен.
     final draftId = _draftId;
@@ -315,24 +333,28 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
     if (at != null && mounted) setState(() => _startsAt = at);
   }
 
-  bool get _canPublish {
-    if (_busy) return false;
-    return switch (_kind) {
-      ComposeKind.moment =>
-        _bodyController.text.trim().length >= 3 || _attachments.isNotEmpty,
-      ComposeKind.article =>
-        _titleController.text.trim().length >= 3 &&
-            _article.markdown.trim().length >= 20 &&
-            _article.markdown.length <= ArticleController.maxLength,
-      ComposeKind.event =>
-        _titleController.text.trim().length >= 3 && _startsAt != null,
-    };
-  }
+  bool get _contentOk => switch (_kind) {
+    ComposeKind.moment =>
+      _bodyController.text.trim().length >= 3 || _attachments.isNotEmpty,
+    ComposeKind.article =>
+      _titleController.text.trim().length >= 3 &&
+          _article.markdown.trim().length >= 20 &&
+          _article.markdown.length <= ArticleController.maxLength,
+    ComposeKind.event =>
+      _titleController.text.trim().length >= 3 && _startsAt != null,
+  };
+
+  /// У момента и статьи нужно не меньше двух тегов: по ним другие люди
+  /// скрывают темы, которые им не интересны.
+  bool get _tagsOk => !_kind.isPost || _tags.length >= minPostTags;
+
+  bool get _canPublish => !_busy && _contentOk && _tagsOk;
 
   /// Что не хватает до публикации — одной строкой, чтобы неактивная кнопка не
   /// была загадкой.
   String? get _missing {
     if (_canPublish || _busy) return null;
+    if (_contentOk && !_tagsOk) return 'Добавьте теги: нужно минимум $minPostTags';
     return switch (_kind) {
       ComposeKind.moment => 'Напишите хотя бы пару слов или добавьте фото',
       ComposeKind.article => _titleController.text.trim().length < 3
@@ -622,6 +644,21 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
                   hintText: 'О чём событие, что взять с собой',
                   alignLabelWithHint: true,
                 ),
+              ),
+            ],
+            if (_kind.isPost) ...[
+              const SizedBox(height: 14),
+              TagRow(
+                tags: _tags,
+                onChanged: (next) => setState(() {
+                  _tags
+                    ..clear()
+                    ..addAll(next);
+                }),
+                suggestions: [
+                  ..._recentTags,
+                  for (final t in ref.watch(trendingHashtagsProvider).value ?? const <({String tag, int posts})>[]) t.tag,
+                ],
               ),
             ],
             const SizedBox(height: 14),
