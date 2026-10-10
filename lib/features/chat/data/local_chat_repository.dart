@@ -277,7 +277,7 @@ class LocalChatRepository implements ChatRepository {
   ];
 
   @override
-  Future<void> markRead(String conversationId) async {
+  Future<void> markRead(String conversationId, {DateTime? upTo}) async {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index != -1) {
       _conversations[index] = _conversations[index].copyWith(unreadCount: 0);

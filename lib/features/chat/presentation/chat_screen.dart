@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/audio/incoming_click.dart';
 import '../../../core/debug/app_log.dart';
 import '../../../core/push/push_service.dart';
 import '../../../core/router/app_router.dart';
@@ -371,9 +372,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // Прочитал — значит в приложении: отметка присутствия не ждёт минутного
     // таймера, и у собеседника сразу «в сети».
     unawaited(ref.read(chatRepositoryProvider).touchPresence());
+    final newest = ref.read(messagesProvider(widget.conversationId)).value?.lastOrNull?.sentAt;
     ref
         .read(chatRepositoryProvider)
-        .markRead(widget.conversationId)
+        .markRead(widget.conversationId, upTo: newest)
         .then((_) => ref.invalidate(conversationsProvider))
         .catchError((Object error) => AppLog.add('Отметка прочтения: $error'));
   }
@@ -405,6 +407,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       // Прочитанным считается и всё, что пришло, пока ответ ещё не ушёл: без
       // before > 0 первая подгрузка после открытия тоже отмечается.
       if ((next.value?.length ?? 0) > before) {
+        // Пришло сообщение, пока чат открыт: тот же щелчок, что и из других
+        // чатов (свои сообщения щёлкают при отправке сами).
+        final fresh = next.value?.lastOrNull;
+        if (before > 0 && fresh != null && fresh.senderId != myId) IncomingClick.play();
         _markRead();
         // Отложенное могло как раз уйти — список «запланировано» устарел.
         ref.invalidate(scheduledMessagesProvider(widget.conversationId));

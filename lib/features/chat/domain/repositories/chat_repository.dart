@@ -86,7 +86,10 @@ abstract interface class ChatRepository {
   /// первом обращении, дальше берёт из кэша.
   Future<String> attachmentFile(ChatMessage message);
 
-  Future<void> markRead(String conversationId);
+  /// [upTo] — время самого нового увиденного сообщения (по часам сервера):
+  /// часы телефона могут отставать, и отметка «сейчас» оказывалась раньше
+  /// сообщения, тогда непрочитанное висело.
+  Future<void> markRead(String conversationId, {DateTime? upTo});
 
   /// Сообщения чата по id: для закрепов и закладок. Старые, которых нет в
   /// загруженной ленте, докачиваются и расшифровываются здесь же. Удалённые у

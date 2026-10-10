@@ -924,11 +924,14 @@ class SecureChatRepository implements ChatRepository {
       error.code == 'PGRST205' || error.code == '42P01';
 
   @override
-  Future<void> markRead(String conversationId) async {
+  Future<void> markRead(String conversationId, {DateTime? upTo}) async {
     await _ready;
+    var at = DateTime.now().toUtc();
+    final seen = upTo?.toUtc();
+    if (seen != null && seen.isAfter(at)) at = seen;
     await _client
         .from('chat_members')
-        .update({'last_read_at': DateTime.now().toUtc().toIso8601String()})
+        .update({'last_read_at': at.toIso8601String()})
         .eq('conversation_id', conversationId)
         .eq('profile_id', currentUserId);
   }
