@@ -19,6 +19,7 @@ import 'providers/feed_providers.dart';
 import 'widgets/comment_composer.dart';
 import 'widgets/comment_tile.dart';
 import 'widgets/post_card.dart';
+import 'widgets/post_share_sheet.dart';
 
 /// Публикация и обсуждение под ней ветками.
 class PostDetailScreen extends ConsumerStatefulWidget {
@@ -224,6 +225,15 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
           tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
         ),
+        actions: [
+          // Статьёй делятся из самой статьи: себе в профиль, в чат, группу или
+          // канал, а последним пунктом ссылкой наружу.
+          IconButton(
+            onPressed: () => showPostShare(context, ref, post),
+            tooltip: 'Поделиться',
+            icon: const Icon(Icons.ios_share),
+          ),
+        ],
       ),
       body: Column(
         children: [
