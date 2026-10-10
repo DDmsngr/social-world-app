@@ -192,6 +192,8 @@ class MapArtPainter extends CustomPainter {
     final rnd = math.Random(variant * 7919 + 13);
     final w = size.width;
     final h = size.height;
+    // Улицы и река уходят за края плитки: без обрезки они рисовались по всему экрану.
+    canvas.clipRect(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, Paint()..color = base);
 
     // Кварталы.

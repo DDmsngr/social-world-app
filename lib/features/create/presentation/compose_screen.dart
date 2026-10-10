@@ -490,7 +490,10 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
           ),
           actions: [
             if (_canDraft)
-              TextButton(
+              // Иконка, а не слово: со словом заголовок «Новая статья» обрезался.
+              IconButton(
+                tooltip: 'Сохранить как черновик',
+                icon: const Icon(Icons.drafts_outlined),
                 onPressed: _dirty && !_busy
                     ? () async {
                         await _saveDraft();
@@ -501,7 +504,6 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
                         context.canPop() ? context.pop() : context.go(Routes.create);
                       }
                     : null,
-                child: const Text('Черновик'),
               ),
             Padding(
               padding: const EdgeInsets.only(right: 12),
