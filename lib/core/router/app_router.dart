@@ -55,6 +55,7 @@ import '../../features/assistant/assistant_screen.dart';
 import '../../features/feed/presentation/hashtag_screen.dart';
 import '../../features/migration/import_screen.dart';
 import '../text/hashtags.dart';
+import '../../features/profile/presentation/invites_screen.dart';
 import '../../features/profile/presentation/profile_menu_screen.dart';
 import '../../features/saved/saved_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
@@ -137,6 +138,9 @@ abstract final class Routes {
 
   /// Раздел «🎯 Квесты» профиля: активные, история, созданные мной (п. 43).
   static const myQuests = '/profile/quests';
+
+  /// Профиль → ☰ → «Приглашения».
+  static const invites = '/profile/invites';
 
   /// «Мне надо»: просьба, создание, мои просьбы.
   static const needDetail = '/need';
@@ -376,6 +380,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.assistant, builder: (_, _) => const AssistantScreen()),
       GoRoute(path: Routes.importData, builder: (_, _) => const ImportScreen()),
       GoRoute(path: Routes.profileMenu, builder: (_, _) => const ProfileMenuScreen()),
+      GoRoute(path: Routes.invites, builder: (_, _) => const InvitesScreen()),
       GoRoute(
         path: '${Routes.hashtag}/:tag',
         builder: (_, state) => HashtagScreen(
