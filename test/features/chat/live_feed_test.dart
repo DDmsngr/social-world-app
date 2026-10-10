@@ -116,20 +116,24 @@ void main() {
         if (attempts == 1) throw StateError('нет ключей');
         return 1;
       },
-      firstPoll: const Duration(milliseconds: 40),
-      pollEvery: const Duration(milliseconds: 40),
+      // Опрос заметно реже проверок: на загруженной машине CI таймеры
+      // запаздывают, и с коротким интервалом повтор успевал сработать раньше
+      // проверки «данных ещё нет».
+      firstPoll: const Duration(milliseconds: 600),
+      pollEvery: const Duration(milliseconds: 600),
     );
     h.fetched = rows(['a']);
     final errors = <Object>[];
     final seen = <List<String>>[];
     final sub = h.stream.listen(seen.add, onError: errors.add);
 
-    await wait(2);
+    for (var i = 0; i < 100 && errors.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
     expect(errors, isNotEmpty, reason: 'экран сразу узнаёт о проблеме');
     expect(seen, isEmpty);
 
-    // Не фиксированная пауза: на загруженной машине CI таймеры запаздывают.
-    for (var i = 0; i < 100 && seen.isEmpty; i++) {
+    for (var i = 0; i < 300 && seen.isEmpty; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
     expect(attempts, greaterThanOrEqualTo(2), reason: 'следующий проход пробует снова');
