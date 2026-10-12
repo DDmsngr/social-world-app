@@ -146,10 +146,20 @@ class MessageBubble extends StatelessWidget {
         ],
         if (message.linkPreview != null && !bare)
           _LinkPreviewCard(preview: message.linkPreview!, mine: mine),
-        if (reactions != null)
-          Align(alignment: Alignment.centerLeft, widthFactor: 1, child: reactions),
         const SizedBox(height: 4),
-        _Meta(message: message, mine: mine, onBubble: !bare),
+        // Реакции на одной строке со временем: слева реакции, справа время.
+        if (reactions != null)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(child: reactions!),
+              const SizedBox(width: 10),
+              _Meta(message: message, mine: mine, onBubble: !bare),
+            ],
+          )
+        else
+          _Meta(message: message, mine: mine, onBubble: !bare),
       ],
     );
 

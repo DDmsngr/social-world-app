@@ -1117,14 +1117,31 @@ class SecureChatRepository implements ChatRepository {
     return _date(row?['last_read_at']);
   }
 
+  /// Ключ собеседника перечитываем не реже раза в минуту: он меняется при
+  /// переустановке приложения, и без этого открытый у нас процесс до
+  /// перезапуска шифровал бы старым ключом, а новые сообщения собеседника
+  /// «не проходили проверку подписи».
+  static const _keysTtl = Duration(minutes: 1);
+  final _keysAt = <String, DateTime>{};
+
   Future<ChatPublicKeys?> _loadPublicKeys(String profileId) async {
     final cached = _keys[profileId];
-    if (cached != null) return cached;
-    final row = await _client
-        .from('chat_public_keys')
-        .select('x25519_public_key, ed25519_public_key, protocol_version')
-        .eq('profile_id', profileId)
-        .maybeSingle();
+    final at = _keysAt[profileId];
+    if (cached != null && at != null && DateTime.now().difference(at) < _keysTtl) {
+      return cached;
+    }
+    final Map<String, dynamic>? row;
+    try {
+      row = await _client
+          .from('chat_public_keys')
+          .select('x25519_public_key, ed25519_public_key, protocol_version')
+          .eq('profile_id', profileId)
+          .maybeSingle();
+    } catch (error) {
+      // Сеть моргнула — работаем со старым ключом, а не роняем чат.
+      if (cached != null) return cached;
+      rethrow;
+    }
     if (row == null ||
         row['protocol_version'] != ChatCryptoService.protocolVersion) {
       return null;
@@ -1134,6 +1151,7 @@ class SecureChatRepository implements ChatRepository {
       signingKey: row['ed25519_public_key'] as String,
     );
     await _checkPin(profileId, keys);
+    _keysAt[profileId] = DateTime.now();
     return _keys[profileId] = keys;
   }
 
