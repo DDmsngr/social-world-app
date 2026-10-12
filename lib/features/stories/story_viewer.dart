@@ -102,6 +102,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   void dispose() {
     _token++;
     _touchHold?.cancel();
+    _captionTimer?.cancel();
     _progress.dispose();
     _releaseVideo();
     super.dispose();
@@ -125,6 +126,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     setState(() {
       _ready = false;
       _failed = false;
+      _captionShown = true;
     });
 
     final story = _story;
@@ -141,8 +143,12 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
           video = VideoPlayerController.networkUrl(Uri.parse(story.mediaUrl!));
           await video.initialize();
           final real = video.value.duration;
+          // Часть длинного видео начинается не с нуля: перематываем и играем
+          // не больше 30 секунд от этого места.
+          final start = story.startSec < real.inSeconds ? story.startSec : 0;
+          if (start > 0) await video.seekTo(Duration(seconds: start));
           length = Duration(
-            seconds: real.inSeconds.clamp(minStorySeconds, maxVideoSeconds),
+            seconds: (real.inSeconds - start).clamp(minStorySeconds, maxVideoSeconds),
           );
         case StoryKind.text:
           break;
@@ -164,6 +170,25 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     });
     _progress.duration = length;
     if (_holds == 0) _play();
+    _armCaption(story);
+  }
+
+  /// Подпись у видео: показывается в начале и уходит через 3 секунды, чтобы не
+  /// закрывать ролик. Тап по экрану возвращает её (см. onTapUp).
+  var _captionShown = true;
+  Timer? _captionTimer;
+
+  bool _hasHideableCaption(Story story) =>
+      story.kind == StoryKind.video && (story.body?.isNotEmpty ?? false);
+
+  void _armCaption(Story story) {
+    _captionTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _captionShown = true);
+    if (!_hasHideableCaption(story)) return;
+    _captionTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _captionShown = false);
+    });
   }
 
   void _play() {
@@ -342,6 +367,11 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
               onTapUp: (details) {
                 if (_touchPaused) return _releaseTouch();
                 _releaseTouch();
+                // Подпись скрыта: первый тап только возвращает её, следующий листает.
+                if (!_captionShown && _hasHideableCaption(story)) {
+                  _armCaption(story);
+                  return;
+                }
                 if (details.localPosition.dx < media.size.width * 0.3) {
                   _prev();
                 } else {
@@ -421,18 +451,22 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                 children: [
                   if (story.kind != StoryKind.text &&
                       (story.body?.isNotEmpty ?? false))
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        story.body!,
-                        maxLines: 5,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                    AnimatedOpacity(
+                      opacity: _captionShown ? 1 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          story.body!,
+                          maxLines: 5,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 15),
+                        ),
                       ),
                     ),
                   Row(

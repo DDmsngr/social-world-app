@@ -86,4 +86,20 @@ void main() {
     expect(s.viewCount, 4);
     expect(s.viewed, isTrue);
   });
+
+  test('смещение части длинного видео читается, без колонки оно ноль', () {
+    Map<String, dynamic> row({Object? start}) => {
+      'id': 'i',
+      'author_id': 'u',
+      'author_name': 'Аня',
+      'kind': 'video',
+      'media_url': 'https://x/y.mp4',
+      'duration_sec': 20,
+      'created_at': '2026-10-06T09:00:00Z',
+      'start_sec': ?start,
+    };
+    expect(Story.fromRow(row(start: 30)).startSec, 30);
+    expect(Story.fromRow(row()).startSec, 0);
+    expect(Story.fromRow(row(start: 30)).copyWith(viewed: true).startSec, 30);
+  });
 }

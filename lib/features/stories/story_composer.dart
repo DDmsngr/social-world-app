@@ -129,15 +129,59 @@ Future<void> publishPostAsStory(WidgetRef ref, Post post) async {
   final repo = ref.read(storiesRepositoryProvider);
   if (!repo.available) return;
   final draft = _draftForPost(post);
-  await repo.create(
-    kind: draft.kind,
-    audience: draft.audience,
-    mediaUrl: draft.remoteUrl,
-    body: draft.text,
-    bg: draft.bg,
-    postId: draft.postId,
-  );
+
+  // Длинное видео не обрезается на тридцатой секунде: история делится на
+  // части по [maxVideoSeconds], подряд, одним роликом со смещением начала.
+  var total = 0;
+  var parts = 1;
+  if (draft.kind == StoryKind.video && draft.remoteUrl != null) {
+    total = await _videoSeconds(draft.remoteUrl!);
+    if (total > maxVideoSeconds) {
+      parts = ((total + maxVideoSeconds - 1) ~/ maxVideoSeconds).clamp(1, maxStoryParts);
+    }
+  }
+
+  for (var i = 0; i < parts; i++) {
+    final start = i * maxVideoSeconds;
+    try {
+      await repo.create(
+        kind: draft.kind,
+        audience: draft.audience,
+        mediaUrl: draft.remoteUrl,
+        // Подпись только на первой части, у остальных только кнопка поста.
+        body: i == 0 ? draft.text : null,
+        bg: draft.bg,
+        postId: draft.postId,
+        startSec: start,
+        durationSec: parts == 1
+            ? defaultStorySeconds
+            : (total - start).clamp(minStorySeconds, maxVideoSeconds),
+      );
+    } catch (error) {
+      // Первая часть не вышла — это провал; остальные части не критичны.
+      if (i == 0) rethrow;
+      AppLog.add('Часть ${i + 1} истории не опубликовалась: $error');
+      break;
+    }
+  }
   await ref.read(storiesProvider.notifier).refresh();
+}
+
+/// Не больше стольких частей (3 минуты видео) из одного ролика.
+const maxStoryParts = 6;
+
+/// Длина ролика по ссылке в секундах; 0 — не удалось узнать.
+Future<int> _videoSeconds(String url) async {
+  final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+  try {
+    await controller.initialize().timeout(const Duration(seconds: 15));
+    return controller.value.duration.inSeconds;
+  } catch (error) {
+    AppLog.add('Длина видео для истории не определилась: $error');
+    return 0;
+  } finally {
+    await controller.dispose();
+  }
 }
 
 StoryDraft _draftForPost(Post post) {

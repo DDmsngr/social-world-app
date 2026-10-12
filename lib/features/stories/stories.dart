@@ -67,6 +67,7 @@ class Story {
     this.postType,
     this.viewed = false,
     this.viewCount,
+    this.startSec = 0,
   });
 
   /// Тип поста, из которого сделана сторис: 'article', 'route', 'moment'.
@@ -97,6 +98,10 @@ class Story {
   final String? body;
   final int bg;
   final int durationSec;
+
+  /// С какой секунды ролика начинается эта история: длинное видео режется на
+  /// части по 30 секунд, у второй части это 30, у третьей 60 (миграция 0074).
+  final int startSec;
   final String? postId;
   final DateTime createdAt;
   final bool viewed;
@@ -119,6 +124,7 @@ class Story {
     createdAt: createdAt,
     viewed: viewed ?? this.viewed,
     viewCount: viewCount,
+    startSec: startSec,
   );
 
   factory Story.fromRow(Map<String, dynamic> row) => Story(
@@ -137,6 +143,7 @@ class Story {
     createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
     viewed: row['viewed'] as bool? ?? false,
     viewCount: (row['view_count'] as num?)?.toInt(),
+    startSec: (row['start_sec'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -263,6 +270,7 @@ class StoriesRepository {
     int bg = 0,
     int durationSec = defaultStorySeconds,
     String? postId,
+    int startSec = 0,
   }) async {
     await _client!.rpc(
       'create_story',
@@ -274,6 +282,9 @@ class StoriesRepository {
         'in_duration': durationSec,
         'in_visibility': audience.wire,
         'in_post': postId,
+        // Только у второй и следующих частей длинного видео: так история с одной
+        // частью работает и до миграции 0074.
+        if (startSec > 0) 'in_start': startSec,
       },
     );
   }
