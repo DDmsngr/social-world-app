@@ -45,5 +45,17 @@ void main() {
         orderedEquals(second.people.map((person) => person.blurredLongitude)),
       );
     });
+
+    test('своя точка на карте становится местом с теми же координатами', () async {
+      final place = await LocalDiscoverRepository().createCustomPlace(
+        title: '  ',
+        latitude: 43.6,
+        longitude: 39.7,
+      );
+
+      expect(place.title, 'Точка на карте');
+      expect(place.latitude, 43.6);
+      expect(place.longitude, 39.7);
+    });
   });
 }

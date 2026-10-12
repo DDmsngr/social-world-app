@@ -13,6 +13,14 @@ abstract interface class DiscoverRepository {
   /// загруженной выборки «рядом». `null` — такого места нет.
   Future<Place?> loadPlace(String placeId);
 
+  /// Своя точка на карте у статьи или события: сервер заводит её как место,
+  /// которое не показывается в каталоге заведений рядом.
+  Future<Place> createCustomPlace({
+    required String title,
+    required double latitude,
+    required double longitude,
+  });
+
   /// Зоны активности под фильтры пользователя. Считает сервер (PostGIS,
   /// `city_activity`): клиент получает готовые ячейки и не тянет на телефон
   /// все объекты города.

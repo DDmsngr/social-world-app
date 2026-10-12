@@ -21,6 +21,21 @@ class LocalDiscoverRepository implements DiscoverRepository {
   }
 
   @override
+  Future<Place> createCustomPlace({
+    required String title,
+    required double latitude,
+    required double longitude,
+  }) async {
+    return Place(
+      id: 'custom-${DateTime.now().microsecondsSinceEpoch}',
+      title: title.trim().isEmpty ? 'Точка на карте' : title.trim(),
+      category: 'Точка',
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
+
+  @override
   Future<List<ActivityCell>> loadActivity(ActivityQuery query) async {
     final objects = [
       for (final place in _places)

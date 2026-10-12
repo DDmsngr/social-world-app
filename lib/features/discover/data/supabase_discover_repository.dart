@@ -95,6 +95,19 @@ class SupabaseDiscoverRepository implements DiscoverRepository {
   }
 
   @override
+  Future<Place> createCustomPlace({
+    required String title,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final rows = await _client.rpc(
+      'create_custom_place',
+      params: {'in_title': title, 'in_lat': latitude, 'in_lng': longitude},
+    ) as List<dynamic>;
+    return _placeFromRow(rows.first as Map<String, dynamic>);
+  }
+
+  @override
   Future<List<ActivityCell>> loadActivity(ActivityQuery query) async {
     final rows = await _client.rpc(
       'city_activity',

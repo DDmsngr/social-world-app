@@ -29,6 +29,7 @@ import 'widgets/article_editor.dart';
 import 'widgets/tag_row.dart';
 import 'widgets/article_media.dart';
 import 'widgets/composer_parts.dart';
+import 'widgets/meeting_point_field.dart';
 import 'widgets/post_body_editor.dart';
 
 /// Что пишем на этом экране. Квест, «Мне надо» и маршрут устроены иначе и
@@ -405,8 +406,12 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
     return choice == 'drop';
   }
 
-  Future<void> _pickPlace(List<Place> places) async {
-    await showModalBottomSheet<void>(
+  Future<void> _pickPlace(
+    List<Place> places,
+    double centerLatitude,
+    double centerLongitude,
+  ) async {
+    final chosen = await showModalBottomSheet<_PlaceChoice>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
@@ -414,31 +419,75 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       showDragHandle: true,
       builder: (sheet) => SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, 20),
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.gutter,
+            0,
+            AppSpacing.gutter,
+            20 + MediaQuery.of(sheet).viewInsets.bottom,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Место', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 6),
               Text(
-                'Необязательно. Указывается название места, а не ваши координаты. '
-                'Нажмите на выбранное ещё раз, чтобы убрать.',
+                'Необязательно. Заведение рядом, адрес или своя точка на карте. '
+                'Другие увидят название места, а не ваши координаты.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
-              PlacePicker(
+              MeetingPointField(
+                value: _selectedPlace == null
+                    ? null
+                    : MeetingPoint.fromPlace(_selectedPlace!),
+                onChanged: (point) => Navigator.pop(sheet, _PlaceChoice(point)),
                 places: places,
-                selectedId: _selectedPlace?.id,
-                onChanged: (place) {
-                  setState(() => _selectedPlace = place);
-                  Navigator.pop(sheet);
-                },
+                resolver: AddressResolver(places: places, geocoder: _geocoder),
+                mapCenterLatitude: centerLatitude,
+                mapCenterLongitude: centerLongitude,
               ),
             ],
           ),
         ),
       ),
     );
+    if (chosen == null || !mounted) return;
+    await _applyPoint(chosen.point, places);
+  }
+
+  /// Заведение берём из списка как есть, адрес и точку на карте заводим на
+  /// сервере как своё место: дальше лента и карта работают с ним по place_id.
+  Future<void> _applyPoint(MeetingPoint? point, List<Place> places) async {
+    if (point == null) {
+      setState(() => _selectedPlace = null);
+      return;
+    }
+    final id = point.placeId;
+    if (id != null) {
+      for (final place in places) {
+        if (place.id == id) {
+          setState(() => _selectedPlace = place);
+          return;
+        }
+      }
+    }
+    try {
+      final place = await ref.read(discoverRepositoryProvider).createCustomPlace(
+        title: point.title ?? '',
+        latitude: point.latitude,
+        longitude: point.longitude,
+      );
+      if (!mounted) return;
+      setState(() => _selectedPlace = place);
+    } catch (error) {
+      AppLog.add('Своя точка не создалась: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendlyError(error, fallback: 'Не удалось сохранить точку')),
+        ),
+      );
+    }
   }
 
   /// Свёрнутая строка параметра: что выбрано сейчас и куда нажать.
@@ -666,7 +715,11 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
               icon: Icons.place_outlined,
               title: 'Место',
               value: _selectedPlace?.title ?? 'Не указано',
-              onTap: () => _pickPlace(places),
+              onTap: () => _pickPlace(
+                places,
+                center?.latitude ?? discoverCenterLatitude,
+                center?.longitude ?? discoverCenterLongitude,
+              ),
               onClear: _selectedPlace == null ? null : () => setState(() => _selectedPlace = null),
             ),
             if (_kind == ComposeKind.event) ...[
@@ -716,4 +769,11 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       ),
     );
   }
+}
+
+/// Результат окна выбора места: `point == null` значит «убрать место», а
+/// закрытие окна без выбора возвращает null вместо этого объекта.
+class _PlaceChoice {
+  const _PlaceChoice(this.point);
+  final MeetingPoint? point;
 }
