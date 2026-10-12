@@ -16,15 +16,18 @@
 # сервере, копируем их scp. Ключи не нужны и наружу не печатаются.
 
 $ErrorActionPreference = 'Stop'
-$server = 'socialworld'
+# 12.10.2026: переезд из Яндекс Облака (авария) в Selectel, Москва; заходим
+# напрямую по ключу из infra/ssh (в git его нет).
+$server = 'root@176.53.224.193'
+$sshOpts = @('-i', (Join-Path $PSScriptRoot '..\..\infra\ssh\selectel_chawo'), '-o', 'BatchMode=yes')
 $bucketDir = '/opt/supabase/docker/volumes/storage/stub/stub/assistant'
 
 function Remote([string]$script) {
   $local = Join-Path $env:TEMP 'inbox_run.sh'
   [IO.File]::WriteAllText($local, $script.Replace("`r`n", "`n"), [Text.UTF8Encoding]::new($false))
-  scp -q $local "${server}:/tmp/inbox_run.sh"
+  scp -q @sshOpts $local "${server}:/tmp/inbox_run.sh"
   if ($LASTEXITCODE -ne 0) { throw 'scp не удался' }
-  $out = ssh $server 'sudo -n sh /tmp/inbox_run.sh | base64 -w0'
+  $out = ssh @sshOpts $server 'sudo -n sh /tmp/inbox_run.sh | base64 -w0'
   if ($LASTEXITCODE -ne 0) { throw 'ssh не удался' }
   $joined = ($out -join '')
   if (-not $joined) { return '' }
@@ -35,7 +38,7 @@ function Psql([string]$sql) {
   # Запрос кладём в файл на сервере, чтобы не бороться с кавычками.
   $sqlLocal = Join-Path $env:TEMP 'inbox_q.sql'
   [IO.File]::WriteAllText($sqlLocal, $sql.Replace("`r`n", "`n"), [Text.UTF8Encoding]::new($false))
-  scp -q $sqlLocal "${server}:/tmp/inbox_q.sql"
+  scp -q @sshOpts $sqlLocal "${server}:/tmp/inbox_q.sql"
   if ($LASTEXITCODE -ne 0) { throw 'scp не удался' }
   Remote "docker cp /tmp/inbox_q.sql supabase-db:/tmp/inbox_q.sql`ndocker exec supabase-db psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -f /tmp/inbox_q.sql"
 }
@@ -61,7 +64,7 @@ select coalesce(json_agg(t), '[]'::json) from (
         $file = Join-Path $OutDir ($r.attachment_path -replace '/', '_')
         $tmp = "/tmp/inbox_$($r.id).bin"
         Remote "cp '$bucketDir/$($r.attachment_path)/$($r.version)' '$tmp' && chmod 644 '$tmp'" | Out-Null
-        scp -q "${server}:$tmp" $file
+        scp -q @sshOpts "${server}:$tmp" $file
         if ($LASTEXITCODE -ne 0) { throw "Не скачался скриншот $($r.attachment_path)" }
         Remote "shred -u '$tmp' 2>/dev/null || true" | Out-Null
         "[скриншот] $file"

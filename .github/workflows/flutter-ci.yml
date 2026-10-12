@@ -359,7 +359,7 @@ jobs:
             echo "::warning::SW_UPDATES_SSH_KEY не задан — копия обновления на свой сервер не загружена"
             exit 0
           fi
-          HOST=89.169.148.47
+          HOST=api-socialworld.deepdrift.tech
           BASE="https://api-socialworld.deepdrift.tech/updates"
           VERSION_CODE=$((5000 + GITHUB_RUN_NUMBER))
           apk_name="social-world-${VERSION_CODE}.apk"
