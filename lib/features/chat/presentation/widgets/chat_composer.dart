@@ -14,6 +14,7 @@ import 'package:record/record.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/errors/friendly_error.dart';
+import '../../../../core/media/video_compressor.dart';
 import '../../../../core/network/vpn_check.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/secure_chat_repository.dart';
@@ -310,8 +311,35 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     final hub = ref.read(typingHubProvider(widget.conversationId));
     hub?.ping(activity: kind.wire);
     final keepAlive = Timer.periodic(const Duration(seconds: 3), (_) => hub?.ping(activity: kind.wire));
+    var shown = label;
+    var compressed = false;
     try {
       final repository = ref.read(chatRepositoryProvider);
+      var sendPath = path;
+      // Чат шифрует файл целиком и принимает до 50 МБ: тяжёлый ролик сначала
+      // сжимается на телефоне (720p, затем 480p и ниже), как в постах.
+      if (kind == MessageKind.video && album == null) {
+        final size = await File(path).length();
+        if (size > maxVideoSourceBytes) {
+          if (mounted) setState(() => _error = videoTooBigMessage(size));
+          return;
+        }
+        if (VideoCompressor.shouldCompress(path, size)) {
+          compressed = true;
+          void rename(String to) {
+            if (!mounted) return;
+            setState(() {
+              final i = _uploads.indexOf(shown);
+              if (i >= 0) _uploads[i] = to;
+              shown = to;
+            });
+          }
+
+          rename('$label (сжимаем)');
+          sendPath = (await VideoCompressor.compress(path)).path;
+          rename(label);
+        }
+      }
       if (album != null) {
         await repository.sendAlbum(
           conversationId: widget.conversationId,
@@ -323,7 +351,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
         await repository.sendAttachment(
           conversationId: widget.conversationId,
           kind: kind,
-          filePath: path,
+          filePath: sendPath,
           name: name,
           mime: mime,
           durationMs: durationMs,
@@ -339,7 +367,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     } finally {
       keepAlive.cancel();
       hub?.stop();
-      if (mounted) setState(() => _uploads.remove(label));
+      if (compressed) await VideoCompressor.cleanup();
+      if (mounted) setState(() => _uploads.remove(shown));
     }
   }
 

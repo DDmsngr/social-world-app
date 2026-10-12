@@ -43,6 +43,12 @@ abstract final class VideoCompressor {
       file = await _pass(file.path, VideoQuality.Res640x480Quality, null);
       size = await file.length();
     }
+    // Длинный ролик: даже 480p не влез — последний проход, самое лёгкое качество.
+    if (size > maxUploadBytes) {
+      AppLog.add('Сжатие 480p дало ${size ~/ (1024 * 1024)} МБ, пробуем минимальное качество');
+      file = await _pass(file.path, VideoQuality.LowQuality, null);
+      size = await file.length();
+    }
     AppLog.add('Ролик сжат до ${size ~/ (1024 * 1024)} МБ');
     return file;
   }

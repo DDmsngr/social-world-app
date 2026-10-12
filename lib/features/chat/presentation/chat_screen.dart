@@ -410,7 +410,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         // Пришло сообщение, пока чат открыт: тот же щелчок, что и из других
         // чатов (свои сообщения щёлкают при отправке сами).
         final fresh = next.value?.lastOrNull;
-        if (before > 0 && fresh != null && fresh.senderId != myId) IncomingClick.play();
+        if (before > 0 && fresh != null && fresh.senderId != myId) {
+          IncomingClick.play();
+          // Чат открыт и сообщение видно: уведомление о нём в шторке лишнее
+          // (если система всё же показала его до нас — убираем).
+          unawaited(_push.clearConversation(widget.conversationId));
+        }
         _markRead();
         // Отложенное могло как раз уйти — список «запланировано» устарел.
         ref.invalidate(scheduledMessagesProvider(widget.conversationId));

@@ -95,23 +95,11 @@ class _PhotoViewerState extends State<PhotoViewer> {
         backgroundColor: Colors.black.withValues(
           alpha: (1 - _dragOffset.abs() / 400).clamp(0.4, 1.0),
         ),
-        body: GestureDetector(
-          // Свайп вниз закрывает, пока фото не приближено: иначе он же
-          // конфликтовал бы с перемещением увеличенной картинки.
-          onVerticalDragUpdate: _zoomed
-              ? null
-              : (details) => setState(() => _dragOffset += details.delta.dy),
-          onVerticalDragEnd: _zoomed
-              ? null
-              : (details) {
-                  if (_dragOffset.abs() > 120 ||
-                      (details.primaryVelocity ?? 0).abs() > 900) {
-                    _close();
-                  } else {
-                    setState(() => _dragOffset = 0);
-                  }
-                },
-          child: Stack(
+        // Свайп вниз закрывает, пока фото не приближено. Он идёт через тот же
+        // обработчик жестов, что и щипок (см. _ZoomablePhoto), а не через
+        // отдельный GestureDetector: два распознавателя спорили за жест, и
+        // щипок двумя пальцами почти не срабатывал.
+        body: Stack(
             fit: StackFit.expand,
             children: [
               Transform.translate(
@@ -127,6 +115,14 @@ class _PhotoViewerState extends State<PhotoViewer> {
                     url: widget.urls[page],
                     onZoomChanged: (zoomed) {
                       if (_zoomed != zoomed) setState(() => _zoomed = zoomed);
+                    },
+                    onDrag: (dy) => setState(() => _dragOffset += dy),
+                    onDragEnd: (velocity) {
+                      if (_dragOffset.abs() > 120 || velocity.abs() > 900) {
+                        _close();
+                      } else {
+                        setState(() => _dragOffset = 0);
+                      }
                     },
                   ),
                 ),
@@ -182,7 +178,6 @@ class _PhotoViewerState extends State<PhotoViewer> {
                   ),
                 ),
             ],
-          ),
         ),
       ),
     );
@@ -190,10 +185,21 @@ class _PhotoViewerState extends State<PhotoViewer> {
 }
 
 class _ZoomablePhoto extends StatefulWidget {
-  const _ZoomablePhoto({required this.url, required this.onZoomChanged});
+  const _ZoomablePhoto({
+    required this.url,
+    required this.onZoomChanged,
+    required this.onDrag,
+    required this.onDragEnd,
+  });
 
   final String url;
   final ValueChanged<bool> onZoomChanged;
+
+  /// Палец тянет неприближенное фото вверх или вниз (сдвиг по вертикали).
+  final ValueChanged<double> onDrag;
+
+  /// Палец отпущен после такого сдвига (вертикальная скорость).
+  final ValueChanged<double> onDragEnd;
 
   @override
   State<_ZoomablePhoto> createState() => _ZoomablePhotoState();
@@ -202,6 +208,7 @@ class _ZoomablePhoto extends StatefulWidget {
 class _ZoomablePhotoState extends State<_ZoomablePhoto> {
   final _controller = TransformationController();
   TapDownDetails? _doubleTap;
+  var _dragged = false;
 
   @override
   void initState() {
@@ -237,6 +244,21 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
         transformationController: _controller,
         minScale: 1,
         maxScale: 5,
+        // Один палец по неприближенному фото, больше вниз, чем вбок: тянем
+        // фото к закрытию. Два пальца (щипок) сюда не попадают.
+        onInteractionUpdate: (details) {
+          final unzoomed = _controller.value.getMaxScaleOnAxis() <= 1.02;
+          final delta = details.focalPointDelta;
+          if (details.pointerCount == 1 && unzoomed && delta.dy.abs() > delta.dx.abs()) {
+            _dragged = true;
+            widget.onDrag(delta.dy);
+          }
+        },
+        onInteractionEnd: (details) {
+          if (!_dragged) return;
+          _dragged = false;
+          widget.onDragEnd(details.velocity.pixelsPerSecond.dy);
+        },
         child: Center(
           child: Image(
             image: imageProviderFor(widget.url),
