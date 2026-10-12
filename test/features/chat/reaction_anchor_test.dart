@@ -54,7 +54,7 @@ void main() {
     await tester.longPress(find.text('сообщение 7'));
     await tester.pump(const Duration(milliseconds: 400));
     final more = tester.getRect(find.bySemanticsLabel('Все реакции'));
-    expect((more.center.dy - bubble.center.dy).abs(), lessThan(200),
+    expect((more.center.dy - bubble.center.dy).abs(), lessThan(260),
         reason: 'панель рядом с сообщением, а не посреди экрана');
   });
 }

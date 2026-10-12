@@ -31,6 +31,9 @@ Future<bool> showMessageMenu(
   required String myId,
   required Conversation? conversation,
   void Function(ChatMessage message)? onReply,
+  // «Выбрать»: переписка включает выбор нескольких сообщений. Без него пункта
+  // нет (просмотр фото, канал).
+  void Function(ChatMessage message)? onSelect,
   // Реакции: текущая моя и что делать при выборе. Без [onReact] полосы нет
   // (просмотр фото, неотправленное сообщение).
   String? myReaction,
@@ -51,6 +54,7 @@ Future<bool> showMessageMenu(
     isPinned: isPinned,
     isBookmarked: ref.read(myBookmarksProvider.notifier).has(message.id),
     mine: message.senderId == myId,
+    canSelect: onSelect != null,
   );
   // Плавающая панель у самого сообщения, как в Telegram: сверху реакции,
   // под ними пункты. Само сообщение остаётся подсвеченным на экране.
@@ -75,6 +79,9 @@ Future<bool> showMessageMenu(
       onReply?.call(message);
       // Из просмотра фото возвращаемся в переписку, где появилась строка ответа.
       return true;
+    case MessageAction.select:
+      onSelect?.call(message);
+      return false;
     case MessageAction.forward:
       await _forward(context, ref, message, myId, conversation);
       return false;
@@ -168,10 +175,10 @@ Future<bool> showMessageMenu(
       await _showInfo(context, message, myId: myId, conversation: conversation);
       return false;
     case MessageAction.saveToGallery:
-      await _saveToGallery(messenger, repository, message);
+      await _saveToGallery(messenger, repository, [message]);
       return false;
     case MessageAction.share:
-      await _share(context, messenger, repository, message);
+      await _share(context, messenger, repository, [message]);
       return false;
     case MessageAction.delete:
       return _delete(
@@ -555,6 +562,7 @@ class _FloatingMenuState extends State<_FloatingMenu> {
 
 String _label(MessageAction action) => switch (action) {
   MessageAction.reply => 'Ответить',
+  MessageAction.select => 'Выбрать',
   MessageAction.edit => 'Изменить',
   MessageAction.forward => 'Переслать',
   MessageAction.editForward => 'Изменить и переслать',
@@ -572,6 +580,7 @@ String _label(MessageAction action) => switch (action) {
 
 IconData _icon(MessageAction action) => switch (action) {
   MessageAction.reply => Icons.reply_rounded,
+  MessageAction.select => Icons.check_circle_outline_rounded,
   MessageAction.edit => Icons.edit_outlined,
   MessageAction.forward => Icons.shortcut_rounded,
   MessageAction.editForward => Icons.drive_file_rename_outline_rounded,
@@ -788,49 +797,70 @@ class _EditTextDialogState extends State<_EditTextDialog> {
   }
 }
 
-Future<void> _saveToGallery(
-  ScaffoldMessengerState messenger,
-  ChatRepository repository,
-  ChatMessage message,
-) async {
-  try {
-    if (!await Gal.hasAccess() && !await Gal.requestAccess()) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Нет доступа к галерее')),
-      );
-      return;
-    }
-    // В личных чатах файл на сервере зашифрован — в галерею уходит уже
-    // расшифрованная копия с устройства.
-    final all = message.attachment?.all ?? const <ChatAttachment>[];
-    if (message.kind == MessageKind.image && all.length > 1) {
-      // Альбом сохраняется целиком, фото по одному.
+/// Часть сетки фото как отдельное сообщение: так файл качается и расшифровывается
+/// тем же путём, что и обычное фото.
+ChatMessage _albumPart(ChatMessage message, int index) => ChatMessage(
+  id: index == 0 ? message.id : '${message.id}-a$index',
+  conversationId: message.conversationId,
+  senderId: message.senderId,
+  sentAt: message.sentAt,
+  kind: MessageKind.image,
+  attachment: message.attachment!.all[index],
+);
+
+/// Сохраняет вложения [messages] в галерею: у сетки — все фото. Возвращает, сколько
+/// файлов сохранено, или null, если галерея не дала доступ.
+Future<int?> _saveFiles(ChatRepository repository, List<ChatMessage> messages) async {
+  if (!await Gal.hasAccess() && !await Gal.requestAccess()) return null;
+  var saved = 0;
+  // В личных чатах файл на сервере зашифрован — в галерею уходит уже
+  // расшифрованная копия с устройства.
+  for (final message in messages) {
+    final attachment = message.attachment;
+    if (attachment == null) continue;
+    final isImage = message.kind == MessageKind.image;
+    final isVideo = message.kind == MessageKind.video || message.kind == MessageKind.videoNote;
+    if (!isImage && !isVideo) continue;
+    final all = attachment.all;
+    if (isImage && all.length > 1) {
       for (var i = 0; i < all.length; i++) {
-        final path = await repository.attachmentFile(
-          ChatMessage(
-            id: i == 0 ? message.id : '${message.id}-a$i',
-            conversationId: message.conversationId,
-            senderId: message.senderId,
-            sentAt: message.sentAt,
-            kind: MessageKind.image,
-            attachment: all[i],
-          ),
-        );
-        await Gal.putImage(path, album: 'ChaWo');
+        await Gal.putImage(await repository.attachmentFile(_albumPart(message, i)), album: 'ChaWo');
+        saved++;
       }
-      messenger.showSnackBar(
-        SnackBar(content: Text('Сохранено в галерею: ${all.length} фото')),
-      );
-      return;
+      continue;
     }
     final path = await repository.attachmentFile(message);
-    if (message.kind == MessageKind.image) {
+    if (isImage) {
       await Gal.putImage(path, album: 'ChaWo');
     } else {
       await Gal.putVideo(path, album: 'ChaWo');
     }
+    saved++;
+  }
+  return saved;
+}
+
+Future<void> _saveToGallery(
+  ScaffoldMessengerState messenger,
+  ChatRepository repository,
+  List<ChatMessage> messages,
+) async {
+  try {
+    final saved = await _saveFiles(repository, messages);
+    if (saved == null) {
+      messenger.showSnackBar(const SnackBar(content: Text('Нет доступа к галерее')));
+      return;
+    }
     messenger.showSnackBar(
-      const SnackBar(content: Text('Сохранено в галерею')),
+      SnackBar(
+        content: Text(
+          saved == 0
+              ? 'Сохранять нечего: нет фото и видео'
+              : saved == 1
+              ? 'Сохранено в галерею'
+              : 'Сохранено в галерею: $saved',
+        ),
+      ),
     );
   } catch (error) {
     AppLog.add('Сохранение в галерею: $error');
@@ -842,22 +872,46 @@ Future<void> _saveToGallery(
   }
 }
 
+/// Файлы сообщения для «Поделиться»: у сетки фото — все, а не только первое.
+Future<List<XFile>> _filesOf(ChatRepository repository, ChatMessage message) async {
+  final attachment = message.attachment;
+  if (attachment == null || message.kind == MessageKind.sticker) return const [];
+  final all = attachment.all;
+  if (message.kind == MessageKind.image && all.length > 1) {
+    return [
+      for (var i = 0; i < all.length; i++)
+        XFile(await repository.attachmentFile(_albumPart(message, i)), mimeType: all[i].mime),
+    ];
+  }
+  return [XFile(await repository.attachmentFile(message), mimeType: attachment.mime)];
+}
+
 Future<void> _share(
   BuildContext context,
   ScaffoldMessengerState messenger,
   ChatRepository repository,
-  ChatMessage message,
+  List<ChatMessage> messages,
 ) async {
   final box = context.findRenderObject() as RenderBox?;
   final origin = box != null && box.hasSize
       ? box.localToGlobal(Offset.zero) & box.size
       : null;
   try {
-    final path = await repository.attachmentFile(message);
+    final files = <XFile>[];
+    final texts = <String>[];
+    for (final message in messages) {
+      files.addAll(await _filesOf(repository, message));
+      final text = message.text?.trim();
+      if (text != null && text.isNotEmpty) texts.add(text);
+    }
+    if (files.isEmpty && texts.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('Поделиться нечем')));
+      return;
+    }
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(path, mimeType: message.attachment?.mime)],
-        text: message.text?.trim().isEmpty ?? true ? null : message.text,
+        files: files.isEmpty ? null : files,
+        text: texts.isEmpty ? null : texts.join('\n\n'),
         sharePositionOrigin: origin,
       ),
     );
@@ -869,6 +923,36 @@ Future<void> _share(
       ),
     );
   }
+}
+
+/// Несколько выбранных сообщений: сохранить фото и видео в галерею.
+Future<void> savePickedMessages(BuildContext context, WidgetRef ref, List<ChatMessage> messages) =>
+    _saveToGallery(ScaffoldMessenger.of(context), ref.read(chatRepositoryProvider), messages);
+
+/// Несколько выбранных сообщений: «Поделиться» (все файлы и тексты разом).
+Future<void> sharePickedMessages(BuildContext context, WidgetRef ref, List<ChatMessage> messages) =>
+    _share(context, ScaffoldMessenger.of(context), ref.read(chatRepositoryProvider), messages);
+
+/// Несколько выбранных сообщений: переслать в другие чаты одним действием.
+Future<void> forwardPickedMessages(
+  BuildContext context,
+  WidgetRef ref,
+  List<ChatMessage> messages,
+  String myId,
+  Conversation? source,
+) async {
+  if (messages.isEmpty) return;
+  final messenger = ScaffoldMessenger.of(context);
+  final myName = ref.read(currentUserProvider)?.displayName ?? 'Вы';
+  final result = await showForwardPicker(
+    context,
+    messages: messages,
+    excludeConversationId: messages.first.conversationId,
+    authorOf: (m) => forwardAuthor(m, myId: myId, myName: myName, source: source),
+  );
+  if (result == null) return;
+  final all = ref.read(conversationsProvider).value ?? const <Conversation>[];
+  messenger.showSnackBar(SnackBar(content: Text(forwardSummary(result, all))));
 }
 
 Future<bool> _delete(

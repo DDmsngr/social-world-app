@@ -76,6 +76,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   /// Сообщение, по которому открыто меню, — подсвечено, пока меню открыто.
   String? _selectedId;
 
+  /// Выбранные сообщения (режим «Выбрать»): переслать, поделиться, сохранить.
+  final _picked = <String>{};
+
   /// Ответ, который сейчас набирается: показан над полем ввода.
   ChatReply? _replyTo;
 
@@ -267,6 +270,74 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     ref.invalidate(scheduledMessagesProvider(widget.conversationId));
   }
 
+  void _startPick(ChatMessage message) {
+    HapticFeedback.selectionClick();
+    setState(() => _picked..clear()..add(message.id));
+  }
+
+  void _togglePick(String id) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (!_picked.remove(id)) _picked.add(id);
+    });
+  }
+
+  void _clearPick() => setState(_picked.clear);
+
+  /// Выбранные сообщения в порядке переписки (сверху вниз).
+  List<ChatMessage> _pickedMessages() {
+    final all = ref.read(messagesProvider(widget.conversationId)).value ?? const <ChatMessage>[];
+    return [for (final m in all) if (_picked.contains(m.id)) m];
+  }
+
+  PreferredSizeWidget _selectionBar(Conversation? info, String myId) {
+    final messages = _pickedMessages();
+    final hasMedia = messages.any(
+      (m) =>
+          m.attachment != null &&
+          (m.kind == MessageKind.image || m.kind == MessageKind.video || m.kind == MessageKind.videoNote),
+    );
+    final hasShareable = messages.any(
+      (m) => (m.attachment != null && m.kind != MessageKind.sticker) || (m.text?.trim().isNotEmpty ?? false),
+    );
+    return AppBar(
+      leading: IconButton(
+        onPressed: _clearPick,
+        tooltip: 'Отменить выбор',
+        icon: const Icon(Icons.close),
+      ),
+      title: Text('Выбрано: ${_picked.length}'),
+      actions: [
+        if (hasMedia)
+          IconButton(
+            onPressed: () async {
+              await savePickedMessages(context, ref, messages);
+              if (mounted) _clearPick();
+            },
+            tooltip: 'Сохранить в галерею',
+            icon: const Icon(Icons.download_rounded),
+          ),
+        if (hasShareable)
+          IconButton(
+            onPressed: () async {
+              await sharePickedMessages(context, ref, messages);
+              if (mounted) _clearPick();
+            },
+            tooltip: 'Поделиться',
+            icon: const Icon(Icons.ios_share_rounded),
+          ),
+        IconButton(
+          onPressed: () async {
+            await forwardPickedMessages(context, ref, messages, myId, info);
+            if (mounted) _clearPick();
+          },
+          tooltip: 'Переслать',
+          icon: const Icon(Icons.shortcut_rounded),
+        ),
+      ],
+    );
+  }
+
   Future<bool> _openMenu(
     BuildContext context,
     ChatMessage message,
@@ -283,6 +354,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             .read(conversationProvider(widget.conversationId))
             .value,
         onReply: (message) => _startReply(message, myId),
+        onSelect: _startPick,
         // Реакцию можно поставить только на дошедшее сообщение.
         myReaction: _myReaction(message.id),
         onReact: message.status == MessageStatus.failed ||
@@ -464,8 +536,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ? 'в сети'
         : presence?.label(now);
 
-    return Scaffold(
-      appBar: AppBar(
+    return PopScope(
+      // Назад сначала снимает выбор, и только потом закрывает чат.
+      canPop: _picked.isEmpty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _clearPick();
+      },
+      child: Scaffold(
+      appBar: _picked.isNotEmpty ? _selectionBar(info, myId) : AppBar(
         titleSpacing: 0,
         title: InkWell(
           onTap: info == null
@@ -761,7 +839,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         ): () => _openMenu(context, message, myId),
                       },
                       child: SwipeToReply(
-                        enabled: !(info?.closed ?? false) &&
+                        enabled: _picked.isEmpty &&
+                            !(info?.closed ?? false) &&
                             message.signatureValid != false &&
                             message.status != MessageStatus.failed,
                         onReply: () => _startReply(message, myId),
@@ -770,13 +849,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         // Короткий тап в личной переписке — реакции, долгий —
                         // выделение и меню. Реакцию можно поставить только на
                         // дошедшее сообщение.
-                        onTap: isDirect &&
+                        onTap: _picked.isNotEmpty
+                            ? () => _togglePick(message.id)
+                            : isDirect &&
                                 message.status != MessageStatus.failed &&
                                 message.status != MessageStatus.sending
                             ? () => _quickReact(_itemKeys[message.id]?.currentContext ?? context, message, myId)
                             : null,
-                        onLongPress: () =>
-                            _openMenu(_itemKeys[message.id]?.currentContext ?? context, message, myId),
+                        onLongPress: () => _picked.isNotEmpty
+                            ? _togglePick(message.id)
+                            : _openMenu(_itemKeys[message.id]?.currentContext ?? context, message, myId),
                         // Подсветка (переход к сообщению, выделение для меню) идёт
                         // по самому пузырю: фон на всю строку торчал за ним кривым
                         // прямоугольником.
@@ -787,8 +869,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                 ? CrossAxisAlignment.end
                                 : CrossAxisAlignment.start,
                             children: [
-                              MessageBubble(
-                                highlighted: _selectedId == message.id,
+                              IgnorePointer(
+                                // В режиме выбора тап по фото или ссылке выбирает сообщение,
+                                // а не открывает просмотр.
+                                ignoring: _picked.isNotEmpty,
+                                child: MessageBubble(
+                                highlighted: _selectedId == message.id || _picked.contains(message.id),
                                 message: message,
                                 mine: mine,
                                 showSender: !isDirect && !mine,
@@ -804,6 +890,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                         mine: false,
                                         onTap: (emoji) => _react(message.id, emoji),
                                       ),
+                              ),
                               ),
                             ],
                           ),
@@ -919,7 +1006,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ],
       ),
       ),
-    );
+    ));
   }
 
   /// Листают — показываем дату верхнего видимого сообщения; перестали —

@@ -4,6 +4,10 @@ import 'entities/chat_message.dart';
 enum MessageAction {
   reply,
 
+  /// «Выбрать»: включает выбор нескольких сообщений для пересылки,
+  /// «поделиться» и сохранения.
+  select,
+
   /// Правка своего текста (или подписи). У сообщения появится карандаш.
   edit,
   copy,
@@ -40,6 +44,7 @@ List<MessageAction> messageActions(
   bool isPinned = false,
   bool isBookmarked = false,
   bool mine = false,
+  bool canSelect = false,
 }) {
   final text = message.text?.trim() ?? '';
   final attachment = message.attachment;
@@ -66,6 +71,7 @@ List<MessageAction> messageActions(
       };
   return [
     if (canReply && trusted) MessageAction.reply,
+    if (canSelect) MessageAction.select,
     if (editable) MessageAction.edit,
     if (text.isNotEmpty) MessageAction.copy,
     if (text.length > 1) MessageAction.copyPart,
