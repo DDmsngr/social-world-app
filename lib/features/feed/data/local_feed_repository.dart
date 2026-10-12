@@ -83,6 +83,7 @@ class LocalFeedRepository implements FeedRepository {
     String? routeId,
     String? questId,
     DateTime? createdAt,
+    void Function(double fraction, String stage)? onUploadProgress,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     // Хранилища в моках нет, поэтому ссылкой служит сам путь к файлу — этого

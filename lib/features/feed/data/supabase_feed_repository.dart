@@ -97,6 +97,7 @@ class SupabaseFeedRepository implements FeedRepository {
     String? routeId,
     String? questId,
     DateTime? createdAt,
+    void Function(double fraction, String stage)? onUploadProgress,
   }) async {
     // UID фиксируем один раз: между двумя await к _client.auth.currentUser
     // в теории может успеть смениться сессия, а вставлять и читать профиль
@@ -106,9 +107,17 @@ class SupabaseFeedRepository implements FeedRepository {
     // Файлы уезжают в хранилище до записи в базу: если загрузка сорвётся,
     // в ленте не останется поста с битыми ссылками.
     final uploader = MediaUploader(_client, bucket: 'post-media');
-    final mediaUrls = <String>[
-      for (final path in mediaPaths) await uploader.upload(path),
-    ];
+    final mediaUrls = <String>[];
+    for (var i = 0; i < mediaPaths.length; i++) {
+      var stage = 'Загружаем';
+      void report(double part) => onUploadProgress?.call((i + part) / mediaPaths.length, stage);
+      report(0);
+      mediaUrls.add(await uploader.upload(
+        mediaPaths[i],
+        onProgress: report,
+        onStage: (value) => stage = value,
+      ));
+    }
 
     final row = await _client
         .from('posts')

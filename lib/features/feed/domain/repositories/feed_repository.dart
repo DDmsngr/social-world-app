@@ -55,6 +55,10 @@ abstract interface class FeedRepository {
 
     /// Исходная дата — для переезда из другой соцсети. Обычные посты без неё.
     DateTime? createdAt,
+
+    /// Ход загрузки вложений: доля 0–1 по всем файлам и подпись этапа («Сжимаем
+    /// видео», «Загружаем»). Для полосы под кнопкой публикации.
+    void Function(double fraction, String stage)? onUploadProgress,
   });
 
   /// Правка собственного поста. [keepMediaUrls] — вложения, которые остаются,

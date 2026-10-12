@@ -90,6 +90,10 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   DateTime? _startsAt;
   var _routePoints = <EventRoutePoint>[];
   bool _busy = false;
+
+  /// Ход загрузки вложений при публикации: доля 0–1 и подпись этапа.
+  double? _uploadFraction;
+  String _uploadStage = '';
   bool _alsoStory = false;
 
   /// Больше четырёх карточка в ленте всё равно не покажет внятно, а вес
@@ -160,7 +164,11 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       _startsAt != null;
 
   Future<void> _publish() async {
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _uploadFraction = null;
+      _uploadStage = '';
+    });
     try {
       if (_kind.isPost) {
         await _publishPost();
@@ -201,6 +209,13 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       placeTitle: _selectedPlace?.title,
       placeLatitude: _selectedPlace?.latitude,
       placeLongitude: _selectedPlace?.longitude,
+      onUploadProgress: (fraction, stage) {
+        if (!mounted) return;
+        setState(() {
+          _uploadFraction = fraction;
+          _uploadStage = stage;
+        });
+      },
     );
 
     // Выбранное в этой публикации становится настройкой по умолчанию для
@@ -559,6 +574,29 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
             tooltip: 'Назад',
             icon: const Icon(Icons.arrow_back),
           ),
+          // Загрузка видео и фото: полоса под шапкой, видна при любой прокрутке.
+          bottom: _busy && _uploadFraction != null
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(34),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$_uploadStage ${((_uploadFraction ?? 0) * 100).round()}%',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(value: _uploadFraction, minHeight: 4),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : null,
           actions: [
             if (_canDraft)
               // Иконка, а не слово: со словом заголовок «Новая статья» обрезался.

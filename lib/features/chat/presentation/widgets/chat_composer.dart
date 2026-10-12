@@ -318,7 +318,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       var sendPath = path;
       // Чат шифрует файл целиком и принимает до 50 МБ: тяжёлый ролик сначала
       // сжимается на телефоне (720p, затем 480p и ниже), как в постах.
-      if (kind == MessageKind.video && album == null) {
+      if ((kind == MessageKind.video || (kind == MessageKind.file && isVideoPath(path))) &&
+          album == null) {
         final size = await File(path).length();
         if (size > maxVideoSourceBytes) {
           if (mounted) setState(() => _error = videoTooBigMessage(size));

@@ -81,6 +81,7 @@ class _FailingFeedRepository implements FeedRepository {
     String? routeId,
     String? questId,
     DateTime? createdAt,
+    void Function(double fraction, String stage)? onUploadProgress,
   }) async => _post;
 
   @override
