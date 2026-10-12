@@ -31,6 +31,7 @@ void main() {
     expect(pointsReasonLabel('referral_level_1'), 'Приглашённый друг');
     expect(pointsReasonLabel('referral_level_3'), contains('уровень 3'));
     expect(pointsReasonLabel('like'), contains('публикациях'));
+    expect(pointsReasonLabel('like_bonus'), 'Бонус за активность');
     expect(pointsReasonLabel('что-то новое'), 'Прочее');
   });
 }

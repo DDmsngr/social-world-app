@@ -83,10 +83,35 @@ class CallController extends ChangeNotifier {
     _started = true;
     _kitEvents = FlutterCallkitIncoming.onEvent.listen(_onKitEvent);
     final accepted = await CallKit.acceptedCall();
-    if (accepted != null) {
+    if (accepted != null && await _isLiveOnServer(accepted.id)) {
       unawaited(accept(accepted));
     } else {
+      // Звонилка могла «помнить» давно закрытый звонок (сорвалась сеть, не
+      // дошёл end_call) и при каждом запуске открывала бы его экран заново.
+      if (accepted != null) {
+        AppLog.add('Старый звонок ${accepted.id}: на сервере уже закрыт, гашу звонилку');
+        unawaited(CallKit.end(accepted.id));
+      }
       unawaited(CallKit.ensurePermissions());
+    }
+  }
+
+  /// Звонок ещё идёт на сервере (звонит или разговор). Нет сети или строки —
+  /// считаем закрытым: подключиться всё равно не к чему.
+  Future<bool> _isLiveOnServer(String id) async {
+    if (id.isEmpty) return false;
+    try {
+      final row = await _client
+          .from('calls')
+          .select('status')
+          .eq('id', id)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
+      final status = row?['status'] as String?;
+      return status == 'ringing' || status == 'active';
+    } catch (error) {
+      AppLog.add('Статус звонка $id не прочитался: $error');
+      return false;
     }
   }
 

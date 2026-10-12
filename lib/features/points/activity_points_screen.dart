@@ -36,6 +36,7 @@ String pointsReasonLabel(String reason) {
   }
   return switch (reason) {
     'like' => 'Отметки «нравится» на ваших публикациях',
+    'like_bonus' => 'Бонус за активность',
     'comment_like' => 'Отметки «нравится» на ваших комментариях',
     'event_join' => 'Участники ваших событий',
     'referral_fraud_reversal' => 'Снятие за недействительное приглашение',

@@ -34,7 +34,7 @@ abstract final class SendSound {
   static Future<void> play() async {
     try {
       if (!await isEnabled()) return;
-      await ClickPlayer.play('sounds/send.wav', volume: 0.7);
+      await ClickPlayer.play('sounds/send.wav', volume: 1.0);
     } catch (error) {
       // Звук — приятная мелочь: сбой проигрывателя не должен мешать отправке.
       AppLog.add('Звук отправки: $error');
