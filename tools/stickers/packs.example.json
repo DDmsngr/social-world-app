@@ -1,0 +1,6 @@
+{
+ "out": "out",
+ "packs": [
+  {"dir": "pack1_basic", "src": "sheets/1.webp", "thr": 70, "names": ["smile", "laugh_tears", "...ровно 35 имён, слева направо и сверху вниз, как ключи в tags.py"]}
+ ]
+}

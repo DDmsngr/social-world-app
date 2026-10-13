@@ -12,8 +12,10 @@ import '../../../../core/widgets/video_poster.dart';
 import '../../../channels/presentation/widgets/channel_media.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_meta.dart';
+import '../../domain/stickers.dart';
 import 'attachment_views.dart';
 import 'emoji_panel.dart';
+import 'sticker_views.dart';
 
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
@@ -57,9 +59,20 @@ class MessageBubble extends StatelessWidget {
     };
     // С ответом или пересылкой сообщению нужен пузырь: в нём живёт цитата.
     final hasMeta = message.replyTo != null || message.forwardedFrom != null;
+    // Фирменный стикер — картинка; незнакомый id (стикер из версии новее
+    // этой) — эмодзи-заменитель из текста, как у старых «стикеров».
+    final stickerPath = message.kind == MessageKind.sticker
+        ? stickerAsset(message.stickerId)
+        : null;
     final bigEmoji = emojiCount > 0 && !hasMeta;
+    final bigEmojiSize = switch (emojiCount) {
+      1 => 56.0,
+      2 => 44.0,
+      _ => 36.0,
+    };
     final bare =
         bigEmoji ||
+        (stickerPath != null && !hasMeta) ||
         (!hasMeta &&
             message.kind == MessageKind.videoNote &&
             message.attachment != null);
@@ -95,17 +108,23 @@ class MessageBubble extends StatelessWidget {
             onTap: onQuoteTap,
             child: _QuoteBlock(reply: message.replyTo!, mine: mine),
           ),
-        if (bigEmoji)
+        if (stickerPath != null)
+          StickerImage(asset: stickerPath, fallback: caption, size: 148)
+        else if (bigEmoji && message.customEmoji.isNotEmpty)
+          // Сообщение из одних своих эмодзи — крупно, как обычные.
+          LinkText(
+            caption,
+            style: TextStyle(fontSize: bigEmojiSize, height: 1.1),
+            inline: customEmojiInlines(
+              caption,
+              message.customEmoji,
+              size: bigEmojiSize * 1.15,
+            ),
+          )
+        else if (bigEmoji)
           Text(
             caption,
-            style: TextStyle(
-              fontSize: switch (emojiCount) {
-                1 => 56,
-                2 => 44,
-                _ => 36,
-              },
-              height: 1.1,
-            ),
+            style: TextStyle(fontSize: bigEmojiSize, height: 1.1),
           )
         else if (hasAttachment && message.attachment!.album.isNotEmpty)
           // Несколько фото одним сообщением: сетка по пропорциям кадров.
@@ -128,7 +147,9 @@ class MessageBubble extends StatelessWidget {
             widthFactor: 1,
             child: AttachmentView(message: message, mine: mine, onMore: onMediaMore),
           ),
-        if (!bare && (!hasAttachment || caption.isNotEmpty)) ...[
+        if (!bare &&
+            stickerPath == null &&
+            (!hasAttachment || caption.isNotEmpty)) ...[
           if (hasAttachment) const SizedBox(height: 6),
           Align(
             alignment: Alignment.centerLeft,
@@ -140,6 +161,11 @@ class MessageBubble extends StatelessWidget {
                 fontSize: 15,
                 height: 1.4,
                 color: mine ? AppColors.onBubbleMine : AppColors.text,
+              ),
+              inline: customEmojiInlines(
+                caption,
+                message.customEmoji,
+                size: 21,
               ),
             ),
           ),

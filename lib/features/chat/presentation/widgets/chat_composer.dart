@@ -22,8 +22,10 @@ import '../../domain/entities/chat_message.dart';
 import '../../domain/entities/chat_meta.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../../domain/schedule_format.dart';
+import '../../domain/stickers.dart';
 import '../providers/chat_providers.dart';
 import '../providers/chat_typing_providers.dart';
+import '../providers/sticker_providers.dart';
 import 'attachment_views.dart';
 import '../../live_location/live_location_screen.dart';
 import 'emoji_panel.dart';
@@ -31,6 +33,7 @@ import 'photo_send_screen.dart';
 import '../../data/link_preview_fetcher.dart';
 import 'scheduled_sheet.dart';
 import 'schedule_picker.dart';
+import 'sticker_views.dart';
 import 'video_note_recorder.dart';
 
 /// Поле ввода чата: текст с эмодзи, вложения (фото, камера, видео, файл),
@@ -71,7 +74,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   /// выключения VPN висела молча: сокет остаётся на исчезнувшей сети.
   static const sendTimeout = Duration(seconds: 20);
 
-  final _controller = TextEditingController();
+  final _controller = InlineEmojiController();
   final _focus = FocusNode();
   bool _emojiOpen = false;
   final _picker = ImagePicker();
@@ -119,6 +122,25 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     setState(() {});
   }
 
+  /// Свой смайл в текст: символ-заместитель, который поле рисует картинкой.
+  void _insertCustomEmoji(Sticker sticker) {
+    final catalog = ref.read(stickerCatalogProvider).value;
+    if (catalog == null) return;
+    _controller.value = insertAtSelection(
+      _controller.value,
+      catalog.inlineChar(sticker),
+    );
+    setState(() {});
+  }
+
+  /// Текст из поля для отправки: свои эмодзи становятся обычными
+  /// эмодзи-заменителями, их места и id — отдельным списком.
+  ({String text, List<CustomEmoji> emoji}) _draft() {
+    final draft = _controller.text.trim();
+    return ref.read(stickerCatalogProvider).value?.encodeDraft(draft) ??
+        (text: draft, emoji: const <CustomEmoji>[]);
+  }
+
   void _backspace() {
     _controller.value = deleteBeforeSelection(_controller.value);
     setState(() {});
@@ -143,7 +165,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   // ── текст ─────────────────────────────────────────────────────────────
 
   Future<void> _sendText({bool silent = false}) async {
-    final text = _controller.text.trim();
+    final (:text, :emoji) = _draft();
     if (text.isEmpty || _sendingText) return;
     setState(() {
       _sendingText = true;
@@ -158,7 +180,12 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           .send(
             conversationId: widget.conversationId,
             text: text,
-            options: SendOptions(replyTo: widget.replyTo, silent: silent, linkPreview: preview),
+            options: SendOptions(
+              replyTo: widget.replyTo,
+              silent: silent,
+              linkPreview: preview,
+              customEmoji: emoji,
+            ),
           )
           .timeout(sendTimeout);
       _controller.clear();
@@ -177,6 +204,58 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       });
     } catch (error) {
       _fail(error, 'Не удалось отправить сообщение');
+    } finally {
+      if (mounted) setState(() => _sendingText = false);
+    }
+  }
+
+  // ── стикеры ───────────────────────────────────────────────────────────
+
+  /// Подсказки стикеров к тому, что набрано: короткий запрос из 1–3 слов
+  /// («любовь», «ржу», «😍»). Длинный текст — это сообщение, а не поиск.
+  List<Sticker> _stickerSuggestions(StickerCatalog? catalog) {
+    if (catalog == null || _recording) return const [];
+    final text = _controller.text.trim();
+    if (text.isEmpty || text.length > 30 || text.contains('\n')) {
+      return const [];
+    }
+    if (text.split(RegExp(r'\s+')).length > 3) return const [];
+    return catalog.search(text, limit: 30);
+  }
+
+  /// Стикер уходит сразу. Из полосы подсказок — вместо набранного запроса
+  /// ([clearText]), из панели — текст в поле остаётся.
+  Future<void> _sendSticker(Sticker sticker, {bool clearText = false}) async {
+    if (_sendingText) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _sendingText = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(chatRepositoryProvider)
+          .send(
+            conversationId: widget.conversationId,
+            text: sticker.emoji,
+            kind: MessageKind.sticker,
+            options: SendOptions(replyTo: widget.replyTo, sticker: sticker.id),
+          )
+          .timeout(sendTimeout);
+      if (clearText) {
+        _controller.clear();
+        ref.read(typingHubProvider(widget.conversationId))?.stop();
+      }
+      widget.onReplyCleared?.call();
+      _afterSend();
+    } on TimeoutException catch (error) {
+      AppLog.add('Стикер не дождался ответа: $error');
+      if (!mounted) return;
+      setState(() {
+        _error = 'Сервер не ответил. Проверьте интернет и отправьте ещё раз.';
+      });
+    } catch (error) {
+      _fail(error, 'Не удалось отправить стикер');
     } finally {
       if (mounted) setState(() => _sendingText = false);
     }
@@ -240,7 +319,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   }
 
   Future<void> _schedule({DateTime? sendAt, bool whenOnline = false}) async {
-    final text = _controller.text.trim();
+    final (:text, :emoji) = _draft();
     if (text.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
     setState(() {
@@ -255,7 +334,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             text: text,
             sendAt: sendAt,
             whenOnline: whenOnline,
-            options: SendOptions(replyTo: widget.replyTo),
+            options: SendOptions(replyTo: widget.replyTo, customEmoji: emoji),
           )
           .timeout(sendTimeout);
       _controller.clear();
@@ -634,6 +713,9 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   @override
   Widget build(BuildContext context) {
     final hasText = _controller.text.trim().isNotEmpty;
+    final catalog = ref.watch(stickerCatalogProvider).value;
+    _controller.catalog = catalog;
+    final suggestions = _stickerSuggestions(catalog);
 
     return SafeArea(
       top: false,
@@ -690,6 +772,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                 reply: widget.replyTo!,
                 onClose: widget.onReplyCleared ?? () {},
               ),
+            if (suggestions.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: StickerSuggestions(
+                  stickers: suggestions,
+                  onPick: (sticker) => _sendSticker(sticker, clearText: true),
+                ),
+              ),
             if (_recording) _recordingBar() else _inputRow(hasText),
             if (_emojiOpen && !_recording)
               Padding(
@@ -697,6 +787,9 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                 child: EmojiPanel(
                   onPick: _insertEmoji,
                   onBackspace: _backspace,
+                  stickerPacks: catalog?.packs ?? const [],
+                  onSticker: _sendSticker,
+                  onCustomEmoji: _insertCustomEmoji,
                 ),
               ),
           ],

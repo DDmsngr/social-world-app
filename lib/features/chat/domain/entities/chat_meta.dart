@@ -1,3 +1,4 @@
+import '../stickers.dart';
 import 'chat_message.dart';
 
 /// На какое сообщение отвечаем. Цитата едет внутри самого сообщения, а не
@@ -79,10 +80,16 @@ class ChatReply {
   }
 }
 
-/// Служебное содержимое сообщения: ответ и пересылка. В группах лежит в
-/// открытой колонке `meta`, в личных диалогах — внутри шифротекста.
+/// Служебное содержимое сообщения: ответ, пересылка, id стикера. В группах
+/// лежит в открытой колонке `meta`, в личных диалогах — внутри шифротекста.
 class ChatMeta {
-  const ChatMeta({this.reply, this.forwardedFrom, this.linkPreview});
+  const ChatMeta({
+    this.reply,
+    this.forwardedFrom,
+    this.linkPreview,
+    this.sticker,
+    this.emoji = const [],
+  });
 
   static const empty = ChatMeta();
 
@@ -96,23 +103,43 @@ class ChatMeta {
   /// получателя: чужие сайты не узнают, кто читает сообщение.
   final LinkPreview? linkPreview;
 
-  bool get isEmpty => reply == null && forwardedFrom == null && linkPreview == null;
+  /// Id фирменного стикера (`<пак>.<ключ>`). Текст такого сообщения —
+  /// эмодзи-заменитель: его и покажут версии, которые стикеров не знают.
+  final String? sticker;
+
+  /// Свои эмодзи внутри текста (см. [CustomEmoji]).
+  final List<CustomEmoji> emoji;
+
+  bool get isEmpty =>
+      reply == null &&
+      forwardedFrom == null &&
+      linkPreview == null &&
+      sticker == null &&
+      emoji.isEmpty;
 
   Map<String, Object?> toJson() => {
     if (reply != null) 'r': reply!.toJson(),
     if (forwardedFrom != null) 'f': forwardedFrom,
     if (linkPreview != null) 'l': linkPreview!.toJson(),
+    if (sticker != null) 's': sticker,
+    if (emoji.isNotEmpty) 'e': [for (final e in emoji) e.toJson()],
   };
 
   static ChatMeta fromJson(Object? raw) {
     if (raw is! Map) return empty;
     final forwarded = raw['f'];
+    final sticker = raw['s'];
+    final emoji = raw['e'];
     return ChatMeta(
       reply: ChatReply.fromJson(raw['r']),
       forwardedFrom: forwarded is String && forwarded.isNotEmpty
           ? forwarded
           : null,
       linkPreview: LinkPreview.fromJson(raw['l']),
+      sticker: sticker is String && sticker.isNotEmpty ? sticker : null,
+      emoji: emoji is List
+          ? [for (final e in emoji.take(200)) ?CustomEmoji.fromJson(e)]
+          : const [],
     );
   }
 }
@@ -149,9 +176,16 @@ class LinkPreview {
   }
 }
 
-/// Как отправить: с ответом, пересылкой, без звука.
+/// Как отправить: с ответом, пересылкой, без звука, стикером.
 class SendOptions {
-  const SendOptions({this.replyTo, this.forwardedFrom, this.silent = false, this.linkPreview});
+  const SendOptions({
+    this.replyTo,
+    this.forwardedFrom,
+    this.silent = false,
+    this.linkPreview,
+    this.sticker,
+    this.customEmoji = const [],
+  });
 
   static const none = SendOptions();
 
@@ -159,13 +193,25 @@ class SendOptions {
   final String? forwardedFrom;
   final LinkPreview? linkPreview;
 
+  /// Id стикера для сообщения с [MessageKind.sticker].
+  final String? sticker;
+
+  /// Свои эмодзи внутри текста.
+  final List<CustomEmoji> customEmoji;
+
   /// Без звука: сообщение обычное, но у получателя пуш приходит тихим.
   /// Флаг открытый (сервер должен выбрать канал уведомления) — это не
   /// содержимое, а настройка доставки.
   final bool silent;
 
   ChatMeta get meta =>
-      ChatMeta(reply: replyTo, forwardedFrom: forwardedFrom, linkPreview: linkPreview);
+      ChatMeta(
+        reply: replyTo,
+        forwardedFrom: forwardedFrom,
+        linkPreview: linkPreview,
+        sticker: sticker,
+        emoji: customEmoji,
+      );
 }
 
 /// Отложенное сообщение: лежит на сервере и уходит в [sendAt] либо когда
