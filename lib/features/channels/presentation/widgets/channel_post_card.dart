@@ -11,7 +11,7 @@ import 'channel_media.dart';
 
 /// Пост канала. Текст — Markdown (ссылки из источника открываются после
 /// подтверждения), вложение — тот же виджет, что в чатах.
-class ChannelPostCard extends StatelessWidget {
+class ChannelPostCard extends StatefulWidget {
   const ChannelPostCard({
     super.key,
     required this.post,
@@ -37,20 +37,38 @@ class ChannelPostCard extends StatelessWidget {
   final bool full;
 
   @override
+  State<ChannelPostCard> createState() => _ChannelPostCardState();
+}
+
+class _ChannelPostCardState extends State<ChannelPostCard> {
+  /// Длинный пост в ленте идёт с обрезкой; тап по нему разворачивает на месте.
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final post = widget.post;
+    final onComments = widget.onComments;
+    final onTap = widget.onTap;
+    final onLongPress = widget.onLongPress;
+    final reactions = widget.reactions;
+    final onReact = widget.onReact;
+    final full = widget.full;
     final message = post.message;
     final text = message.text?.trim() ?? '';
+    final collapsed = !full && !_expanded && text.length > 700;
 
-    // Тап по самому посту открывает его с обсуждением: комментарии живут
-    // внутри поста, а не в ленте канала.
+    // Обрезанный пост тап разворачивает; развёрнутый и короткий открывает
+    // реакции (или обсуждение, если обработчика нет).
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: full
           ? null
+          : collapsed
+          ? () => setState(() => _expanded = true)
           : onTap != null
-          ? () => onTap!(context)
+          ? () => onTap(context)
           : onComments,
-      onLongPress: onLongPress == null ? null : () => onLongPress!(context),
+      onLongPress: onLongPress == null ? null : () => onLongPress(context),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
@@ -66,18 +84,18 @@ class ChannelPostCard extends StatelessWidget {
             if (text.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: full || text.length <= 700
-                    ? MarkdownView(data: text, selectable: full)
-                    : MarkdownView(data: channelPostPreview(text)),
+                child: collapsed
+                    ? MarkdownView(data: channelPostPreview(text))
+                    : MarkdownView(data: text, selectable: full),
               ),
             if (!full && text.length > 700)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: onComments,
+                  onTap: () => setState(() => _expanded = !_expanded),
                   child: Text(
-                    'Читать дальше',
+                    _expanded ? 'Свернуть' : 'Читать дальше',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -89,7 +107,7 @@ class ChannelPostCard extends StatelessWidget {
             if (reactions.isNotEmpty && onReact != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                child: ReactionChips(reactions: reactions, mine: false, onTap: onReact!),
+                child: ReactionChips(reactions: reactions, mine: false, onTap: onReact),
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 6, 4),
