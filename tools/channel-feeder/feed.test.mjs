@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { htmlToMarkdown, stripSignature, parseChannelPage } from './feed.mjs';
+import { htmlToMarkdown, stripSignature, parseChannelPage, planPosts } from './feed.mjs';
 
 test('жирный: пробелы и переносы вне маркеров', () => {
   assert.equal(htmlToMarkdown('<b>Заголовок<br/><br/></b>Текст'), '**Заголовок**\n\nТекст');
@@ -56,4 +56,26 @@ test('альбом: все фото поста, по порядку', () => {
   const [post] = parseChannelPage(html, 'ch');
   assert.equal(post.media.url, 'https://cdn/1.jpg');
   assert.deepEqual(post.album.map((m) => m.url), ['https://cdn/2.jpg', 'https://cdn/3.jpg']);
+});
+
+const at = (iso) => ({ ref: iso, date: new Date(iso) });
+
+test('план постов: по порядку времени, с зазором, только новее последнего', () => {
+  const posts = [
+    at('2026-10-13T10:05:00Z'),
+    at('2026-10-13T09:00:00Z'),
+    at('2026-10-13T10:00:00Z'),
+    at('2026-10-13T11:30:00Z'),
+    at('2026-10-13T08:00:00Z'),
+  ];
+  const last = new Date('2026-10-13T08:30:00Z');
+  const plan = planPosts(posts, last, 30, 10).map((p) => p.ref);
+  // 08:00 старше последнего, 10:05 ближе 30 минут к 10:00.
+  assert.deepEqual(plan, ['2026-10-13T09:00:00Z', '2026-10-13T10:00:00Z', '2026-10-13T11:30:00Z']);
+});
+
+test('план постов: потолок за заход и пустой канал', () => {
+  const posts = [at('2026-10-13T09:00:00Z'), at('2026-10-13T10:00:00Z'), at('2026-10-13T11:00:00Z')];
+  assert.equal(planPosts(posts, null, 30, 2).length, 2);
+  assert.equal(planPosts([], null, 30, 2).length, 0);
 });

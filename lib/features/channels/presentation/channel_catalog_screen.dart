@@ -27,7 +27,9 @@ class ChannelCatalogScreen extends ConsumerStatefulWidget {
 class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
   final _search = TextEditingController();
   Timer? _debounce;
-  ChannelTopic? _topic;
+  /// Выбранная тема: готовая (wire) или чья-то своя; null — все.
+  String? _topic;
+  var _customTopics = <String>[];
   List<CatalogChannel>? _items;
   var _failed = false;
   final _busy = <String>{};
@@ -51,7 +53,19 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
       final items = await ref
           .read(channelsRepositoryProvider)
           .search(query: _search.text, topic: _topic);
-      if (mounted) setState(() => _items = items);
+      if (mounted) {
+        setState(() {
+          _items = items;
+          // Свои темы, что встретились в выдаче, становятся фильтрами.
+          final builtin = {for (final t in ChannelTopic.values) t.wire};
+          final seen = <String>{};
+          _customTopics = [
+            for (final c in items)
+              for (final t in c.topics)
+                if (!builtin.contains(t) && seen.add(t.toLowerCase())) t,
+          ].take(12).toList();
+        });
+      }
     } catch (error) {
       AppLog.add('Каталог каналов: $error');
       if (mounted) setState(() => _failed = true);
@@ -117,11 +131,15 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gutter),
               children: [
-                for (final topic in [null, ...ChannelTopic.values])
+                for (final topic in <String?>[
+                  null,
+                  for (final t in ChannelTopic.values) t.wire,
+                  ..._customTopics,
+                ])
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
-                      label: Text(topic?.label ?? 'Все темы'),
+                      label: Text(topic == null ? 'Все темы' : channelTopicLabel(topic)),
                       selected: _topic == topic,
                       onSelected: (_) {
                         setState(() => _topic = topic);
@@ -161,7 +179,7 @@ class _ChannelCatalogScreenState extends ConsumerState<ChannelCatalogScreen> {
   Widget _tile(CatalogChannel channel) {
     final meta = [
       if (channel.handle != null) '@${channel.handle}',
-      channel.topic.label,
+      channel.topics.take(2).map(channelTopicLabel).join(', '),
       if (channel.subscriberCount != null) subscribersLabel(channel.subscriberCount!),
     ].join(' · ');
     return ListTile(

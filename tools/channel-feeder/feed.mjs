@@ -12,23 +12,24 @@ const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, '');
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const DRY = process.argv.includes('--dry');
 
-// everyMin — не чаще одного захода в столько минут; perRun — сколько постов за
-// заход; maxAgeH — насколько старый пост ещё годится (у редких каналов — дольше).
+// everyMin — минимальный промежуток между постами канала (по времени постов в
+// источнике); perRun — потолок постов за заход, на случай долгого простоя;
+// maxAgeH — насколько старый пост ещё годится (у редких каналов — дольше).
 // credit — подписывать ли источник (у мемов из своего @memepul не нужно).
 //
 // Источники проверены 02.10.2026 по дате последнего поста; мёртвые (naukapro,
 // sochi_news, vcemem и т. п.) не берём. Чем больше источников у канала, тем
 // разнообразнее лента: посты разных источников чередуются.
 const CHANNELS = [
-  { handle: 'chawo_memes', sources: ['memepul', 'prikol'], everyMin: 20, perRun: 2, maxAgeH: 24, credit: false },
-  { handle: 'chawo_news', sources: ['tass_agency', 'rbc_news', 'interfaxonline', 'kommersant', 'vedomosti', 'izvestia_ru', 'lentadnya', 'bbbreaking'], everyMin: 10, perRun: 2 },
-  { handle: 'chawo_science', sources: ['nplusone', 'habr_com', 'rozetked', 'postnauka', 'ixbt_official', 'tproger_official'], everyMin: 30, perRun: 2, maxAgeH: 24 },
-  { handle: 'chawo_fashion', sources: ['LIVfashionmag', 'trendsetter', 'looktrend', 'goldchihuahua', 'beautyinsider'], everyMin: 45, perRun: 2, maxAgeH: 72 },
-  { handle: 'chawo_food', sources: ['thesaltmagazine', 'topretsept', 'kulinarka', 'foodblogger'], everyMin: 45, perRun: 2, maxAgeH: 36 },
-  { handle: 'chawo_sochi', sources: ['sochi24tv', 'sochi_online', 'sochi_today', 'sochigid', 'kuban24'], everyMin: 15, perRun: 2, maxAgeH: 24 },
-  { handle: 'chawo_travel', sources: ['tutu_travel', 'aviasales'], everyMin: 60, perRun: 1, maxAgeH: 48 },
-  { handle: 'chawo_kino', sources: ['kinopoisk', 'kineman'], everyMin: 60, perRun: 1, maxAgeH: 96 },
-  { handle: 'chawo_sport', sources: ['sportsru', 'championat', 'sovsport'], everyMin: 20, perRun: 2 },
+  { handle: 'chawo_memes', sources: ['memepul', 'prikol'], everyMin: 30, perRun: 4, maxAgeH: 24, credit: false },
+  { handle: 'chawo_news', sources: ['tass_agency', 'rbc_news', 'interfaxonline', 'kommersant', 'vedomosti', 'izvestia_ru', 'lentadnya', 'bbbreaking'], everyMin: 10, perRun: 4 },
+  { handle: 'chawo_science', sources: ['nplusone', 'habr_com', 'rozetked', 'postnauka', 'ixbt_official', 'tproger_official'], everyMin: 30, perRun: 4, maxAgeH: 24 },
+  { handle: 'chawo_fashion', sources: ['LIVfashionmag', 'trendsetter', 'looktrend', 'goldchihuahua', 'beautyinsider'], everyMin: 45, perRun: 4, maxAgeH: 72 },
+  { handle: 'chawo_food', sources: ['thesaltmagazine', 'topretsept', 'kulinarka', 'foodblogger'], everyMin: 45, perRun: 4, maxAgeH: 36 },
+  { handle: 'chawo_sochi', sources: ['sochi24tv', 'sochi_online', 'sochi_today', 'sochigid', 'kuban24'], everyMin: 15, perRun: 4, maxAgeH: 24 },
+  { handle: 'chawo_travel', sources: ['tutu_travel', 'aviasales'], everyMin: 60, perRun: 2, maxAgeH: 48 },
+  { handle: 'chawo_kino', sources: ['kinopoisk', 'kineman'], everyMin: 60, perRun: 2, maxAgeH: 96 },
+  { handle: 'chawo_sport', sources: ['sportsru', 'championat', 'sovsport'], everyMin: 20, perRun: 4 },
 ];
 
 const MAX_AGE_HOURS = 12;
@@ -256,6 +257,26 @@ async function uploadMedia(conversationId, media) {
   };
 }
 
+/**
+ * Какие посты выложить: только новее последнего в канале, по порядку времени, с
+ * зазором не меньше [everyMin] минут между соседними (лента идёт ровно, а не
+ * пачкой), не больше [cap]. Остальное пропускаем: свежее важнее полноты.
+ */
+export function planPosts(candidates, lastAt, everyMin, cap) {
+  const gap = everyMin * 60_000;
+  const after = lastAt ? lastAt.getTime() : -Infinity;
+  let prev = after;
+  const picked = [];
+  for (const post of [...candidates].sort((a, b) => a.date - b.date)) {
+    if (picked.length >= cap) break;
+    const at = post.date.getTime();
+    if (at <= after) continue; // не новее последнего поста в канале
+    if (at - prev < gap) continue; // слишком близко к предыдущему
+    picked.push(post);
+    prev = at;
+  }
+  return picked;
+}
 async function publish(handle, post, credit) {
   const state = await channelState(handle);
   let body = post.text;
@@ -295,6 +316,10 @@ async function publish(handle, post, credit) {
       in_kind: kind,
       in_body: body.slice(0, 4000),
       in_media: media,
+      // Время поста в источнике: ленту канала ведёт оно, а не момент, когда
+      // наполнитель добрался (GitHub будит его раз в несколько часов, и
+      // раньше накопившееся ложилось одной пачкой).
+      in_sent_at: post.date ? post.date.toISOString() : null,
     }),
   });
   return id !== null;
@@ -325,22 +350,14 @@ async function feedChannel(cfg) {
     .filter((p) => !isAd(p.plain));
 
   const known = await knownRefs(state.id, candidates.map((p) => p.ref));
-  candidates = candidates
-    .filter((p) => !known.has(p.ref))
-    // Старые из свежих — первыми: лента канала идёт по порядку.
-    .sort((a, b) => a.date - b.date);
+  candidates = candidates.filter((p) => !known.has(p.ref));
 
-  // Чередуем источники, чтобы канал не стал зеркалом одного.
-  const bySource = new Map();
-  for (const p of candidates) bySource.set(p.channel, [...(bySource.get(p.channel) ?? []), p]);
-  const queue = [];
-  while (queue.length < candidates.length) {
-    for (const list of bySource.values()) if (list.length) queue.push(list.shift());
-  }
+  // По времени источников: свежие после последнего поста канала, с зазором
+  // everyMin между соседними. Источники смешиваются сами, по часам.
+  const queue = planPosts(candidates, state.lastAt, cfg.everyMin, cfg.perRun);
 
   let posted = 0;
   for (const post of queue) {
-    if (posted >= cfg.perRun) break;
     if (DRY) {
       console.log(`[${cfg.handle}] (dry) ${post.ref} ${post.media?.kind ?? 'text'} ${post.text.slice(0, 80)}`);
       posted++;

@@ -17,6 +17,7 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../profile/presentation/avatar_crop_screen.dart';
 import 'widgets/channel_avatar.dart';
+import 'widgets/channel_topics_picker.dart';
 import '../data/channels_repository.dart';
 import 'channel_screen.dart';
 import 'providers/channel_providers.dart';
@@ -130,7 +131,7 @@ class ChannelInfoScreen extends ConsumerWidget {
                 child: Text(
                   [
                     info.isPublic ? '@${info.handle}' : 'закрытый канал',
-                    info.topic.label,
+                    info.topics.take(3).map(channelTopicLabel).join(', '),
                     if (info.subscriberCount != null) subscribersLabel(info.subscriberCount!),
                   ].join(' · '),
                   style: TextStyle(color: AppColors.textDim),
@@ -239,7 +240,7 @@ class ChannelInfoScreen extends ConsumerWidget {
     final handle = TextEditingController(text: info.handle ?? '');
     var isPublic = info.isPublic;
     var showSubscribers = info.showSubscribers;
-    var topic = info.topic;
+    var topics = [...info.topics];
 
     final save = await showModalBottomSheet<bool>(
       context: context, useRootNavigator: true,
@@ -294,17 +295,9 @@ class ChannelInfoScreen extends ConsumerWidget {
                   onChanged: (v) => setSheet(() => showSubscribers = v),
                   title: const Text('Показывать число подписчиков'),
                 ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final t in ChannelTopic.values)
-                      ChoiceChip(
-                        label: Text(t.label),
-                        selected: topic == t,
-                        onSelected: (_) => setSheet(() => topic = t),
-                      ),
-                  ],
+                ChannelTopicsPicker(
+                  topics: topics,
+                  onChanged: (next) => setSheet(() => topics = next),
                 ),
                 const SizedBox(height: 16),
                 FilledButton(
@@ -326,7 +319,7 @@ class ChannelInfoScreen extends ConsumerWidget {
           description: description.text.trim(),
           isPublic: isPublic,
           handle: isPublic ? handle.text.trim().toLowerCase() : null,
-          topic: topic,
+          topics: topics,
           showSubscribers: showSubscribers,
         );
         ref.invalidate(channelInfoProvider(channelId));

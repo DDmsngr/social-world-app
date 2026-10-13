@@ -14,6 +14,7 @@ import '../../profile/presentation/avatar_crop_screen.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../data/channels_repository.dart';
 import 'providers/channel_providers.dart';
+import 'widgets/channel_topics_picker.dart';
 
 /// Новый канал: название, описание, тип (публичный с @адресом или закрытый),
 /// тема для каталога.
@@ -29,7 +30,7 @@ class _CreateChannelScreenState extends ConsumerState<CreateChannelScreen> {
   final _description = TextEditingController();
   final _handle = TextEditingController();
   var _public = true;
-  var _topic = ChannelTopic.other;
+  var _topics = <String>[ChannelTopic.other.wire];
   var _busy = false;
   String? _avatarPath;
 
@@ -61,7 +62,7 @@ class _CreateChannelScreenState extends ConsumerState<CreateChannelScreen> {
         title: _title.text.trim(),
         description: _description.text.trim(),
         isPublic: _public,
-        topic: _topic,
+        topics: _topics,
         handle: _public ? _handle.text.trim().toLowerCase() : null,
       );
       final avatar = _avatarPath;
@@ -178,19 +179,9 @@ class _CreateChannelScreenState extends ConsumerState<CreateChannelScreen> {
             ),
           ],
           const SizedBox(height: 14),
-          Text('Тема', style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final topic in ChannelTopic.values)
-                ChoiceChip(
-                  label: Text(topic.label),
-                  selected: _topic == topic,
-                  onSelected: (_) => setState(() => _topic = topic),
-                ),
-            ],
+          ChannelTopicsPicker(
+            topics: _topics,
+            onChanged: (next) => setState(() => _topics = next),
           ),
           const SizedBox(height: 24),
           FilledButton(

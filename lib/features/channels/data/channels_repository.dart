@@ -25,6 +25,30 @@ enum ChannelTopic {
       values.firstWhere((t) => t.wire == raw, orElse: () => other);
 }
 
+/// Подпись темы: готовые темы по-русски, свои — как ввёл автор.
+String channelTopicLabel(String topic) {
+  for (final t in ChannelTopic.values) {
+    if (t.wire == topic) return t.label;
+  }
+  return topic;
+}
+
+/// Темы канала из ответа сервера; у старых строк без списка — главная тема.
+List<String> channelTopicsFrom(Object? raw, ChannelTopic fallback) {
+  if (raw is List && raw.isNotEmpty) return [for (final t in raw) t.toString()];
+  return [fallback.wire];
+}
+
+/// Главная готовая тема из списка: её получают старые версии приложения.
+ChannelTopic primaryChannelTopic(List<String> topics) {
+  for (final t in topics) {
+    for (final known in ChannelTopic.values) {
+      if (known.wire == t && known != ChannelTopic.other) return known;
+    }
+  }
+  return ChannelTopic.other;
+}
+
 class ChannelInfo {
   const ChannelInfo({
     required this.id,
@@ -40,6 +64,7 @@ class ChannelInfo {
     this.requested = false,
     this.inviteToken,
     this.pendingRequests = 0,
+    this.topics = const [],
   });
 
   final String id;
@@ -48,6 +73,9 @@ class ChannelInfo {
   final String? handle;
   final bool isPublic;
   final ChannelTopic topic;
+
+  /// Все темы канала: готовые и свои (до пяти).
+  final List<String> topics;
   final String? avatarUrl;
   final bool showSubscribers;
 
@@ -76,6 +104,7 @@ class ChannelInfo {
     handle: row['handle'] as String?,
     isPublic: row['visibility'] == 'public',
     topic: ChannelTopic.parse(row['topic']),
+    topics: channelTopicsFrom(row['topics'], ChannelTopic.parse(row['topic'])),
     avatarUrl: row['avatar_url'] as String?,
     showSubscribers: row['show_subscribers'] as bool? ?? true,
     subscriberCount: (row['subscriber_count'] as num?)?.toInt(),
@@ -97,6 +126,7 @@ class CatalogChannel {
     this.subscriberCount,
     this.lastPostAt,
     this.avatarUrl,
+    this.topics = const [],
   });
 
   final String id;
@@ -104,6 +134,7 @@ class CatalogChannel {
   final String? description;
   final String? handle;
   final ChannelTopic topic;
+  final List<String> topics;
   final int? subscriberCount;
   final bool joined;
   final DateTime? lastPostAt;
@@ -179,10 +210,11 @@ class ChannelsRepository {
     ];
   }
 
-  Future<List<CatalogChannel>> search({String? query, ChannelTopic? topic}) async {
+  /// [topic] — готовая тема (её wire) или своя словами: ищет по всем темам канала.
+  Future<List<CatalogChannel>> search({String? query, String? topic}) async {
     final rows = await _client.rpc(
       'search_channels',
-      params: {'in_query': query, 'in_topic': topic?.wire},
+      params: {'in_query': query, 'in_topic': topic},
     ) as List;
     return [
       for (final raw in rows.cast<Map<String, dynamic>>())
@@ -192,6 +224,7 @@ class ChannelsRepository {
           description: raw['description'] as String?,
           handle: raw['handle'] as String?,
           topic: ChannelTopic.parse(raw['topic']),
+          topics: channelTopicsFrom(raw['topics'], ChannelTopic.parse(raw['topic'])),
           subscriberCount: (raw['subscriber_count'] as num?)?.toInt(),
           joined: raw['joined'] as bool? ?? false,
           lastPostAt: raw['last_post_at'] == null
@@ -206,7 +239,7 @@ class ChannelsRepository {
     required String title,
     required String description,
     required bool isPublic,
-    required ChannelTopic topic,
+    required List<String> topics,
     String? handle,
   }) async =>
       await _client.rpc(
@@ -216,7 +249,8 @@ class ChannelsRepository {
               'in_description': description,
               'in_visibility': isPublic ? 'public' : 'private',
               'in_handle': handle,
-              'in_topic': topic.wire,
+              'in_topic': primaryChannelTopic(topics).wire,
+              'in_topics': topics,
             },
           )
           as String;
@@ -227,7 +261,7 @@ class ChannelsRepository {
     required String description,
     required bool isPublic,
     required String? handle,
-    required ChannelTopic topic,
+    required List<String> topics,
     required bool showSubscribers,
   }) => _client.rpc(
     'update_channel',
@@ -237,7 +271,8 @@ class ChannelsRepository {
       'in_description': description,
       'in_visibility': isPublic ? 'public' : 'private',
       'in_handle': handle,
-      'in_topic': topic.wire,
+      'in_topic': primaryChannelTopic(topics).wire,
+      'in_topics': topics,
       'in_show_subscribers': showSubscribers,
     },
   );
