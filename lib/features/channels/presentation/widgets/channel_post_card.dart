@@ -70,6 +70,22 @@ class ChannelPostCard extends StatelessWidget {
                     ? MarkdownView(data: text, selectable: full)
                     : MarkdownView(data: channelPostPreview(text)),
               ),
+            if (!full && text.length > 700)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onComments,
+                  child: Text(
+                    'Читать дальше',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
             if (reactions.isNotEmpty && onReact != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),

@@ -116,11 +116,10 @@ class _MeetingPointFieldState extends State<MeetingPointField> {
               : [EventRoutePoint(latitude: value.latitude, longitude: value.longitude)],
           centerLatitude: widget.mapCenterLatitude,
           centerLongitude: widget.mapCenterLongitude,
+          single: true,
         ),
       ),
     );
-    // Экран маршрута даёт поставить несколько точек — для встречи берём
-    // последнюю поставленную.
     if (result == null || result.isEmpty) return;
     final point = result.last;
     widget.onChanged(

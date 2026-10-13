@@ -11,7 +11,10 @@ class EventRoutePickerScreen extends StatelessWidget {
     required this.initial,
     required this.centerLatitude,
     required this.centerLongitude,
+    this.single = false,
   });
+
+  final bool single;
 
   final List<EventRoutePoint> initial;
   final double centerLatitude;

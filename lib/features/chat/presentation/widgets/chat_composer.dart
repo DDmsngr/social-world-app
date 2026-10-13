@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/audio/send_sound.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/debug/app_log.dart';
 import '../../../../core/errors/friendly_error.dart';
@@ -92,10 +93,44 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   final _amplitudes = <double>[];
   Timer? _ticker;
 
+  /// Кнопка справа показывает микрофон или кружок: тап переключает, удержание
+  /// 1,5 секунды начинает запись. Выбор помним между запусками.
+  static const _modePref = 'composer.video_note_mode';
+  bool _videoNoteMode = false;
+
   @override
   void initState() {
     super.initState();
     _focus.addListener(_onFocus);
+    _loadMode();
+  }
+
+  Future<void> _loadMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) setState(() => _videoNoteMode = prefs.getBool(_modePref) ?? false);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleMode() async {
+    final next = !_videoNoteMode;
+    setState(() => _videoNoteMode = next);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(milliseconds: 1800),
+          content: Text(
+            next
+                ? 'Кружок. Удерживайте кнопку 1,5 секунды, чтобы записать'
+                : 'Голосовое. Удерживайте кнопку 1,5 секунды, чтобы записать',
+          ),
+        ),
+      );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_modePref, next);
+    } catch (_) {}
   }
 
   void _onFocus() {
@@ -522,7 +557,6 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               ('camera', Icons.photo_camera_outlined, 'Сделать фото'),
               ('video', Icons.video_library_outlined, 'Видео из галереи'),
               ('file', Icons.attach_file, 'Файл'),
-              ('videonote', Icons.radio_button_checked, 'Видеосообщение (кружок)'),
               ('live', Icons.share_location, 'Геопозиция (трансляция)'),
             ])
               ListTile(
@@ -570,8 +604,6 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               caption: caption.isEmpty ? null : caption,
             );
           }
-        case 'videonote':
-          await _recordVideoNote();
         case 'live':
           if (!mounted) return;
           final started = await startLiveSharing(context, ref, widget.conversationId);
@@ -944,11 +976,13 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             ),
           )
         else
-          _RoundButton(
-            icon: Icons.mic,
-            tooltip: 'Голосовое',
-            accent: true,
-            onPressed: _startVoice,
+          HoldToRecordButton(
+            icon: _videoNoteMode ? Icons.radio_button_checked : Icons.mic,
+            label: _videoNoteMode
+                ? 'Кружок: тап переключает на голосовое, удержание записывает'
+                : 'Голосовое: тап переключает на кружок, удержание записывает',
+            onTap: _toggleMode,
+            onHold: _videoNoteMode ? _recordVideoNote : _startVoice,
           ),
       ],
     );
@@ -1048,6 +1082,112 @@ class _RoundButton extends StatelessWidget {
         minimumSize: const Size(48, 48),
       ),
       icon: Icon(icon, size: 20),
+    );
+  }
+}
+
+/// Красная кнопка записи. Короткий тап ([onTap]) переключает микрофон и кружок,
+/// удержание [holdDuration] ([onHold]) начинает запись. Пока палец на кнопке,
+/// вокруг неё набегает кольцо, чтобы было видно, сколько ещё держать.
+class HoldToRecordButton extends StatefulWidget {
+  const HoldToRecordButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.onHold,
+  });
+
+  static const holdDuration = Duration(milliseconds: 1500);
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final VoidCallback onHold;
+
+  @override
+  State<HoldToRecordButton> createState() => HoldToRecordButtonState();
+}
+
+class HoldToRecordButtonState extends State<HoldToRecordButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ring = AnimationController(
+    vsync: this,
+    duration: HoldToRecordButton.holdDuration,
+  )..addStatusListener(_onRing);
+
+  bool _fired = false;
+
+  void _onRing(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _fired = true;
+    HapticFeedback.mediumImpact();
+    widget.onHold();
+  }
+
+  @override
+  void dispose() {
+    _ring.dispose();
+    super.dispose();
+  }
+
+  void _down() {
+    _fired = false;
+    _ring.forward(from: 0);
+  }
+
+  void _up() {
+    final wasHold = _fired;
+    _ring.reset();
+    if (!wasHold) widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: widget.label,
+      onTap: widget.onTap,
+      onLongPress: widget.onHold,
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _down(),
+        onTapUp: (_) => _up(),
+        onTapCancel: _ring.reset,
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(color: AppColors.primaryTint, shape: BoxShape.circle),
+                child: Icon(widget.icon, size: 20, color: AppColors.onPrimary),
+              ),
+              IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _ring,
+                  builder: (context, _) => _ring.value == 0
+                      ? const SizedBox.shrink()
+                      : SizedBox(
+                          width: 52,
+                          height: 52,
+                          child: CircularProgressIndicator(
+                            value: _ring.value,
+                            strokeWidth: 3,
+                            color: AppColors.onPrimary,
+                            backgroundColor: Colors.transparent,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

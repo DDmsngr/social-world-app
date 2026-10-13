@@ -20,6 +20,7 @@ import 'widgets/channel_avatar.dart';
 import 'widgets/channel_topics_picker.dart';
 import '../data/channels_repository.dart';
 import 'channel_screen.dart';
+import 'channel_subscribers_screen.dart';
 import 'providers/channel_providers.dart';
 
 /// О канале: описание, ссылка, заявки на вступление, настройки владельца,
@@ -166,6 +167,16 @@ class ChannelInfoScreen extends ConsumerWidget {
                     Clipboard.setData(ClipboardData(text: '@${info.handle}'));
                     _snack(context, 'Адрес скопирован');
                   },
+                ),
+              if (info.isAdmin)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.people_outline),
+                  title: const Text('Подписчики'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => ChannelSubscribersScreen(channelId: channelId)),
+                  ),
                 ),
               if (info.isAdmin && info.pendingRequests > 0) ...[
                 const SizedBox(height: 16),

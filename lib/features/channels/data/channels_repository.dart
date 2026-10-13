@@ -160,6 +160,22 @@ class JoinRequest {
   final String? avatarUrl;
 }
 
+class Subscriber {
+  const Subscriber({
+    required this.profileId,
+    required this.name,
+    required this.role,
+    required this.joinedAt,
+    this.avatarUrl,
+  });
+
+  final String profileId;
+  final String name;
+  final String role;
+  final DateTime joinedAt;
+  final String? avatarUrl;
+}
+
 enum JoinResult { joined, requested }
 
 class ChannelsRepository {
@@ -304,6 +320,21 @@ class ChannelsRepository {
         JoinRequest(
           profileId: raw['profile_id'] as String,
           name: raw['display_name'] as String? ?? 'Без имени',
+          avatarUrl: raw['avatar_url'] as String?,
+        ),
+    ];
+  }
+
+  /// Подписчики канала. Сервер отдаёт их только администраторам канала.
+  Future<List<Subscriber>> subscribers(String channelId) async {
+    final rows = await _client.rpc('channel_subscribers', params: {'in_channel': channelId}) as List;
+    return [
+      for (final raw in rows.cast<Map<String, dynamic>>())
+        Subscriber(
+          profileId: raw['profile_id'] as String,
+          name: raw['display_name'] as String? ?? 'Без имени',
+          role: raw['role'] as String? ?? 'member',
+          joinedAt: DateTime.parse(raw['joined_at'] as String).toLocal(),
           avatarUrl: raw['avatar_url'] as String?,
         ),
     ];

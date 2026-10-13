@@ -23,11 +23,16 @@ class EventRoutePickerScreen extends StatefulWidget {
     required this.initial,
     required this.centerLatitude,
     required this.centerLongitude,
+    this.single = false,
   });
 
   final List<EventRoutePoint> initial;
   final double centerLatitude;
   final double centerLongitude;
+
+  /// Одна точка (место встречи): новое нажатие переставляет её, а не
+  /// продолжает маршрут.
+  final bool single;
 
   @override
   State<EventRoutePickerScreen> createState() => _EventRoutePickerScreenState();
@@ -222,9 +227,10 @@ class _EventRoutePickerScreenState extends State<EventRoutePickerScreen> {
       ),
       animation: const ymk.Animation(type: ymk.AnimationType.Smooth, duration: 0.4),
     );
-    if (_points.length >= maxEventRoutePoints) return;
+    if (!widget.single && _points.length >= maxEventRoutePoints) return;
     // Название найденного места едет вместе с точкой: так его увидят другие.
     setState(() {
+      if (widget.single) _points.clear();
       _points.add(
         EventRoutePoint(latitude: hit.latitude, longitude: hit.longitude, title: hit.title),
       );
@@ -233,13 +239,14 @@ class _EventRoutePickerScreenState extends State<EventRoutePickerScreen> {
   }
 
   void _addPoint(ymk.Point point) {
-    if (_points.length >= maxEventRoutePoints) {
+    if (!widget.single && _points.length >= maxEventRoutePoints) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Не больше $maxEventRoutePoints точек')),
       );
       return;
     }
     setState(() {
+      if (widget.single) _points.clear();
       _points.add(
         EventRoutePoint(latitude: point.latitude, longitude: point.longitude),
       );
@@ -302,7 +309,7 @@ class _EventRoutePickerScreenState extends State<EventRoutePickerScreen> {
         : null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Маршрут на карте')),
+      appBar: AppBar(title: Text(widget.single ? 'Точка на карте' : 'Маршрут на карте')),
       body: unavailable != null
           ? StateMessage(title: unavailable, icon: Icons.map_outlined)
           : Column(
@@ -349,6 +356,7 @@ class _EventRoutePickerScreenState extends State<EventRoutePickerScreen> {
                 ),
                 _Panel(
                   count: _points.length,
+                  single: widget.single,
                   onUndo: _points.isEmpty ? null : _undo,
                   onClear: _points.isEmpty ? null : _clear,
                   onDone: () => Navigator.of(context).pop(_points),
@@ -362,12 +370,14 @@ class _EventRoutePickerScreenState extends State<EventRoutePickerScreen> {
 class _Panel extends StatelessWidget {
   const _Panel({
     required this.count,
+    required this.single,
     required this.onUndo,
     required this.onClear,
     required this.onDone,
   });
 
   final int count;
+  final bool single;
   final VoidCallback? onUndo;
   final VoidCallback? onClear;
   final VoidCallback onDone;
@@ -391,7 +401,11 @@ class _Panel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              count == 0
+              single
+                  ? (count == 0
+                        ? 'Нажмите на карту или найдите место в поиске'
+                        : 'Точка стоит. Нажмите в другом месте, чтобы передвинуть')
+                  : count == 0
                   ? 'Нажимайте на карту — точки встанут по порядку'
                   : 'Точек: $count. Нажмите ещё, чтобы продолжить маршрут',
               style: Theme.of(context).textTheme.bodyMedium,
@@ -399,12 +413,14 @@ class _Panel extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                OutlinedButton(
-                  onPressed: onUndo,
-                  child: const Text('Отменить последнюю'),
-                ),
-                const SizedBox(width: 8),
-                TextButton(onPressed: onClear, child: const Text('Очистить')),
+                if (!single) ...[
+                  OutlinedButton(
+                    onPressed: onUndo,
+                    child: const Text('Отменить последнюю'),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                TextButton(onPressed: onClear, child: Text(single ? 'Убрать точку' : 'Очистить')),
                 const Spacer(),
                 FilledButton(
                   onPressed: onDone,
