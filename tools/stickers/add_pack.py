@@ -12,11 +12,15 @@
 Спека (см. specs/alexa.json):
     id, title, description, publisher, category, status, is_default,
     sort_order, version — шапка пака (уходит в pack.json как есть);
+    into — необязательно: id существующего пака. Тогда это второй лист того
+    же пака: стикеры дописываются в конец, шапка и прежние стикеры целы;
     sheet — путь к листу от этой папки; grid — [колонки, ряды]; thr — порог
     фона (90 подходит для мадженты); exclude — ключи, которые есть на листе,
     но в пак не идут; stickers — по одной строке на ячейку, слева направо и
     сверху вниз: key, title, emoji, emotions (семейства из packs/families.json,
     первое главное), synonyms. Пустая ячейка листа — строка с "key": null.
+    Необязательно у стикера: "drop_far": N — убрать всё дальше N px (на
+    листе) от фигуры, если рядом с ней остался чужой обломок.
 
 Дальше: проверить превью глазами и опубликовать (publish.ps1 <пак>).
 """
@@ -25,7 +29,7 @@ import os
 import re
 import shutil
 import sys
-import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -61,7 +65,7 @@ def drop_specks(a, max_area=60, min_gap=35):
     верхней и нижней кромки полосы."""
     lab, n = ndi.label(a > 0.3, structure=np.ones((3, 3)))
     if n < 2:
-        return a
+        return clear_halo(a)
     areas = ndi.sum(a > 0.3, lab, np.arange(1, n + 1))
     main = 1 + int(np.argmax(areas))
     gap = ndi.distance_transform_edt(lab != main)
@@ -72,17 +76,63 @@ def drop_specks(a, max_area=60, min_gap=35):
             continue
         if gap[comp].min() > min_gap or on_border:
             a = np.where(comp, 0, a)
-    return a
+    return clear_halo(a)
 
 
-def cut_by_rows(sheet, cols, rows, thr):
+def clear_halo(a, reach=4):
+    """Полупрозрачные остатки (мягкая кромка чужого обломка) не проходят порог
+    компонент, но раздувают границы стикера и торчат тонкой чертой. Всё, что
+    дальше [reach] px от настоящей фигуры, обнуляется."""
+    solid = ndi.binary_dilation(a > 0.3, iterations=reach)
+    return np.where(solid, a, 0)
+
+
+def row_bounds(img, rows, thr, reach=60):
+    """Границы рядов: не ровные `высота/ряды`, а самая пустая строка листа
+    рядом с ней. Подпись или тень нижнего края ряда заходит за ровную линию
+    на пару пикселей, и её обрезок попадал бы в верх следующей полосы
+    отдельным куском (тонкая черта над стикером)."""
+    h = img.shape[0]
+    bg = cut.bg_color(img)
+    bounds = [0]
+    for k in range(1, rows):
+        centre = k * h // rows
+        best, best_y = None, centre
+        for y in range(max(bounds[-1] + 20, centre - reach), min(h - 20, centre + reach) + 1):
+            fg = int((np.linalg.norm(img[y] - bg, axis=1) > thr).sum())
+            if best is None or fg < best or (fg == best and abs(y - centre) < abs(best_y - centre)):
+                best, best_y = fg, y
+        bounds.append(best_y)
+    bounds.append(h)
+    return bounds
+
+
+def drop_far(a, reach):
+    """Убирает всё, что дальше [reach] px (на листе) от самого большого куска:
+    для точечного случая, когда рядом попал чужой обломок, а настоящие искры
+    и подписи стоят ближе."""
+    lab, n = ndi.label(a > 0.3, structure=np.ones((3, 3)))
+    if n < 2:
+        return a
+    areas = ndi.sum(a > 0.3, lab, np.arange(1, n + 1))
+    main = 1 + int(np.argmax(areas))
+    gap = ndi.distance_transform_edt(lab != main)
+    for i in range(1, n + 1):
+        comp = lab == i
+        if i != main and gap[comp].min() > reach:
+            a = np.where(comp, 0, a)
+    return clear_halo(a)
+
+
+def cut_by_rows(sheet, cols, rows, thr, far=None):
     """Стикеры листа по ячейкам: {(ряд, колонка): RGBA}, масштаб общий."""
+    far = far or {}
     img = cut.load(sheet)
-    band = img.shape[0] // rows
+    bounds = row_bounds(img, rows, thr)
     cut.COLS, cut.ROWS = cols, 1
     items = {}
     for r in range(rows):
-        strip = img[r * band:(r + 1) * band]
+        strip = img[bounds[r]:bounds[r + 1]]
         rgb, alpha = cut.key(strip, thr)
         rgb = despill(rgb, alpha)
         lab, cells = cut.assign(alpha, strip.shape[:2])
@@ -90,6 +140,8 @@ def cut_by_rows(sheet, cols, rows, thr):
             keep = np.isin(lab, comps)
             keep = ndi.binary_dilation(keep, iterations=3) & (alpha > 0)
             a = drop_specks(np.where(keep, alpha, 0))
+            if (r, c) in far:
+                a = drop_far(a, far[(r, c)])
             ys, xs = np.where(a > 0.02)
             if len(ys) == 0:
                 continue
@@ -99,6 +151,21 @@ def cut_by_rows(sheet, cols, rows, thr):
     cut.ROWS = rows
     scale = cut.FIT / max(max(v.shape[:2]) for v in items.values())
     return items, scale
+
+
+def remove_file(path, tries=20):
+    """Windows не даёт стереть файл, пока его держит антивирус или
+    проводник (WinError 32): подождать и повторить."""
+    for attempt in range(tries):
+        try:
+            os.remove(path)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if attempt == tries - 1:
+                raise
+            time.sleep(0.5)
 
 
 def render(rgba, scale):
@@ -137,19 +204,25 @@ def main(argv):
         print('ok', spec['id'])
         return
     pid = spec['id']
+    # "into": стикеры листа дописываются в уже существующий пак (второй лист
+    # того же персонажа): шапка и чужие стикеры не трогаются.
+    target = spec.get('into', pid)
     cols, rows = spec['grid']
     exclude = set(spec.get('exclude', []))
     cells = spec['stickers']
 
-    items, scale = cut_by_rows(os.path.join(HERE, spec['sheet']), cols, rows, spec.get('thr', 90))
+    far = {(i // cols, i % cols): s['drop_far'] for i, s in enumerate(cells) if s.get('drop_far')}
+    items, scale = cut_by_rows(os.path.join(HERE, spec['sheet']), cols, rows, spec.get('thr', 90), far)
     empty = [i for i, s in enumerate(cells) if s.get('key') and (i // cols, i % cols) not in items]
     assert not empty, f'на листе не нашлись ячейки {[cells[i]["key"] for i in empty]}'
 
-    out = os.path.join(HERE, 'packs', pid)
+    out = os.path.join(HERE, 'packs', target)
     os.makedirs(out, exist_ok=True)
+    mine = {s['key'] for s in cells if s.get('key')}
     for old in os.listdir(out):  # папку не удаляем: Windows может держать её открытой
-        if old.endswith('.webp'):
-            os.remove(os.path.join(out, old))
+        # При дописывании стираем только свои файлы, у себя — все.
+        if old.endswith('.webp') and ('into' not in spec or old[:-5] in mine):
+            remove_file(os.path.join(out, old))
     thumbs = {}
     for i, s in enumerate(cells):
         if not s.get('key') or s['key'] in exclude:
@@ -158,16 +231,27 @@ def main(argv):
         canvas.save(os.path.join(out, s['key'] + '.webp'), 'WEBP', quality=92, alpha_quality=100, method=6)
         thumbs[(i // cols, i % cols)] = canvas
 
-    meta = {k: spec[k] for k in HEADER if k in spec}
-    meta.setdefault('publisher', 'Команда ChaWo')
-    meta.setdefault('status', 'draft')
-    meta.setdefault('version', 1)
-    meta['stickers'] = [
+    stickers = [
         {'key': s['key'], 'title': s['title'], 'emoji': s['emoji'],
          'synonyms': s.get('synonyms', []), 'emotions': s['emotions']}
         for s in cells if s.get('key') and s['key'] not in exclude
     ]
-    with open(os.path.join(out, 'pack.json'), 'w', encoding='utf-8') as fh:
+    pack_json = os.path.join(out, 'pack.json')
+    if 'into' in spec:
+        meta = json.load(open(pack_json, encoding='utf-8'))
+        index = {s['key']: i for i, s in enumerate(meta['stickers'])}
+        for s in stickers:  # уже есть — на своём месте, нет — в конец
+            if s['key'] in index:
+                meta['stickers'][index[s['key']]] = s
+            else:
+                meta['stickers'].append(s)
+    else:
+        meta = {k: spec[k] for k in HEADER if k in spec}
+        meta.setdefault('publisher', 'Команда ChaWo')
+        meta.setdefault('status', 'draft')
+        meta.setdefault('version', 1)
+        meta['stickers'] = stickers
+    with open(pack_json, 'w', encoding='utf-8') as fh:
         json.dump(meta, fh, ensure_ascii=False, indent=1)
 
     previews = [a for a in argv[1:] if not a.startswith('--')]

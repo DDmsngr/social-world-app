@@ -13,11 +13,25 @@ void main() {
       jsonDecode(File('${dir.path}/pack.json').readAsStringSync()) as Map<String, dynamic>,
   ];
 
-  test('пак «Алекса»: 23 стикера (без «победы»), у каждого есть файл', () {
+  test('пак «Жиза»: 24 стикера парня, у каждого есть файл', () {
+    final zhiza = packs.firstWhere((p) => p['id'] == 'zhiza');
+    expect(zhiza['title'], 'Жиза');
+    expect(zhiza['category'], 'мемы');
+    final stickers = (zhiza['stickers'] as List).cast<Map<String, dynamic>>();
+    expect(stickers, hasLength(24));
+    for (final s in stickers) {
+      expect(File('${root.path}/zhiza/${s['key']}.webp').existsSync(), isTrue, reason: s['key']);
+    }
+  });
+
+  test('пак «Алекса»: два листа (23 + 24), без «победы», у каждого есть файл', () {
     final alexa = packs.firstWhere((p) => p['id'] == 'alexa');
     expect(alexa['title'], 'Алекса');
     final stickers = (alexa['stickers'] as List).cast<Map<String, dynamic>>();
-    expect(stickers, hasLength(23));
+    expect(stickers, hasLength(47));
+    // Первый лист — без подписей, второй дописан в конец.
+    expect(stickers.first['key'], 'wave');
+    expect(stickers.last['key'], 'spokoynoy_nochi');
     expect(stickers.map((s) => s['key']), isNot(contains('victory')));
     expect(File('${root.path}/alexa/victory.webp').existsSync(), isFalse);
     for (final s in stickers) {
