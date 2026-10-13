@@ -52,10 +52,10 @@ void main() {
   List<String> ids(List<Sticker> stickers) => [for (final s in stickers) s.id];
 
   group('каталог', () {
-    test('140 стикеров, id уникальны, у каждого есть картинка', () {
+    test('163 стикера (4 пака по 35 и «Алекса» 23), id уникальны, у каждого есть картинка', () {
       final all = [for (final p in catalog.packs) ...p.stickers];
-      expect(all, hasLength(140));
-      expect(ids(all).toSet(), hasLength(140));
+      expect(all, hasLength(163));
+      expect(ids(all).toSet(), hasLength(163));
       for (final sticker in all) {
         expect(File(sticker.asset).existsSync(), isTrue, reason: sticker.id);
         expect(sticker.emoji, isNotEmpty, reason: sticker.id);

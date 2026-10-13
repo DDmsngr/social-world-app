@@ -16,6 +16,14 @@ python3 -I cut.py packs.json            # packs.json — по образцу pac
 python3 -I export_app.py out ../../assets/stickers
 ```
 
+Пак «Алекса» (лист 6×4, в паке 23: `EXCLUDE` в скрипте — что не берём) собирается отдельным `add_alexa.py`: он не
+стирает остальные паки, а пересобирает только `assets/stickers/alexa/` и свою
+запись в `manifest.json`. Исходный лист лежит в `sheets/alexa.png`.
+
+```bash
+python3 -I add_alexa.py sheets/alexa.png ../../assets/stickers [папка для превью]
+```
+
 Id стикера (`<пак>.<ключ>`, например `chao.wave`) уходит в сообщения и **не
 меняется**: переименовать ключ — значит сломать уже отправленные стикеры
 (вместо картинки покажется эмодзи-заменитель). Новый стикер — новый ключ.
