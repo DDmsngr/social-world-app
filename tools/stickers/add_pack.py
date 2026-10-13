@@ -177,7 +177,7 @@ def render(rgba, scale):
 
 
 def check_spec(spec):
-    families = json.load(open(os.path.join(HERE, 'packs', 'families.json'), encoding='utf-8'))
+    families = json.load(open(os.path.join(HERE, 'packs', 'families.json'), encoding='utf-8-sig'))
     cols, rows = spec['grid']
     cells = spec['stickers']
     assert len(cells) == cols * rows, f'строк в stickers {len(cells)}, а ячеек {cols}×{rows}'
@@ -198,7 +198,7 @@ def check_spec(spec):
 
 def main(argv):
     spec_path = argv[0]
-    spec = json.load(open(spec_path, encoding='utf-8'))
+    spec = json.load(open(spec_path, encoding='utf-8-sig'))
     check_spec(spec)
     if '--check' in argv:
         print('ok', spec['id'])
@@ -238,7 +238,7 @@ def main(argv):
     ]
     pack_json = os.path.join(out, 'pack.json')
     if 'into' in spec:
-        meta = json.load(open(pack_json, encoding='utf-8'))
+        meta = json.load(open(pack_json, encoding='utf-8-sig'))
         index = {s['key']: i for i, s in enumerate(meta['stickers'])}
         for s in stickers:  # уже есть — на своём месте, нет — в конец
             if s['key'] in index:

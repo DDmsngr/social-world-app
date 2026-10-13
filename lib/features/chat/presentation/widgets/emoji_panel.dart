@@ -57,9 +57,13 @@ class EmojiPanel extends StatefulWidget {
     this.onSticker,
     this.onCustomEmoji,
     this.onOpenStore,
+    this.onPackLongPress,
     this.startWithStickers = false,
     this.height = 300,
   });
+
+  /// Долгий тап по вкладке пака (открыть пак, убрать из своих).
+  final ValueChanged<StickerPack>? onPackLongPress;
 
   final ValueChanged<String> onPick;
   final VoidCallback onBackspace;
@@ -110,12 +114,45 @@ class _EmojiPanelState extends State<EmojiPanel> {
         if (pack.stickers.isNotEmpty) pack,
     ];
     if (packs.isEmpty) {
+      if (widget.startWithStickers || widget.onOpenStore == null) {
+        return Container(
+          height: widget.height,
+          color: AppColors.ink2,
+          child: widget.startWithStickers ? _noStickers() : _picker(widget.height),
+        );
+      }
+      // Своих паков нет: эмодзи как обычно, а над ними — путь в магазин.
       return Container(
         height: widget.height,
         color: AppColors.ink2,
-        child: widget.startWithStickers
-            ? _noStickers()
-            : _picker(widget.height),
+        child: Column(
+          children: [
+            SizedBox(
+              height: _tabsHeight,
+              child: Row(
+                children: [
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    key: const ValueKey('sticker-store-tab'),
+                    onPressed: widget.onOpenStore,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primaryTint,
+                      minimumSize: const Size(0, 36),
+                    ),
+                    icon: const Icon(Icons.add_circle_outline, size: 20),
+                    label: const Text('Добавить стикеры'),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: AppColors.hair),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) => _picker(constraints.maxHeight),
+              ),
+            ),
+          ],
+        ),
       );
     }
     final stickerMode = _stickerMode;
@@ -146,6 +183,9 @@ class _EmojiPanelState extends State<EmojiPanel> {
                           key: ValueKey('sticker-pack-${p.id}'),
                           selected: pack == p,
                           onTap: () => setState(() => _tab = 'pack:${p.id}'),
+                          onLongPress: widget.onPackLongPress == null
+                              ? null
+                              : () => widget.onPackLongPress!(p),
                           child: StickerImage(
                             url: p.coverUrl,
                             fallback: p.stickers.first.emoji,
@@ -319,16 +359,19 @@ class _Tab extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.child,
+    this.onLongPress,
   });
 
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         width: 48,

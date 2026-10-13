@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/errors/friendly_error.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -54,21 +53,6 @@ class _StickerPackScreenState extends ConsumerState<StickerPackScreen> {
             : SnackBarAction(label: 'Мои стикеры', onPressed: () => context.push(Routes.myStickers)),
       ),
     );
-  }
-
-  Future<void> _uninstall(StickerPack pack) async {
-    try {
-      await ref.read(installedStickerPacksProvider.notifier).uninstall(pack.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Пак «${pack.title}» убран из ваших стикеров')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось убрать пак'))),
-      );
-    }
   }
 
   void _preview(Sticker sticker) {
@@ -138,7 +122,6 @@ class _StickerPackScreenState extends ConsumerState<StickerPackScreen> {
   }
 
   Widget _content(StickerPack pack) {
-    final installed = ref.watch(installedStickerPacksProvider).value?.contains(pack.id) ?? false;
     Sticker? highlighted;
     for (final s in pack.stickers) {
       if (s.key == widget.highlight) highlighted = s;
@@ -210,17 +193,6 @@ class _StickerPackScreenState extends ConsumerState<StickerPackScreen> {
                 ),
             ],
           ),
-          if (installed) ...[
-            const SizedBox(height: 20),
-            Center(
-              child: TextButton.icon(
-                key: ValueKey('pack-uninstall-${pack.id}'),
-                onPressed: () => _uninstall(pack),
-                icon: const Icon(Icons.remove_circle_outline, size: 18),
-                label: const Text('Убрать из моих стикеров'),
-              ),
-            ),
-          ],
         ],
       ),
     );

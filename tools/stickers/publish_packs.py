@@ -39,7 +39,7 @@ STATUSES = {'draft', 'review', 'published', 'archived'}
 
 def load_pack(pid):
     folder = os.path.join(PACKS, pid)
-    meta = json.load(open(os.path.join(folder, 'pack.json'), encoding='utf-8'))
+    meta = json.load(open(os.path.join(folder, 'pack.json'), encoding='utf-8-sig'))
     assert meta['id'] == pid and PACK_RE.match(pid), f'{pid}: id пака'
     assert meta.get('status', 'draft') in STATUSES, f'{pid}: status'
     keys = [s['key'] for s in meta['stickers']]
@@ -143,7 +143,7 @@ def publish(api, pid):
 def main(argv):
     names = [a for a in argv if not a.startswith('--')]
     packs = names or sorted(d for d in os.listdir(PACKS) if os.path.isdir(os.path.join(PACKS, d)))
-    families = json.load(open(os.path.join(PACKS, 'families.json'), encoding='utf-8'))
+    families = json.load(open(os.path.join(PACKS, 'families.json'), encoding='utf-8-sig'))
     for pid in packs:
         _, meta = load_pack(pid)
         for s in meta['stickers']:

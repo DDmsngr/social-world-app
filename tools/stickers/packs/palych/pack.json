@@ -1,0 +1,389 @@
+{
+ "id": "palych",
+ "title": "Палыч",
+ "description": "Мастер с ключом на все случаи жизни. С матом — 18+.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 70,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "opyat_huynya",
+   "title": "опять эта хуйня",
+   "emoji": "🔧",
+   "synonyms": [
+    "опять",
+    "снова",
+    "хуйня",
+    "сломалось",
+    "достало"
+   ],
+   "emotions": [
+    "anger",
+    "tired"
+   ]
+  },
+  {
+   "key": "krasava",
+   "title": "красава",
+   "emoji": "👍",
+   "synonyms": [
+    "молодец",
+    "красавчик",
+    "класс",
+    "одобряю",
+    "огонь"
+   ],
+   "emotions": [
+    "joy",
+    "cool"
+   ]
+  },
+  {
+   "key": "geniy",
+   "title": "гений, блять",
+   "emoji": "🤣",
+   "synonyms": [
+    "гений",
+    "блять",
+    "ржу",
+    "умник",
+    "смешно"
+   ],
+   "emotions": [
+    "joy",
+    "think"
+   ]
+  },
+  {
+   "key": "pizdets",
+   "title": "пиздец",
+   "emoji": "😩",
+   "synonyms": [
+    "пиздец",
+    "кошмар",
+    "капец",
+    "всё плохо",
+    "устал"
+   ],
+   "emotions": [
+    "sad",
+    "tired"
+   ]
+  },
+  {
+   "key": "idi_nahuy",
+   "title": "иди нахуй",
+   "emoji": "🖕",
+   "synonyms": [
+    "нахуй",
+    "отвали",
+    "отстань",
+    "бесишь",
+    "фак"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "veryu",
+   "title": "я тебе верю",
+   "emoji": "😏",
+   "synonyms": [
+    "верю",
+    "ага",
+    "ну-ну",
+    "сарказм",
+    "сигарета"
+   ],
+   "emotions": [
+    "think",
+    "cool"
+   ]
+  },
+  {
+   "key": "vse_norm",
+   "title": "всё норм",
+   "emoji": "😎",
+   "synonyms": [
+    "норм",
+    "нормально",
+    "всё хорошо",
+    "очки",
+    "спокойно"
+   ],
+   "emotions": [
+    "cool"
+   ]
+  },
+  {
+   "key": "ne_segodnya",
+   "title": "не сегодня",
+   "emoji": "🚬",
+   "synonyms": [
+    "потом",
+    "завтра",
+    "лень",
+    "перекур",
+    "не буду"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  },
+  {
+   "key": "da_ladno_bro",
+   "title": "да ладно, бро",
+   "emoji": "😁",
+   "synonyms": [
+    "бро",
+    "да ладно",
+    "брат",
+    "дружище",
+    "расслабься"
+   ],
+   "emotions": [
+    "joy",
+    "friend"
+   ]
+  },
+  {
+   "key": "zaebal",
+   "title": "заебал",
+   "emoji": "😡",
+   "synonyms": [
+    "задолбал",
+    "бесит",
+    "достал",
+    "злюсь",
+    "надоел"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "scha_dodelayu",
+   "title": "ща доделаю",
+   "emoji": "😴",
+   "synonyms": [
+    "щас",
+    "доделаю",
+    "сплю",
+    "устал",
+    "сейчас"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "somnitelno",
+   "title": "как-то сомнительно",
+   "emoji": "🤨",
+   "synonyms": [
+    "сомнительно",
+    "сомневаюсь",
+    "не уверен",
+    "подозрительно",
+    "хм"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "zaebis",
+   "title": "заебись",
+   "emoji": "👍",
+   "synonyms": [
+    "отлично",
+    "супер",
+    "круто",
+    "сварка",
+    "класс"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "nu_ponyatno",
+   "title": "ну, понятно",
+   "emoji": "🙄",
+   "synonyms": [
+    "понятно",
+    "ясно",
+    "ну-ну",
+    "ладно",
+    "всё ясно"
+   ],
+   "emotions": [
+    "anger",
+    "think"
+   ]
+  },
+  {
+   "key": "rabota_ne_volk",
+   "title": "работа не волк",
+   "emoji": "👷",
+   "synonyms": [
+    "работа",
+    "не волк",
+    "каска",
+    "стройка",
+    "в лес не убежит"
+   ],
+   "emotions": [
+    "tired",
+    "anger"
+   ]
+  },
+  {
+   "key": "che_za_huynya",
+   "title": "чё за хуйня",
+   "emoji": "😠",
+   "synonyms": [
+    "что за",
+    "хуйня",
+    "не понял",
+    "что происходит",
+    "чё"
+   ],
+   "emotions": [
+    "surprise",
+    "anger"
+   ]
+  },
+  {
+   "key": "derzhi_instrument",
+   "title": "держи инструмент",
+   "emoji": "🔧",
+   "synonyms": [
+    "инструмент",
+    "ключ",
+    "держи",
+    "помоги",
+    "работаем"
+   ],
+   "emotions": [
+    "friend",
+    "energy"
+   ]
+  },
+  {
+   "key": "prosto_rabotayu",
+   "title": "просто работаю",
+   "emoji": "☕",
+   "synonyms": [
+    "работаю",
+    "без понтов",
+    "кофе",
+    "работа",
+    "спокойно"
+   ],
+   "emotions": [
+    "cool",
+    "tired"
+   ]
+  },
+  {
+   "key": "kak_besit",
+   "title": "как же бесит",
+   "emoji": "🤦",
+   "synonyms": [
+    "бесит",
+    "раздражает",
+    "фейспалм",
+    "достало",
+    "злюсь"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "poshel_nahuy",
+   "title": "пошёл нахуй",
+   "emoji": "🚶",
+   "synonyms": [
+    "ухожу",
+    "нахуй",
+    "пока",
+    "до свидания",
+    "всё"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "ebaniy_pizdets",
+   "title": "ёбаный пиздец",
+   "emoji": "😱",
+   "synonyms": [
+    "пиздец",
+    "ужас",
+    "шок",
+    "кошмар",
+    "капец"
+   ],
+   "emotions": [
+    "fear",
+    "surprise"
+   ]
+  },
+  {
+   "key": "zhizn_bol",
+   "title": "жизнь боль",
+   "emoji": "😔",
+   "synonyms": [
+    "боль",
+    "грусть",
+    "тоска",
+    "печаль",
+    "жизнь"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "ty_sleduyushchiy",
+   "title": "ты следующий",
+   "emoji": "👉",
+   "synonyms": [
+    "следующий",
+    "твоя очередь",
+    "ты",
+    "берегись",
+    "очки"
+   ],
+   "emotions": [
+    "cool",
+    "anger"
+   ]
+  },
+  {
+   "key": "vse_budet_potom",
+   "title": "всё будет, но потом",
+   "emoji": "😌",
+   "synonyms": [
+    "потом",
+    "всё будет",
+    "позже",
+    "завтра",
+    "не спеши"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  }
+ ]
+}

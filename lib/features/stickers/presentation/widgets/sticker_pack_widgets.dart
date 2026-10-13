@@ -41,17 +41,52 @@ class _PackInstallButtonState extends ConsumerState<PackInstallButton> {
     widget.onInstalled?.call();
   }
 
+  /// Убрать из своих — тут же, рядом с «Установлен», с возможностью вернуть.
+  Future<void> _uninstall() async {
+    final installed = ref.read(installedStickerPacksProvider.notifier);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await installed.uninstall(widget.pack.id);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Пак «${widget.pack.title}» убран из ваших стикеров'),
+          action: widget.pack.isPublished
+              ? SnackBarAction(label: 'Вернуть', onPressed: () => installed.install(widget.pack.id))
+              : null,
+        ),
+      );
+    } catch (error) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось убрать пак'))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final installed = ref.watch(installedStickerPacksProvider).value?.contains(widget.pack.id) ?? false;
     if (installed) {
-      return Row(
+      // Wrap, а не Row: в карточке магазина на узком телефоне «Убрать» не
+      // влезает в строку и переносится, а не вылезает за край.
+      return Wrap(
         key: ValueKey('pack-installed-${widget.pack.id}'),
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 4,
         children: [
-          Icon(Icons.check_circle, size: 18, color: AppColors.success),
-          const SizedBox(width: 6),
-          Text('Установлен', style: TextStyle(fontSize: 14, color: AppColors.textDim)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle, size: 18, color: AppColors.success),
+              const SizedBox(width: 6),
+              Text('Установлен', style: TextStyle(fontSize: 14, color: AppColors.textDim)),
+            ],
+          ),
+          TextButton(
+            key: ValueKey('pack-uninstall-${widget.pack.id}'),
+            onPressed: _uninstall,
+            style: AppButtons.compact,
+            child: const Text('Убрать'),
+          ),
         ],
       );
     }

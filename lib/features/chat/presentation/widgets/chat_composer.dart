@@ -143,25 +143,15 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   void _syncActive() => chatEmojiPanelOpen.value = _emojiOpen;
 
-  /// Панель открыта кнопкой стикеров — в режиме стикеров.
-  bool _panelStickers = false;
-
-  void _toggleEmoji() => _togglePanel(stickers: false);
-
-  void _toggleStickers() => _togglePanel(stickers: true);
-
-  /// Та же кнопка закрывает панель (и возвращает клавиатуру); другая —
-  /// переключает панель в свой режим.
-  void _togglePanel({required bool stickers}) {
-    if (_emojiOpen && _panelStickers == stickers) {
+  /// Одна кнопка на всё: эмодзи, свои смайлы, стикеры и вход в магазин —
+  /// внутри панели.
+  void _toggleEmoji() {
+    if (_emojiOpen) {
       setState(() => _emojiOpen = false);
       _focus.requestFocus();
     } else {
       _focus.unfocus();
-      setState(() {
-        _emojiOpen = true;
-        _panelStickers = stickers;
-      });
+      setState(() => _emojiOpen = true);
     }
     _syncActive();
   }
@@ -170,6 +160,56 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     setState(() => _emojiOpen = false);
     _syncActive();
     context.push(Routes.stickerStore);
+  }
+
+  /// Долгий тап по вкладке пака: открыть его или убрать из своих.
+  Future<void> _packMenu(StickerPack pack) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: AppColors.ink2,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.collections_outlined, color: AppColors.textDim),
+              title: Text('Пак «${pack.title}»'),
+              onTap: () => Navigator.of(sheet).pop('open'),
+            ),
+            ListTile(
+              key: const ValueKey('panel-pack-remove'),
+              leading: Icon(Icons.remove_circle_outline, color: AppColors.danger),
+              title: const Text('Убрать из моих стикеров'),
+              onTap: () => Navigator.of(sheet).pop('remove'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'open') {
+      setState(() => _emojiOpen = false);
+      _syncActive();
+      context.push(Routes.stickerPack(pack.id));
+      return;
+    }
+    try {
+      await ref.read(installedStickerPacksProvider.notifier).uninstall(pack.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Пак «${pack.title}» убран'),
+          action: SnackBarAction(
+            label: 'Вернуть',
+            onPressed: () => ref.read(installedStickerPacksProvider.notifier).install(pack.id),
+          ),
+        ),
+      );
+    } catch (error) {
+      _fail(error, 'Не удалось убрать пак');
+    }
   }
 
   void _insertEmoji(String emoji) {
@@ -222,6 +262,15 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   Future<void> _sendText({bool silent = false}) async {
     final (:text, :emoji) = _draft();
     if (text.isEmpty || _sendingText) return;
+    // В поле только один свой смайл, и больше ничего — это стикер: уходит
+    // картинкой, а не буквой. Обычный эмодзи (😂) остаётся текстом.
+    if (emoji.length == 1 && text == emoji.single.text) {
+      final sticker = ref.read(stickerCatalogProvider).value?.byId(emoji.single.sticker);
+      if (sticker != null) {
+        await _sendSticker(sticker, clearText: true);
+        return;
+      }
+    }
     setState(() {
       _sendingText = true;
       _error = null;
@@ -839,16 +888,13 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: EmojiPanel(
-                  // Новый режим — новая панель: кнопка стикеров не должна
-                  // открывать эмодзи, оставшиеся с прошлого раза.
-                  key: ValueKey('panel-$_panelStickers'),
                   onPick: _insertEmoji,
                   onBackspace: _backspace,
                   stickerPacks: myPacks,
                   onSticker: _sendSticker,
                   onCustomEmoji: _insertCustomEmoji,
                   onOpenStore: _openStickerStore,
-                  startWithStickers: _panelStickers,
+                  onPackLongPress: _packMenu,
                 ),
               ),
           ],
@@ -955,32 +1001,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _scheduledButton(),
-                    // Без текста — место есть: стикеры отдельной кнопкой.
-                    if (!hasText)
-                      IconButton(
-                        key: const ValueKey('composer-stickers'),
-                        onPressed: _toggleStickers,
-                        tooltip: _emojiOpen && _panelStickers ? 'Клавиатура' : 'Стикеры',
-                        visualDensity: VisualDensity.compact,
-                        icon: Icon(
-                          _emojiOpen && _panelStickers
-                              ? Icons.keyboard_alt_outlined
-                              : Icons.sticky_note_2_outlined,
-                          color: _emojiOpen && _panelStickers
-                              ? AppColors.primaryTint
-                              : AppColors.textDim,
-                        ),
-                      ),
                     IconButton(
                       onPressed: _toggleEmoji,
-                      tooltip: _emojiOpen && !_panelStickers ? 'Клавиатура' : 'Эмодзи',
+                      tooltip: _emojiOpen ? 'Клавиатура' : 'Эмодзи',
                       icon: Icon(
-                        _emojiOpen && !_panelStickers
+                        _emojiOpen
                             ? Icons.keyboard_alt_outlined
                             : Icons.emoji_emotions_outlined,
-                        color: _emojiOpen && !_panelStickers
-                            ? AppColors.primaryTint
-                            : AppColors.textDim,
+                        color: _emojiOpen ? AppColors.primaryTint : AppColors.textDim,
                       ),
                     ),
                   ],

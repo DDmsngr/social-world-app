@@ -24,6 +24,17 @@ void main() {
     }
   });
 
+  test('пак «Палыч»: 24 стикера, помечен 18+, у каждого есть файл', () {
+    final palych = packs.firstWhere((p) => p['id'] == 'palych');
+    expect(palych['title'], 'Палыч');
+    expect(palych['description'], contains('18+'));
+    final stickers = (palych['stickers'] as List).cast<Map<String, dynamic>>();
+    expect(stickers, hasLength(24));
+    for (final s in stickers) {
+      expect(File('${root.path}/palych/${s['key']}.webp').existsSync(), isTrue, reason: s['key']);
+    }
+  });
+
   test('пак «Алекса»: два листа (23 + 24), без «победы», у каждого есть файл', () {
     final alexa = packs.firstWhere((p) => p['id'] == 'alexa');
     expect(alexa['title'], 'Алекса');
