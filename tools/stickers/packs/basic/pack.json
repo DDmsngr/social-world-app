@@ -1,0 +1,488 @@
+{
+ "id": "basic",
+ "title": "Основные",
+ "description": "Самые нужные эмоции на каждый день: смех, слёзы, любовь, удивление.",
+ "publisher": "Команда ChaWo",
+ "category": "эмоции",
+ "status": "published",
+ "is_default": true,
+ "sort_order": 10,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "smile",
+   "title": "улыбка",
+   "emoji": "🙂",
+   "synonyms": [
+    "доволен",
+    "мило",
+    "хорошее настроение"
+   ],
+   "emotions": [
+    "joy"
+   ]
+  },
+  {
+   "key": "laugh_tears",
+   "title": "смех до слёз",
+   "emoji": "😂",
+   "synonyms": [
+    "ржака",
+    "хохочу",
+    "смешно",
+    "лол",
+    "ржу"
+   ],
+   "emotions": [
+    "joy"
+   ]
+  },
+  {
+   "key": "grin",
+   "title": "широкая улыбка",
+   "emoji": "😃",
+   "synonyms": [
+    "рад",
+    "ухмылка",
+    "здорово"
+   ],
+   "emotions": [
+    "joy"
+   ]
+  },
+  {
+   "key": "wink",
+   "title": "подмигивание",
+   "emoji": "😉",
+   "synonyms": [
+    "флирт",
+    "шучу",
+    "намёк"
+   ],
+   "emotions": [
+    "joy",
+    "love"
+   ]
+  },
+  {
+   "key": "blush",
+   "title": "смущение",
+   "emoji": "😊",
+   "synonyms": [
+    "стесняюсь",
+    "краснею",
+    "мило",
+    "скромно"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "heart_eyes",
+   "title": "влюблён",
+   "emoji": "😍",
+   "synonyms": [
+    "глаза сердечки",
+    "восторг",
+    "обожаю",
+    "любовь"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "star_eyes",
+   "title": "восторг",
+   "emoji": "🤩",
+   "synonyms": [
+    "звёзды в глазах",
+    "вау",
+    "потрясающе"
+   ],
+   "emotions": [
+    "joy",
+    "surprise"
+   ]
+  },
+  {
+   "key": "kiss",
+   "title": "воздушный поцелуй",
+   "emoji": "😘",
+   "synonyms": [
+    "чмок",
+    "целую",
+    "любовь"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "cool",
+   "title": "круто",
+   "emoji": "😎",
+   "synonyms": [
+    "очки",
+    "солнечные очки",
+    "крутой"
+   ],
+   "emotions": [
+    "cool"
+   ]
+  },
+  {
+   "key": "thinking",
+   "title": "думаю",
+   "emoji": "🤔",
+   "synonyms": [
+    "хм",
+    "размышляю",
+    "подумать"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "smirk",
+   "title": "ухмылка",
+   "emoji": "😏",
+   "synonyms": [
+    "хитро",
+    "самодовольно",
+    "хитрец"
+   ],
+   "emotions": [
+    "cool"
+   ]
+  },
+  {
+   "key": "eye_roll",
+   "title": "закатил глаза",
+   "emoji": "🙄",
+   "synonyms": [
+    "ага конечно",
+    "надоело",
+    "скучно",
+    "ладно"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "neutral",
+   "title": "без эмоций",
+   "emoji": "😐",
+   "synonyms": [
+    "никак",
+    "равнодушие",
+    "всё равно"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "sleepy",
+   "title": "сонный",
+   "emoji": "😴",
+   "synonyms": [
+    "сплю",
+    "сон",
+    "хочу спать",
+    "устал"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "sad",
+   "title": "грусть",
+   "emoji": "😞",
+   "synonyms": [
+    "огорчён",
+    "не очень"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "cry",
+   "title": "слеза",
+   "emoji": "😢",
+   "synonyms": [
+    "плачу",
+    "обидно",
+    "жаль"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "sob",
+   "title": "рыдаю",
+   "emoji": "😭",
+   "synonyms": [
+    "плачу навзрыд",
+    "горе",
+    "истерика"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "angry",
+   "title": "злой",
+   "emoji": "😠",
+   "synonyms": [
+    "сердитый",
+    "недоволен"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "furious",
+   "title": "в ярости",
+   "emoji": "😡",
+   "synonyms": [
+    "бешенство",
+    "кипит",
+    "пар"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "scream",
+   "title": "крик ужаса",
+   "emoji": "😱",
+   "synonyms": [
+    "а-а-а",
+    "кошмар",
+    "вопль"
+   ],
+   "emotions": [
+    "fear",
+    "surprise"
+   ]
+  },
+  {
+   "key": "shocked",
+   "title": "шок",
+   "emoji": "😮",
+   "synonyms": [
+    "удивлён",
+    "не может быть",
+    "ого"
+   ],
+   "emotions": [
+    "surprise"
+   ]
+  },
+  {
+   "key": "facepalm",
+   "title": "фейспалм",
+   "emoji": "🤦",
+   "synonyms": [
+    "стыдно",
+    "ну что за",
+    "позор"
+   ],
+   "emotions": [
+    "anger",
+    "tired"
+   ]
+  },
+  {
+   "key": "sweat_smile",
+   "title": "неловкая улыбка",
+   "emoji": "😅",
+   "synonyms": [
+    "нервничаю",
+    "пронесло",
+    "упс",
+    "волнуюсь"
+   ],
+   "emotions": [
+    "fear"
+   ]
+  },
+  {
+   "key": "sick",
+   "title": "заболел",
+   "emoji": "🤒",
+   "synonyms": [
+    "температура",
+    "болею",
+    "градусник",
+    "простыл"
+   ],
+   "emotions": [
+    "health"
+   ]
+  },
+  {
+   "key": "party",
+   "title": "вечеринка",
+   "emoji": "🥳",
+   "synonyms": [
+    "колпак",
+    "хлопушка",
+    "ура"
+   ],
+   "emotions": [
+    "party"
+   ]
+  },
+  {
+   "key": "yummy",
+   "title": "вкусно",
+   "emoji": "😋",
+   "synonyms": [
+    "ммм",
+    "лакомство",
+    "облизываюсь"
+   ],
+   "emotions": [
+    "food",
+    "joy"
+   ]
+  },
+  {
+   "key": "shush",
+   "title": "тсс",
+   "emoji": "🤫",
+   "synonyms": [
+    "тише",
+    "секрет",
+    "молчу",
+    "никому"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "tongue",
+   "title": "дразнюсь",
+   "emoji": "😛",
+   "synonyms": [
+    "язык",
+    "шучу",
+    "бе-бе-бе"
+   ],
+   "emotions": [
+    "joy"
+   ]
+  },
+  {
+   "key": "thumbs_up",
+   "title": "класс",
+   "emoji": "👍",
+   "synonyms": [
+    "лайк",
+    "отлично",
+    "одобряю",
+    "палец вверх"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "clap",
+   "title": "аплодисменты",
+   "emoji": "👏",
+   "synonyms": [
+    "браво",
+    "молодец",
+    "хлопаю"
+   ],
+   "emotions": [
+    "joy",
+    "party"
+   ]
+  },
+  {
+   "key": "thanks",
+   "title": "спасибо",
+   "emoji": "🙏",
+   "synonyms": [
+    "пожалуйста",
+    "благодарю",
+    "прошу",
+    "молитва"
+   ],
+   "emotions": [
+    "thanks"
+   ]
+  },
+  {
+   "key": "heart",
+   "title": "сердце",
+   "emoji": "❤️",
+   "synonyms": [
+    "красное сердце",
+    "люблю",
+    "любовь"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "fire",
+   "title": "огонь",
+   "emoji": "🔥",
+   "synonyms": [
+    "пламя",
+    "горячо",
+    "бомба"
+   ],
+   "emotions": [
+    "cool",
+    "energy"
+   ]
+  },
+  {
+   "key": "wave",
+   "title": "привет",
+   "emoji": "👋",
+   "synonyms": [
+    "помахать",
+    "пока",
+    "рукой"
+   ],
+   "emotions": [
+    "greet"
+   ]
+  },
+  {
+   "key": "sun_cool",
+   "title": "солнце в очках",
+   "emoji": "☀️",
+   "synonyms": [
+    "лето",
+    "пляж",
+    "жара",
+    "отпуск"
+   ],
+   "emotions": [
+    "weather",
+    "city",
+    "cool"
+   ]
+  }
+ ]
+}

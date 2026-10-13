@@ -47,6 +47,11 @@ class ProfileMenuScreen extends ConsumerWidget {
             onTap: () => context.push(Routes.saved),
           ),
           _MenuTile(
+            icon: Icons.sticky_note_2_outlined,
+            title: 'Стикеры',
+            onTap: () => context.push(Routes.myStickers),
+          ),
+          _MenuTile(
             icon: Icons.person_add_alt_1_outlined,
             title: 'Приглашения',
             onTap: () => context.push(Routes.invites),

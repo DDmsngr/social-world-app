@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -17,12 +16,18 @@ import 'package:social_world/features/chat/presentation/providers/sticker_provid
 import 'package:social_world/features/chat/presentation/widgets/chat_composer.dart';
 import 'package:social_world/features/chat/presentation/widgets/message_bubble.dart';
 
-// Фирменные стикеры: каталог из ассетов, поиск по словам («любовь» находит
-// все стикеры про любовь) и то, как стикер едет в сообщении — id в служебной
-// части, эмодзи-заменитель в тексте для версий, которые стикеров не знают.
-StickerCatalog _loadCatalog() => StickerCatalog.fromJson(
-  jsonDecode(File('assets/stickers/manifest.json').readAsStringSync())
-      as Map<String, dynamic>,
+import '../stickers/sticker_fixtures.dart';
+
+// Стикеры: каталог магазина (в том виде, что отдаёт сервер, из исходников
+// паков), поиск по словам («любовь» находит все стикеры про любовь) и то,
+// как стикер едет в сообщении — id в служебной части, эмодзи-заменитель в
+// тексте для версий, которые стикеров не знают.
+StickerCatalog _loadCatalog() => catalogFromSources();
+
+Finder _stickerImage([String? url]) => find.byWidgetPredicate(
+  (w) =>
+      w.key is ValueKey<String> &&
+      (w.key! as ValueKey<String>).value.startsWith('sticker-image ${url ?? ''}'),
 );
 
 class _SpyRepository extends LocalChatRepository {
@@ -48,6 +53,7 @@ class _SpyRepository extends LocalChatRepository {
 }
 
 void main() {
+  useTestStickerImages();
   final catalog = _loadCatalog();
   List<String> ids(List<Sticker> stickers) => [for (final s in stickers) s.id];
 
@@ -57,7 +63,11 @@ void main() {
       expect(all, hasLength(163));
       expect(ids(all).toSet(), hasLength(163));
       for (final sticker in all) {
-        expect(File(sticker.asset).existsSync(), isTrue, reason: sticker.id);
+        expect(
+          File('tools/stickers/packs/${sticker.packId}/${sticker.key}.webp').existsSync(),
+          isTrue,
+          reason: sticker.id,
+        );
         expect(sticker.emoji, isNotEmpty, reason: sticker.id);
         expect(sticker.title, isNotEmpty, reason: sticker.id);
         expect(sticker.emotions, isNotEmpty, reason: sticker.id);
@@ -67,13 +77,20 @@ void main() {
       }
     });
 
-    test('путь к картинке только для id нашего вида', () {
-      expect(stickerAsset('chao.wave'), 'assets/stickers/chao/wave.webp');
-      expect(stickerAsset('../secret'), isNull);
-      expect(stickerAsset('chao/../x.y'), isNull);
-      expect(stickerAsset('Chao.Wave'), isNull);
-      expect(stickerAsset(''), isNull);
-      expect(stickerAsset(null), isNull);
+    test('адрес картинки только для id нашего вида', () {
+      expect(stickerImageUrl('chao.wave'), 'https://test/stickers/chao/wave.webp');
+      expect(stickerImageUrl('chao.wave', thumb: true), 'https://test/stickers/chao/thumb/wave.webp');
+      for (final bad in ['../secret', 'chao/../x.y', 'Chao.Wave', '', null]) {
+        expect(stickerImageUrl(bad), isNull, reason: '$bad');
+        expect(isStickerId(bad), isFalse, reason: '$bad');
+      }
+    });
+
+    test('картинка стикера из сообщения не зависит от каталога и коллекции', () {
+      // Пак у получателя не установлен и в каталоге его может не быть
+      // (снят с публикации, каталог ещё не загружен) — адрес тот же.
+      expect(stickerImageUrl('alexa.cocoa'), catalog.byId('alexa.cocoa')!.imageUrl);
+      expect(stickerImageUrl('gone.pack'), 'https://test/stickers/gone/pack.webp');
     });
   });
 
@@ -169,11 +186,14 @@ void main() {
     });
     tearDown(() => repository.dispose());
 
+    // Установлены четыре старых пака (так их получили все после 0079).
     Widget app(Widget child) => ProviderScope(
       overrides: [
         chatRepositoryProvider.overrideWithValue(repository),
         currentUserProvider.overrideWithValue(const AppUser(id: 'me')),
-        stickerCatalogProvider.overrideWith((ref) async => catalog),
+        stickerBackendProvider.overrideWithValue(
+          FakeStickerBackend(installed: ['basic', 'more', 'city', 'chao']),
+        ),
       ],
       child: MaterialApp(home: Scaffold(body: child)),
     );
@@ -188,27 +208,24 @@ void main() {
       stickerId: id,
     );
 
-    testWidgets('известный стикер — картинка без пузыря', (tester) async {
+    testWidgets('стикер — картинка с сервера без пузыря, даже без пака у получателя', (tester) async {
+      // У получателя «Алекса» не установлена — стикер всё равно виден.
       await tester.pumpWidget(
-        app(MessageBubble(message: sticker('chao.wave', '👋'), mine: true)),
-      );
-      final image = tester.widget<Image>(find.byType(Image));
-      expect((image.image as ResizeImage).imageProvider, isA<AssetImage>());
-      expect(find.text('👋'), findsNothing);
-    });
-
-    testWidgets('незнакомый стикер — крупный эмодзи-заменитель', (
-      tester,
-    ) async {
-      // Стикер из версии новее этой: картинки в ассетах нет, загрузка
-      // падает — и на её месте эмодзи из текста.
-      await tester.pumpWidget(
-        app(MessageBubble(message: sticker('future.thing', '🦄'), mine: true)),
-      );
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+        app(MessageBubble(message: sticker('alexa.cocoa', '☕'), mine: false)),
       );
       await tester.pump();
+      expect(_stickerImage('https://test/stickers/alexa/cocoa.webp'), findsOneWidget);
+      expect(find.text('☕'), findsNothing);
+    });
+
+    testWidgets('id не нашего вида — крупный эмодзи-заменитель', (
+      tester,
+    ) async {
+      // Сообщение мог собрать кто угодно: в адрес картинки такой id не идёт.
+      await tester.pumpWidget(
+        app(MessageBubble(message: sticker('../etc', '🦄'), mine: true)),
+      );
+      expect(_stickerImage(), findsNothing);
       expect(
         tester.widget<Text>(find.text('🦄')).style!.fontSize,
         greaterThan(40),
@@ -388,7 +405,9 @@ void main() {
       overrides: [
         chatRepositoryProvider.overrideWithValue(repository),
         currentUserProvider.overrideWithValue(const AppUser(id: 'me')),
-        stickerCatalogProvider.overrideWith((ref) async => catalog),
+        stickerBackendProvider.overrideWithValue(
+          FakeStickerBackend(installed: ['basic', 'more', 'city', 'chao']),
+        ),
       ],
       child: MaterialApp(home: Scaffold(body: child)),
     );
@@ -418,7 +437,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(TextField),
-          matching: find.byType(Image),
+          matching: _stickerImage('https://test/stickers/chao/thumb/wave.webp'),
         ),
         findsOneWidget,
       );
@@ -455,8 +474,7 @@ void main() {
           ),
         ),
       );
-      final image = tester.widget<Image>(find.byType(Image));
-      expect((image.image as ResizeImage).imageProvider, isA<AssetImage>());
+      expect(_stickerImage('https://test/stickers/chao/thumb/wave.webp'), findsOneWidget);
     });
   });
 }

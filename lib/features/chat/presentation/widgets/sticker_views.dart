@@ -1,47 +1,85 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../domain/stickers.dart';
 
-/// Картинка стикера из ассетов. Если картинки нет (стикер из версии новее
-/// этой), рисуется эмодзи-заменитель.
+/// Картинка стикера с сервера. Файл кешируется на диске (повторно не
+/// качается), пропорции не искажаются — стикер вписывается в квадрат с
+/// прозрачными полями. Пока грузится — бледная подложка; не загрузилось
+/// (нет сети, стикер из будущей версии) — эмодзи-заменитель.
 class StickerImage extends StatelessWidget {
   const StickerImage({
     super.key,
-    required this.asset,
+    required this.url,
     this.fallback = '',
     this.size = 148,
     this.semanticLabel,
   });
 
-  final String asset;
+  final String? url;
   final String fallback;
   final double size;
   final String? semanticLabel;
 
+  /// В тестах нет ни сети, ни плагинов дискового кеша: вместо загрузки —
+  /// пустой квадрат с ключом `sticker-image <адрес>`, по которому проверяют,
+  /// какую картинку экран собирался показать.
+  @visibleForTesting
+  static bool offlineForTests = false;
+
+  Widget _emoji() => SizedBox(
+    width: size,
+    height: size,
+    child: Center(
+      child: Text(
+        fallback.isEmpty ? '🙂' : fallback,
+        style: TextStyle(fontSize: size * 0.4, height: 1.1),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
+    final url = this.url;
+    if (url == null) return _emoji();
+    final label = semanticLabel;
+    final image = offlineForTests
+        ? SizedBox(key: ValueKey('sticker-image $url'), width: size, height: size)
+        : _network(context, url);
+    return label == null
+        ? image
+        : Semantics(label: label, image: true, excludeSemantics: true, child: image);
+  }
+
+  Widget _network(BuildContext context, String url) {
     // Декодируем сразу в нужном размере: 512×512 на каждый стикер в сетке
     // панели — лишняя память.
     final cache = (size * MediaQuery.devicePixelRatioOf(context)).round();
-    return Image.asset(
-      asset,
-      width: size,
-      height: size,
-      cacheWidth: cache,
-      fit: BoxFit.contain,
-      filterQuality: FilterQuality.medium,
-      semanticLabel: semanticLabel,
-      errorBuilder: (_, _, _) => SizedBox(
+    return CachedNetworkImage(
+        imageUrl: url,
         width: size,
         height: size,
-        child: Center(
-          child: Text(
-            fallback.isEmpty ? '🙂' : fallback,
-            style: TextStyle(fontSize: size * 0.4, height: 1.1),
+        memCacheWidth: cache,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        fadeInDuration: const Duration(milliseconds: 120),
+        placeholder: (_, _) => SizedBox(
+          width: size,
+          height: size,
+          child: Center(
+            child: Container(
+              width: size * 0.6,
+              height: size * 0.6,
+              decoration: BoxDecoration(
+                color: AppColors.hair,
+                shape: BoxShape.circle,
+              ),
+            ),
           ),
         ),
-      ),
-    );
+        errorWidget: (_, _, _) => _emoji(),
+      );
   }
 }
 
@@ -75,7 +113,7 @@ class StickerSuggestions extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(4),
               child: StickerImage(
-                asset: sticker.asset,
+                url: sticker.thumbUrl,
                 fallback: sticker.emoji,
                 size: 64,
                 semanticLabel: 'Стикер «${sticker.title}»',
@@ -115,7 +153,7 @@ class StickerGrid extends StatelessWidget {
             key: ValueKey('sticker-${sticker.id}'),
             onTap: () => onPick(sticker),
             child: StickerImage(
-              asset: sticker.asset,
+              url: sticker.thumbUrl,
               fallback: sticker.emoji,
               size: compact ? 40 : 72,
               semanticLabel: compact
@@ -137,13 +175,13 @@ List<({int start, int end, InlineSpan span})> customEmojiInlines(
   required double size,
 }) => [
   for (final e in validCustomEmoji(text, emoji))
-    if (stickerAsset(e.sticker) case final asset?)
+    if (stickerImageUrl(e.sticker, thumb: size < 64) case final url?)
       (
         start: e.offset,
         end: e.end,
         span: WidgetSpan(
           alignment: PlaceholderAlignment.middle,
-          child: StickerImage(asset: asset, fallback: e.text, size: size),
+          child: StickerImage(url: url, fallback: e.text, size: size),
         ),
       ),
 ];
@@ -192,7 +230,7 @@ class InlineEmojiController extends TextEditingController {
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: StickerImage(
-            asset: sticker.asset,
+            url: sticker.thumbUrl,
             fallback: sticker.emoji,
             size: size,
           ),

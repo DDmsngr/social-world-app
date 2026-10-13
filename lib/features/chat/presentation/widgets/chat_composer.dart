@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/audio/send_sound.dart';
+import '../../../../core/router/app_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -141,15 +143,33 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   void _syncActive() => chatEmojiPanelOpen.value = _emojiOpen;
 
-  void _toggleEmoji() {
-    if (_emojiOpen) {
+  /// Панель открыта кнопкой стикеров — в режиме стикеров.
+  bool _panelStickers = false;
+
+  void _toggleEmoji() => _togglePanel(stickers: false);
+
+  void _toggleStickers() => _togglePanel(stickers: true);
+
+  /// Та же кнопка закрывает панель (и возвращает клавиатуру); другая —
+  /// переключает панель в свой режим.
+  void _togglePanel({required bool stickers}) {
+    if (_emojiOpen && _panelStickers == stickers) {
       setState(() => _emojiOpen = false);
       _focus.requestFocus();
     } else {
       _focus.unfocus();
-      setState(() => _emojiOpen = true);
+      setState(() {
+        _emojiOpen = true;
+        _panelStickers = stickers;
+      });
     }
     _syncActive();
+  }
+
+  void _openStickerStore() {
+    setState(() => _emojiOpen = false);
+    _syncActive();
+    context.push(Routes.stickerStore);
   }
 
   void _insertEmoji(String emoji) {
@@ -248,14 +268,15 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   /// Подсказки стикеров к тому, что набрано: короткий запрос из 1–3 слов
   /// («любовь», «ржу», «😍»). Длинный текст — это сообщение, а не поиск.
-  List<Sticker> _stickerSuggestions(StickerCatalog? catalog) {
-    if (catalog == null || _recording) return const [];
+  /// Только из установленных паков: отправлять можно только их.
+  List<Sticker> _stickerSuggestions(StickerCatalog? catalog, List<StickerPack> mine) {
+    if (catalog == null || mine.isEmpty || _recording) return const [];
     final text = _controller.text.trim();
     if (text.isEmpty || text.length > 30 || text.contains('\n')) {
       return const [];
     }
     if (text.split(RegExp(r'\s+')).length > 3) return const [];
-    return catalog.search(text, limit: 30);
+    return catalog.search(text, limit: 30, packs: {for (final p in mine) p.id});
   }
 
   /// Стикер уходит сразу. Из полосы подсказок — вместо набранного запроса
@@ -746,8 +767,9 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   Widget build(BuildContext context) {
     final hasText = _controller.text.trim().isNotEmpty;
     final catalog = ref.watch(stickerCatalogProvider).value;
+    final myPacks = ref.watch(myStickerPacksProvider);
     _controller.catalog = catalog;
-    final suggestions = _stickerSuggestions(catalog);
+    final suggestions = _stickerSuggestions(catalog, myPacks);
 
     return SafeArea(
       top: false,
@@ -817,11 +839,16 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: EmojiPanel(
+                  // Новый режим — новая панель: кнопка стикеров не должна
+                  // открывать эмодзи, оставшиеся с прошлого раза.
+                  key: ValueKey('panel-$_panelStickers'),
                   onPick: _insertEmoji,
                   onBackspace: _backspace,
-                  stickerPacks: catalog?.packs ?? const [],
+                  stickerPacks: myPacks,
                   onSticker: _sendSticker,
                   onCustomEmoji: _insertCustomEmoji,
+                  onOpenStore: _openStickerStore,
+                  startWithStickers: _panelStickers,
                 ),
               ),
           ],
@@ -928,14 +955,32 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _scheduledButton(),
+                    // Без текста — место есть: стикеры отдельной кнопкой.
+                    if (!hasText)
+                      IconButton(
+                        key: const ValueKey('composer-stickers'),
+                        onPressed: _toggleStickers,
+                        tooltip: _emojiOpen && _panelStickers ? 'Клавиатура' : 'Стикеры',
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          _emojiOpen && _panelStickers
+                              ? Icons.keyboard_alt_outlined
+                              : Icons.sticky_note_2_outlined,
+                          color: _emojiOpen && _panelStickers
+                              ? AppColors.primaryTint
+                              : AppColors.textDim,
+                        ),
+                      ),
                     IconButton(
                       onPressed: _toggleEmoji,
-                      tooltip: _emojiOpen ? 'Клавиатура' : 'Эмодзи',
+                      tooltip: _emojiOpen && !_panelStickers ? 'Клавиатура' : 'Эмодзи',
                       icon: Icon(
-                        _emojiOpen
+                        _emojiOpen && !_panelStickers
                             ? Icons.keyboard_alt_outlined
                             : Icons.emoji_emotions_outlined,
-                        color: _emojiOpen ? AppColors.primaryTint : AppColors.textDim,
+                        color: _emojiOpen && !_panelStickers
+                            ? AppColors.primaryTint
+                            : AppColors.textDim,
                       ),
                     ),
                   ],

@@ -70,6 +70,9 @@ import '../../features/quests/presentation/quest_moment_screen.dart';
 import '../../features/routes/presentation/route_detail_screen.dart';
 import '../../features/routes/presentation/route_recorder_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
+import '../../features/stickers/presentation/my_stickers_screen.dart';
+import '../../features/stickers/presentation/sticker_pack_screen.dart';
+import '../../features/stickers/presentation/sticker_store_screen.dart';
 import '../widgets/splash_screen.dart';
 
 abstract final class Routes {
@@ -146,6 +149,13 @@ abstract final class Routes {
   static const needDetail = '/need';
   static const createNeed = '/create-need';
   static const myNeeds = '/profile/needs';
+
+  /// Магазин стикеров, мои стикеры и страница пака. Пак открывается и по
+  /// стикеру из сообщения: `?s=<ключ>` подсвечивает именно его.
+  static const stickerStore = '/stickers';
+  static const myStickers = '/stickers/mine';
+  static String stickerPack(String packId, {String? sticker}) =>
+      sticker == null ? '/stickers/pack/$packId' : '/stickers/pack/$packId?s=$sticker';
 
   static const authFlow = {splash, signIn, onboarding};
 }
@@ -381,6 +391,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: Routes.importData, builder: (_, _) => const ImportScreen()),
       GoRoute(path: Routes.profileMenu, builder: (_, _) => const ProfileMenuScreen()),
       GoRoute(path: Routes.invites, builder: (_, _) => const InvitesScreen()),
+      GoRoute(path: Routes.stickerStore, builder: (_, _) => const StickerStoreScreen()),
+      GoRoute(path: Routes.myStickers, builder: (_, _) => const MyStickersScreen()),
+      GoRoute(
+        path: '/stickers/pack/:id',
+        builder: (_, state) => StickerPackScreen(
+          packId: state.pathParameters['id'] ?? '',
+          highlight: state.uri.queryParameters['s'],
+        ),
+      ),
       GoRoute(
         path: '${Routes.hashtag}/:tag',
         builder: (_, state) => HashtagScreen(

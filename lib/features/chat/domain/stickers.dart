@@ -1,11 +1,16 @@
-/// Фирменные стикеры: каталог из `assets/stickers/manifest.json` и поиск по
-/// словам.
+/// Стикеры: каталог магазина (приходит с сервера, см. миграцию 0078) и поиск
+/// по словам.
 ///
 /// Стикер в сообщении — это его [Sticker.id] (`<пак>.<ключ>`) плюс
-/// эмодзи-заменитель в тексте. Старые версии приложения видят только эмодзи,
-/// новые рисуют картинку из ассетов. Id уходит в сообщения навсегда, поэтому
-/// не меняется, даже если стикер перерисуют.
+/// эмодзи-заменитель в тексте. Версии без стикеров видят только эмодзи,
+/// новые рисуют картинку из публичного бакета `stickers`. Id уходит в
+/// сообщения навсегда, поэтому не меняется, даже если стикер перерисуют, а
+/// сам стикер с сервера не удаляется (пак только снимают с публикации).
 library;
+
+import 'package:flutter/foundation.dart';
+
+import '../../../core/config/env.dart';
 
 class Sticker {
   const Sticker({
@@ -15,6 +20,8 @@ class Sticker {
     required this.title,
     this.synonyms = const [],
     this.emotions = const [],
+    this.image,
+    this.thumb,
   });
 
   final String packId;
@@ -23,16 +30,39 @@ class Sticker {
   /// Заменитель для старых версий, превью в списке чатов и пуша.
   final String emoji;
 
-  /// Основное название — по нему поиск ставит стикер выше всего.
+  /// Основное название — по нему поиск ставит стикер выше всего. Оно же —
+  /// альтернативный текст картинки.
   final String title;
   final List<String> synonyms;
 
   /// Семейства эмоций (см. [StickerCatalog.families]); первое — главное.
   final List<String> emotions;
 
+  /// Пути в бакете: оригинал (в переписке) и превью (сетки магазина и
+  /// панели). null — путь по умолчанию из id.
+  final String? image;
+  final String? thumb;
+
   String get id => '$packId.$key';
 
-  String get asset => stickerAsset(id)!;
+  /// Картинка для переписки — оригинал.
+  String get imageUrl => StickerUrls.file(image ?? '$packId/$key.webp');
+
+  /// Картинка для сеток — превью. Без превью — оригинал.
+  String get thumbUrl => thumb == null ? imageUrl : StickerUrls.file(thumb!);
+}
+
+/// Статус пака в каталоге (колонка status). Черновики и паки на модерации
+/// до приложения не доходят.
+enum StickerPackStatus {
+  published,
+
+  /// Снят с публикации: в магазине его нет, поставить нельзя, но его
+  /// стикеры по-прежнему показываются в старых сообщениях.
+  archived;
+
+  static StickerPackStatus parse(Object? value) =>
+      value == 'archived' ? archived : published;
 }
 
 class StickerPack {
@@ -40,21 +70,69 @@ class StickerPack {
     required this.id,
     required this.title,
     required this.stickers,
+    this.description,
+    this.publisher = 'Команда ChaWo',
+    this.category,
+    this.cover,
+    this.status = StickerPackStatus.published,
   });
 
   final String id;
   final String title;
   final List<Sticker> stickers;
+  final String? description;
+  final String publisher;
+  final String? category;
+
+  /// Путь обложки в бакете; null — превью первого стикера.
+  final String? cover;
+  final StickerPackStatus status;
+
+  bool get isPublished => status == StickerPackStatus.published;
+
+  String? get coverUrl => cover != null
+      ? StickerUrls.file(cover!)
+      : stickers.isEmpty
+      ? null
+      : stickers.first.thumbUrl;
+}
+
+/// Адреса картинок стикеров: публичный бакет `stickers` на нашем сервере.
+abstract final class StickerUrls {
+  static String? _base;
+
+  static String get base =>
+      _base ?? '${Env.supabaseUrl}/storage/v1/object/public/stickers';
+
+  /// В тестах `.env` нет: адрес задаётся явно.
+  @visibleForTesting
+  static set baseForTest(String? value) => _base = value;
+
+  static String file(String path) => '$base/$path';
 }
 
 final _idPattern = RegExp(r'^([a-z0-9_]{1,32})\.([a-z0-9_]{1,48})$');
 
-/// Путь к картинке стикера по его id. null — id не похож на наш: он пришёл
-/// в сообщении, а сообщение мог собрать кто угодно.
-String? stickerAsset(String? id) {
+/// Похоже ли на id нашего стикера. Id приходит в сообщении, а сообщение мог
+/// собрать кто угодно — в адрес картинки попадает только проверенный.
+bool isStickerId(String? id) => id != null && _idPattern.hasMatch(id);
+
+/// Пак и ключ из id; null — id не наш.
+({String pack, String key})? parseStickerId(String? id) {
   final match = id == null ? null : _idPattern.firstMatch(id);
-  if (match == null) return null;
-  return 'assets/stickers/${match[1]}/${match[2]}.webp';
+  return match == null ? null : (pack: match[1]!, key: match[2]!);
+}
+
+/// Адрес картинки стикера из сообщения. Пак мог быть не установлен у
+/// получателя или вообще снят с публикации — картинка всё равно лежит по
+/// этому адресу, каталог для показа не нужен. [thumb] — превью 192 px (для
+/// своих эмодзи внутри текста оригинал 512 px не нужен).
+String? stickerImageUrl(String? id, {bool thumb = false}) {
+  final parts = parseStickerId(id);
+  if (parts == null) return null;
+  return StickerUrls.file(
+    thumb ? '${parts.pack}/thumb/${parts.key}.webp' : '${parts.pack}/${parts.key}.webp',
+  );
 }
 
 /// Свой эмодзи внутри текста: в [offset] текста стоит [text] — обычный
@@ -83,7 +161,7 @@ class CustomEmoji {
     final sticker = raw['s'];
     if (offset is! int || offset < 0) return null;
     if (text is! String || text.isEmpty || text.length > 16) return null;
-    if (sticker is! String || stickerAsset(sticker) == null) return null;
+    if (sticker is! String || !isStickerId(sticker)) return null;
     return CustomEmoji(offset: offset, text: text, sticker: sticker);
   }
 
@@ -121,6 +199,8 @@ List<CustomEmoji> validCustomEmoji(String text, List<CustomEmoji> emoji) {
 const inlineEmojiBase = 0xE000;
 
 class StickerCatalog {
+  static final empty = StickerCatalog(packs: const [], families: const {});
+
   StickerCatalog({required this.packs, required this.families}) {
     for (final pack in packs) {
       for (final sticker in pack.stickers) {
@@ -147,31 +227,40 @@ class StickerCatalog {
       for (final entry in (json['families'] as Map? ?? const {}).entries)
         entry.key as String: [for (final w in entry.value as List) w as String],
     };
+    String? text(Object? value) => value is String && value.isNotEmpty ? value : null;
     final packs = <StickerPack>[
       for (final raw in json['packs'] as List? ?? const [])
-        StickerPack(
-          id: raw['id'] as String,
-          title: raw['title'] as String? ?? '',
-          stickers: [
-            for (final s in raw['stickers'] as List? ?? const [])
-              if (_idPattern.firstMatch(s['id'] as String? ?? '')
-                  case final match?)
-                Sticker(
-                  packId: match[1]!,
-                  key: match[2]!,
-                  emoji: s['emoji'] as String? ?? '',
-                  title: s['title'] as String? ?? '',
-                  synonyms: [
-                    for (final w in s['synonyms'] as List? ?? const [])
-                      w as String,
-                  ],
-                  emotions: [
-                    for (final w in s['emotions'] as List? ?? const [])
-                      w as String,
-                  ],
-                ),
-          ],
-        ),
+        if (raw is Map && raw['id'] is String)
+          StickerPack(
+            id: raw['id'] as String,
+            title: raw['title'] as String? ?? '',
+            description: text(raw['description']),
+            publisher: text(raw['publisher']) ?? 'Команда ChaWo',
+            category: text(raw['category']),
+            cover: text(raw['cover']),
+            status: StickerPackStatus.parse(raw['status']),
+            stickers: [
+              for (final s in raw['stickers'] as List? ?? const [])
+                if (_idPattern.firstMatch(s['id'] as String? ?? '')
+                    case final match?)
+                  Sticker(
+                    packId: match[1]!,
+                    key: match[2]!,
+                    emoji: s['emoji'] as String? ?? '',
+                    title: s['title'] as String? ?? '',
+                    synonyms: [
+                      for (final w in s['synonyms'] as List? ?? const [])
+                        w as String,
+                    ],
+                    emotions: [
+                      for (final w in s['emotions'] as List? ?? const [])
+                        w as String,
+                    ],
+                    image: text(s['image']),
+                    thumb: text(s['thumb']),
+                  ),
+            ],
+          ),
     ];
     return StickerCatalog(packs: packs, families: families);
   }
@@ -188,6 +277,21 @@ class StickerCatalog {
   final _familyStems = <String, List<String>>{};
 
   Sticker? byId(String? id) => id == null ? null : _byId[id];
+
+  StickerPack? pack(String? id) {
+    for (final pack in packs) {
+      if (pack.id == id) return pack;
+    }
+    return null;
+  }
+
+  /// Категории опубликованных паков — для фильтра магазина.
+  List<String> get categories => [
+    ...{
+      for (final pack in packs)
+        if (pack.isPublished && pack.category != null) pack.category!,
+    },
+  ];
 
   /// Символ, которым свой эмодзи стоит в поле ввода (см. [inlineEmojiBase]).
   String inlineChar(Sticker sticker) =>
@@ -225,8 +329,9 @@ class StickerCatalog {
 
   /// Стикеры по словам или эмодзи. Порядок: совпало название, потом
   /// синонимы, потом стикеры, где эта эмоция главная, потом побочные.
-  /// Запрос из нескольких слов требует совпадения по каждому.
-  List<Sticker> search(String query, {int limit = 40}) {
+  /// Запрос из нескольких слов требует совпадения по каждому. [packs] —
+  /// искать только в этих паках (установленных: отправлять можно только их).
+  List<Sticker> search(String query, {int limit = 40, Set<String>? packs}) {
     final emoji = _bareEmoji(query.trim());
     final words = _tokens(query);
     if (words.isEmpty && emoji.isEmpty) return const [];
@@ -265,7 +370,9 @@ class StickerCatalog {
     final ranked =
         [
           for (final entry in scores.entries)
-            if (words.isEmpty || matched[entry.key] == words.length) entry,
+            if ((words.isEmpty || matched[entry.key] == words.length) &&
+                (packs == null || packs.contains(entry.key.sticker.packId)))
+              entry,
         ]..sort((a, b) {
           final byScore = b.value.compareTo(a.value);
           return byScore != 0 ? byScore : a.key.order.compareTo(b.key.order);

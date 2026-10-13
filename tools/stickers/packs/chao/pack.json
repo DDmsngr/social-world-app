@@ -1,0 +1,491 @@
+{
+ "id": "chao",
+ "title": "Чао",
+ "description": "Чао — талисман ChaWo. Машет, танцует, ищет, куда пойти.",
+ "publisher": "Команда ChaWo",
+ "category": "персонажи",
+ "status": "published",
+ "is_default": true,
+ "sort_order": 40,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "lookout",
+   "title": "дозорный",
+   "emoji": "👀",
+   "synonyms": [
+    "сурикат",
+    "чао",
+    "жду",
+    "слежу",
+    "смотрю"
+   ],
+   "emotions": [
+    "greet",
+    "think"
+   ]
+  },
+  {
+   "key": "wave",
+   "title": "привет от чао",
+   "emoji": "👋",
+   "synonyms": [
+    "помахать",
+    "здравствуй",
+    "сурикат"
+   ],
+   "emotions": [
+    "greet"
+   ]
+  },
+  {
+   "key": "laugh_tears",
+   "title": "смеюсь до слёз",
+   "emoji": "😂",
+   "synonyms": [
+    "ржу",
+    "хохот",
+    "смешно"
+   ],
+   "emotions": [
+    "joy"
+   ]
+  },
+  {
+   "key": "heart_eyes",
+   "title": "влюблён",
+   "emoji": "😍",
+   "synonyms": [
+    "сердечки в глазах",
+    "обожаю",
+    "любовь",
+    "любовь"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "wink_thumb",
+   "title": "класс",
+   "emoji": "👍",
+   "synonyms": [
+    "лайк",
+    "подмигиваю",
+    "одобряю"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "kiss",
+   "title": "воздушный поцелуй",
+   "emoji": "😘",
+   "synonyms": [
+    "целую",
+    "сердечко",
+    "нежность",
+    "любовь"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "sunglasses",
+   "title": "круто",
+   "emoji": "😎",
+   "synonyms": [
+    "очки",
+    "стильно",
+    "уверенность"
+   ],
+   "emotions": [
+    "cool"
+   ]
+  },
+  {
+   "key": "sad",
+   "title": "грущу",
+   "emoji": "😞",
+   "synonyms": [
+    "печаль",
+    "грустно",
+    "тоска"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "cry",
+   "title": "плачу",
+   "emoji": "😢",
+   "synonyms": [
+    "слёзы",
+    "горе",
+    "обидно"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "angry",
+   "title": "сержусь",
+   "emoji": "😠",
+   "synonyms": [
+    "злюсь",
+    "недоволен",
+    "обида"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "shocked",
+   "title": "в шоке",
+   "emoji": "😱",
+   "synonyms": [
+    "не может быть",
+    "ого",
+    "удивление"
+   ],
+   "emotions": [
+    "surprise"
+   ]
+  },
+  {
+   "key": "thinking",
+   "title": "думаю",
+   "emoji": "🤔",
+   "synonyms": [
+    "размышляю",
+    "хм",
+    "сомневаюсь"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "facepalm",
+   "title": "фейспалм",
+   "emoji": "🤦",
+   "synonyms": [
+    "стыд",
+    "ну надо же"
+   ],
+   "emotions": [
+    "anger",
+    "tired"
+   ]
+  },
+  {
+   "key": "shrug",
+   "title": "не знаю",
+   "emoji": "🤷",
+   "synonyms": [
+    "пожимаю плечами",
+    "без понятия",
+    "как получится"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "sleeping",
+   "title": "сплю",
+   "emoji": "😴",
+   "synonyms": [
+    "сон",
+    "спокойной ночи",
+    "отдых"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "yawn",
+   "title": "зеваю",
+   "emoji": "🥱",
+   "synonyms": [
+    "скучно",
+    "хочу спать"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "sprint",
+   "title": "бегу",
+   "emoji": "🏃",
+   "synonyms": [
+    "спешу",
+    "скорее",
+    "быстро"
+   ],
+   "emotions": [
+    "energy"
+   ]
+  },
+  {
+   "key": "dance",
+   "title": "танцую",
+   "emoji": "💃",
+   "synonyms": [
+    "музыка",
+    "весело",
+    "танцы"
+   ],
+   "emotions": [
+    "joy",
+    "party"
+   ]
+  },
+  {
+   "key": "flex",
+   "title": "я сильный",
+   "emoji": "💪",
+   "synonyms": [
+    "мускулы",
+    "спорт",
+    "могу"
+   ],
+   "emotions": [
+    "energy"
+   ]
+  },
+  {
+   "key": "low_battery",
+   "title": "нет сил",
+   "emoji": "🪫",
+   "synonyms": [
+    "устал",
+    "разряжен",
+    "выгорел"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "hug",
+   "title": "обнимашки",
+   "emoji": "🤗",
+   "synonyms": [
+    "обнимаю",
+    "тепло",
+    "поддержка"
+   ],
+   "emotions": [
+    "love",
+    "friend"
+   ]
+  },
+  {
+   "key": "binoculars",
+   "title": "высматриваю",
+   "emoji": "🔭",
+   "synonyms": [
+    "бинокль",
+    "ищу",
+    "наблюдаю",
+    "что рядом"
+   ],
+   "emotions": [
+    "quest",
+    "city"
+   ]
+  },
+  {
+   "key": "map",
+   "title": "карта",
+   "emoji": "🗺️",
+   "synonyms": [
+    "маршрут",
+    "навигация",
+    "путь",
+    "изучаю"
+   ],
+   "emotions": [
+    "quest",
+    "city"
+   ]
+  },
+  {
+   "key": "point_pin",
+   "title": "смотри сюда",
+   "emoji": "📍",
+   "synonyms": [
+    "метка",
+    "место",
+    "я тут",
+    "встретимся"
+   ],
+   "emotions": [
+    "city",
+    "quest"
+   ]
+  },
+  {
+   "key": "selfie",
+   "title": "селфи",
+   "emoji": "🤳",
+   "synonyms": [
+    "фото",
+    "снимаю",
+    "телефон"
+   ],
+   "emotions": [
+    "chat"
+   ]
+  },
+  {
+   "key": "typing",
+   "title": "пишу",
+   "emoji": "💬",
+   "synonyms": [
+    "печатаю",
+    "сообщение",
+    "телефон"
+   ],
+   "emotions": [
+    "chat"
+   ]
+  },
+  {
+   "key": "qr",
+   "title": "qr-код",
+   "emoji": "📱",
+   "synonyms": [
+    "сканируй",
+    "вход",
+    "бонус",
+    "код"
+   ],
+   "emotions": [
+    "quest"
+   ]
+  },
+  {
+   "key": "megaphone",
+   "title": "внимание всем",
+   "emoji": "📢",
+   "synonyms": [
+    "объявление",
+    "новость",
+    "кричу"
+   ],
+   "emotions": [
+    "chat",
+    "party"
+   ]
+  },
+  {
+   "key": "coffee",
+   "title": "кофе",
+   "emoji": "☕",
+   "synonyms": [
+    "уют",
+    "утро",
+    "тепло",
+    "чашка"
+   ],
+   "emotions": [
+    "food",
+    "love"
+   ]
+  },
+  {
+   "key": "ice_cream",
+   "title": "мороженое",
+   "emoji": "🍦",
+   "synonyms": [
+    "сладкое",
+    "лето",
+    "вкусно"
+   ],
+   "emotions": [
+    "food",
+    "joy"
+   ]
+  },
+  {
+   "key": "umbrella",
+   "title": "дождь",
+   "emoji": "☔",
+   "synonyms": [
+    "зонт",
+    "ливень",
+    "непогода"
+   ],
+   "emotions": [
+    "weather",
+    "sad"
+   ]
+  },
+  {
+   "key": "winter",
+   "title": "зима",
+   "emoji": "🧣",
+   "synonyms": [
+    "снег",
+    "шапка",
+    "шарф",
+    "мороз"
+   ],
+   "emotions": [
+    "weather"
+   ]
+  },
+  {
+   "key": "party",
+   "title": "праздник",
+   "emoji": "🥳",
+   "synonyms": [
+    "вечеринка",
+    "поздравляю",
+    "ура",
+    "хлопушка"
+   ],
+   "emotions": [
+    "party",
+    "joy"
+   ]
+  },
+  {
+   "key": "medal",
+   "title": "награда",
+   "emoji": "🥇",
+   "synonyms": [
+    "медаль",
+    "победа",
+    "достижение"
+   ],
+   "emotions": [
+    "quest",
+    "joy"
+   ]
+  },
+  {
+   "key": "peek_wall",
+   "title": "выглядываю",
+   "emoji": "👀",
+   "synonyms": [
+    "подглядываю",
+    "прячусь",
+    "любопытно"
+   ],
+   "emotions": [
+    "think"
+   ]
+  }
+ ]
+}

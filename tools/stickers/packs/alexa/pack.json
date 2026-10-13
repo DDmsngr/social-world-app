@@ -1,0 +1,355 @@
+{
+ "id": "alexa",
+ "title": "Алекса",
+ "description": "Алекса: девочка с характером. Смущается, обнимает кота, пьёт какао.",
+ "publisher": "Команда ChaWo",
+ "category": "персонажи",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 50,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "wave",
+   "title": "привет",
+   "emoji": "👋",
+   "synonyms": [
+    "привет",
+    "пока",
+    "здравствуй",
+    "машу",
+    "алекса"
+   ],
+   "emotions": [
+    "greet",
+    "joy"
+   ]
+  },
+  {
+   "key": "laugh",
+   "title": "смеюсь",
+   "emoji": "😂",
+   "synonyms": [
+    "смех",
+    "ржу",
+    "хаха",
+    "весело",
+    "радуюсь"
+   ],
+   "emotions": [
+    "joy"
+   ]
+  },
+  {
+   "key": "smirk_think",
+   "title": "хитрая мысль",
+   "emoji": "🤔",
+   "synonyms": [
+    "думаю",
+    "хмм",
+    "интересно",
+    "прикидываю"
+   ],
+   "emotions": [
+    "think",
+    "cool"
+   ]
+  },
+  {
+   "key": "shocked",
+   "title": "ничего себе",
+   "emoji": "😲",
+   "synonyms": [
+    "вау",
+    "ого",
+    "шок",
+    "не может быть"
+   ],
+   "emotions": [
+    "surprise"
+   ]
+  },
+  {
+   "key": "grumpy",
+   "title": "обиделась",
+   "emoji": "😒",
+   "synonyms": [
+    "дуюсь",
+    "обида",
+    "недовольна",
+    "бука"
+   ],
+   "emotions": [
+    "anger",
+    "sad"
+   ]
+  },
+  {
+   "key": "cry",
+   "title": "плачу",
+   "emoji": "😭",
+   "synonyms": [
+    "слёзы",
+    "рыдаю",
+    "грустно",
+    "горько"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "queen",
+   "title": "королева",
+   "emoji": "👑",
+   "synonyms": [
+    "корона",
+    "лучшая",
+    "царица",
+    "я молодец"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "shy",
+   "title": "смущаюсь",
+   "emoji": "🥰",
+   "synonyms": [
+    "стесняюсь",
+    "мило",
+    "краснею",
+    "приятно"
+   ],
+   "emotions": [
+    "love",
+    "joy"
+   ]
+  },
+  {
+   "key": "cheer",
+   "title": "ура",
+   "emoji": "🎉",
+   "synonyms": [
+    "победа",
+    "получилось",
+    "урааа",
+    "праздник"
+   ],
+   "emotions": [
+    "party",
+    "joy"
+   ]
+  },
+  {
+   "key": "question",
+   "title": "а что?",
+   "emoji": "❓",
+   "synonyms": [
+    "вопрос",
+    "почему",
+    "не понимаю",
+    "как так"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "doubt",
+   "title": "сомневаюсь",
+   "emoji": "🧐",
+   "synonyms": [
+    "не верю",
+    "подозрительно",
+    "сомнение",
+    "серьёзно"
+   ],
+   "emotions": [
+    "think",
+    "anger"
+   ]
+  },
+  {
+   "key": "cat_hug",
+   "title": "обнимаю кота",
+   "emoji": "🐱",
+   "synonyms": [
+    "кот",
+    "котик",
+    "уют",
+    "обнимашки",
+    "нежность"
+   ],
+   "emotions": [
+    "love",
+    "friend"
+   ]
+  },
+  {
+   "key": "sleep",
+   "title": "сплю",
+   "emoji": "😴",
+   "synonyms": [
+    "сон",
+    "спокойной ночи",
+    "спать",
+    "подушка"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "idea",
+   "title": "идея",
+   "emoji": "💡",
+   "synonyms": [
+    "придумала",
+    "лампочка",
+    "эврика",
+    "решение"
+   ],
+   "emotions": [
+    "think",
+    "joy"
+   ]
+  },
+  {
+   "key": "kiss",
+   "title": "воздушный поцелуй",
+   "emoji": "😘",
+   "synonyms": [
+    "целую",
+    "чмок",
+    "люблю",
+    "поцелуй"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "stop",
+   "title": "стоп",
+   "emoji": "✋",
+   "synonyms": [
+    "хватит",
+    "не надо",
+    "нет",
+    "остановись"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "bored",
+   "title": "устала",
+   "emoji": "😩",
+   "synonyms": [
+    "скучно",
+    "бесит",
+    "лень",
+    "надоело"
+   ],
+   "emotions": [
+    "tired",
+    "anger"
+   ]
+  },
+  {
+   "key": "dreamy",
+   "title": "мечтаю",
+   "emoji": "🥹",
+   "synonyms": [
+    "мечта",
+    "умиление",
+    "милота",
+    "хочу"
+   ],
+   "emotions": [
+    "love",
+    "joy"
+   ]
+  },
+  {
+   "key": "facepalm",
+   "title": "фейспалм",
+   "emoji": "🤦",
+   "synonyms": [
+    "позор",
+    "ну зачем",
+    "ужас",
+    "стыдно"
+   ],
+   "emotions": [
+    "sad",
+    "anger"
+   ]
+  },
+  {
+   "key": "peek_door",
+   "title": "выглядываю",
+   "emoji": "🚪",
+   "synonyms": [
+    "подглядываю",
+    "можно?",
+    "за дверью",
+    "прячусь"
+   ],
+   "emotions": [
+    "think",
+    "fear"
+   ]
+  },
+  {
+   "key": "plate",
+   "title": "угощаю",
+   "emoji": "🍽️",
+   "synonyms": [
+    "еда",
+    "готово",
+    "за стол",
+    "приятного аппетита"
+   ],
+   "emotions": [
+    "food",
+    "friend"
+   ]
+  },
+  {
+   "key": "rain_sad",
+   "title": "грустный дождь",
+   "emoji": "🌧️",
+   "synonyms": [
+    "дождь",
+    "тоска",
+    "пасмурно",
+    "печаль"
+   ],
+   "emotions": [
+    "sad",
+    "weather"
+   ]
+  },
+  {
+   "key": "cocoa",
+   "title": "какао",
+   "emoji": "☕",
+   "synonyms": [
+    "какао",
+    "уют",
+    "тепло",
+    "сладкое",
+    "кофе"
+   ],
+   "emotions": [
+    "food",
+    "joy"
+   ]
+  }
+ ]
+}

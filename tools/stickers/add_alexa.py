@@ -1,9 +1,8 @@
-"""Пак «Алекса»: лист 6x4 на маджентовом фоне → assets/stickers/alexa/*.webp и
-запись в assets/stickers/manifest.json.
+"""Пак «Алекса»: лист 6x4 на маджентовом фоне → packs/alexa/*.webp и стикеры
+в packs/alexa/pack.json. Дальше пак уходит в магазин через publish.ps1.
 
-В отличие от export_app.py ничего не стирает: остальные паки не трогаются,
-пак «alexa» при повторном запуске пересобирается.
-Запуск: python3 -I add_alexa.py sheets/alexa.png ../../assets/stickers
+Остальные паки не трогаются, «alexa» при повторном запуске пересобирается.
+Запуск: python3 -I add_alexa.py sheets/alexa.png packs [папка для превью]
 """
 import json
 import os
@@ -147,23 +146,21 @@ def main(sheet, dst):
             shutil.copy(os.path.join(tmp, f), os.path.join(out, f.split('_', 1)[1]))
     shutil.rmtree(tmp)
 
-    path = os.path.join(dst, 'manifest.json')
-    with open(path, encoding='utf-8') as fh:
-        data = json.load(fh)
-    stickers = [
-        {'id': f'alexa.{key}', 'emoji': emoji, 'title': title, 'synonyms': extra, 'emotions': fams}
+    # Описание пака для publish_packs.py: шапка сохраняется, стикеры — из
+    # списка выше по порядку.
+    path = os.path.join(out, 'pack.json')
+    meta = json.load(open(path, encoding='utf-8')) if os.path.isfile(path) else {
+        'id': 'alexa', 'title': 'Алекса', 'publisher': 'Команда ChaWo',
+        'category': 'персонажи', 'status': 'draft', 'version': 1,
+    }
+    meta['stickers'] = [
+        {'key': key, 'title': title, 'emoji': emoji, 'synonyms': extra, 'emotions': fams}
         for key, title, emoji, fams, extra in STICKERS
         if key not in EXCLUDE
     ]
-    packs = [p for p in data['packs'] if p['id'] != 'alexa']
-    packs.append({'id': 'alexa', 'title': 'Алекса', 'stickers': stickers})
-    data['packs'] = packs
-    for s in stickers:
-        for fam in s['emotions']:
-            assert fam in data['families'], fam
     with open(path, 'w', encoding='utf-8') as fh:
-        json.dump(data, fh, ensure_ascii=False, separators=(',', ':'))
-    print('ok', len(stickers), 'scale %.2f' % scale)
+        json.dump(meta, fh, ensure_ascii=False, indent=1)
+    print('ok', len(meta['stickers']), 'scale %.2f' % scale)
 
 
 if __name__ == '__main__':

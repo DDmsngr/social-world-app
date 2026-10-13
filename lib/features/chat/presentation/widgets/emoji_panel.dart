@@ -56,16 +56,24 @@ class EmojiPanel extends StatefulWidget {
     this.stickerPacks = const [],
     this.onSticker,
     this.onCustomEmoji,
+    this.onOpenStore,
+    this.startWithStickers = false,
     this.height = 300,
   });
 
   final ValueChanged<String> onPick;
   final VoidCallback onBackspace;
 
-  /// Паки стикеров — вкладками перед эмодзи.
+  /// Установленные паки стикеров — вкладками перед эмодзи.
   final List<StickerPack> stickerPacks;
   final ValueChanged<Sticker>? onSticker;
   final ValueChanged<Sticker>? onCustomEmoji;
+
+  /// Вкладка «+» в конце: магазин стикеров.
+  final VoidCallback? onOpenStore;
+
+  /// Открыта кнопкой стикеров (а не эмодзи): сразу режим стикеров.
+  final bool startWithStickers;
   final double height;
 
   @override
@@ -80,8 +88,9 @@ class _EmojiPanelState extends State<EmojiPanel> {
   static const _tabsHeight = 44.0;
 
   /// false — свои паки вставляются в текст как эмодзи, true — уходят
-  /// стикерами. Панель открывается кнопкой эмодзи, поэтому сначала — эмодзи.
-  bool _stickers = false;
+  /// стикерами. Кнопка эмодзи открывает режим эмодзи, кнопка стикеров —
+  /// стикеров.
+  late bool _stickers = widget.startWithStickers;
 
   bool get _stickerMode => _stickers || widget.onCustomEmoji == null;
 
@@ -104,7 +113,9 @@ class _EmojiPanelState extends State<EmojiPanel> {
       return Container(
         height: widget.height,
         color: AppColors.ink2,
-        child: _picker(widget.height),
+        child: widget.startWithStickers
+            ? _noStickers()
+            : _picker(widget.height),
       );
     }
     final stickerMode = _stickerMode;
@@ -136,10 +147,22 @@ class _EmojiPanelState extends State<EmojiPanel> {
                           selected: pack == p,
                           onTap: () => setState(() => _tab = 'pack:${p.id}'),
                           child: StickerImage(
-                            asset: p.stickers.first.asset,
+                            url: p.coverUrl,
                             fallback: p.stickers.first.emoji,
                             size: 28,
                             semanticLabel: 'Пак «${p.title}»',
+                          ),
+                        ),
+                      if (widget.onOpenStore != null)
+                        _Tab(
+                          key: const ValueKey('sticker-store-tab'),
+                          selected: false,
+                          onTap: widget.onOpenStore!,
+                          child: Icon(
+                            Icons.add_circle_outline,
+                            size: 22,
+                            semanticLabel: 'Магазин стикеров',
+                            color: AppColors.textFaint,
                           ),
                         ),
                       if (!stickerMode)
@@ -203,6 +226,38 @@ class _EmojiPanelState extends State<EmojiPanel> {
       ),
     );
   }
+
+  /// Стикеров в коллекции нет — зовём в магазин.
+  Widget _noStickers() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sticky_note_2_outlined, size: 40, color: AppColors.textFaint),
+          const SizedBox(height: 10),
+          Text(
+            'У вас пока нет стикеров',
+            style: TextStyle(fontSize: 15, color: AppColors.text),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Паки ставятся из магазина — бесплатно',
+            style: TextStyle(fontSize: 13, color: AppColors.textDim),
+          ),
+          if (widget.onOpenStore != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const ValueKey('sticker-store-empty'),
+              onPressed: widget.onOpenStore,
+              icon: const Icon(Icons.storefront_outlined, size: 18),
+              label: const Text('Открыть магазин'),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
 
   Widget _picker(double pickerHeight) {
     final onPick = widget.onPick;

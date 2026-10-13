@@ -55,3 +55,6 @@ android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 # Ключ сервисного аккаунта FCM — серверный секрет, живёт только в секретах Edge Functions.
 *firebase-adminsdk*.json
+
+# Python
+__pycache__/

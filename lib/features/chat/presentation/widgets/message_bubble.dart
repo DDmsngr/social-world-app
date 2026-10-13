@@ -3,8 +3,10 @@ import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/link_text.dart';
@@ -59,10 +61,11 @@ class MessageBubble extends StatelessWidget {
     };
     // С ответом или пересылкой сообщению нужен пузырь: в нём живёт цитата.
     final hasMeta = message.replyTo != null || message.forwardedFrom != null;
-    // Фирменный стикер — картинка; незнакомый id (стикер из версии новее
-    // этой) — эмодзи-заменитель из текста, как у старых «стикеров».
+    // Стикер — картинка из магазина: показывается, даже если пак у
+    // получателя не установлен или снят с публикации. Картинка не
+    // загрузилась — эмодзи-заменитель из текста, как у старых «стикеров».
     final stickerPath = message.kind == MessageKind.sticker
-        ? stickerAsset(message.stickerId)
+        ? stickerImageUrl(message.stickerId)
         : null;
     final bigEmoji = emojiCount > 0 && !hasMeta;
     final bigEmojiSize = switch (emojiCount) {
@@ -109,7 +112,22 @@ class MessageBubble extends StatelessWidget {
             child: _QuoteBlock(reply: message.replyTo!, mine: mine),
           ),
         if (stickerPath != null)
-          StickerImage(asset: stickerPath, fallback: caption, size: 148)
+          // Тап по стикеру — его пак в магазине, сам стикер подсвечен.
+          GestureDetector(
+            key: const ValueKey('message-sticker'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              final parts = parseStickerId(message.stickerId);
+              if (parts == null) return;
+              context.push(Routes.stickerPack(parts.pack, sticker: parts.key));
+            },
+            child: StickerImage(
+              url: stickerPath,
+              fallback: caption,
+              size: 148,
+              semanticLabel: 'Стикер. Открыть пак',
+            ),
+          )
         else if (bigEmoji && message.customEmoji.isNotEmpty)
           // Сообщение из одних своих эмодзи — крупно, как обычные.
           LinkText(

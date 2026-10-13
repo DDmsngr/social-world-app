@@ -1,0 +1,519 @@
+{
+ "id": "city",
+ "title": "Город и настроение",
+ "description": "Город и настроение: прогулки, море, кофе, маршруты и встречи.",
+ "publisher": "Команда ChaWo",
+ "category": "город",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 30,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "sun_squint",
+   "title": "яркое солнце",
+   "emoji": "☀️",
+   "synonyms": [
+    "щурюсь",
+    "лето",
+    "жарко"
+   ],
+   "emotions": [
+    "weather",
+    "joy"
+   ]
+  },
+  {
+   "key": "seagull",
+   "title": "чайка",
+   "emoji": "🕊️",
+   "synonyms": [
+    "птица",
+    "море",
+    "набережная"
+   ],
+   "emotions": [
+    "city"
+   ]
+  },
+  {
+   "key": "hiker",
+   "title": "турист",
+   "emoji": "🎒",
+   "synonyms": [
+    "поход",
+    "рюкзак",
+    "горы",
+    "прогулка"
+   ],
+   "emotions": [
+    "city",
+    "energy"
+   ]
+  },
+  {
+   "key": "headphones",
+   "title": "музыка",
+   "emoji": "🎧",
+   "synonyms": [
+    "наушники",
+    "слушаю",
+    "плейлист"
+   ],
+   "emotions": [
+    "chat",
+    "joy"
+   ]
+  },
+  {
+   "key": "cozy_mug",
+   "title": "уют",
+   "emoji": "☕",
+   "synonyms": [
+    "чай",
+    "кофе",
+    "тепло",
+    "дома"
+   ],
+   "emotions": [
+    "food",
+    "love"
+   ]
+  },
+  {
+   "key": "rain_umbrella",
+   "title": "дождь",
+   "emoji": "☔",
+   "synonyms": [
+    "зонт",
+    "ливень",
+    "сырость"
+   ],
+   "emotions": [
+    "weather",
+    "sad"
+   ]
+  },
+  {
+   "key": "winter_scarf",
+   "title": "зима",
+   "emoji": "🧣",
+   "synonyms": [
+    "снег",
+    "шапка",
+    "шарф",
+    "горы",
+    "красная поляна"
+   ],
+   "emotions": [
+    "weather"
+   ]
+  },
+  {
+   "key": "typing",
+   "title": "печатает",
+   "emoji": "💬",
+   "synonyms": [
+    "пишет",
+    "сообщение",
+    "набирает"
+   ],
+   "emotions": [
+    "chat"
+   ]
+  },
+  {
+   "key": "detective",
+   "title": "расследую",
+   "emoji": "🕵️",
+   "synonyms": [
+    "детектив",
+    "ищу",
+    "лупа",
+    "подозрительно"
+   ],
+   "emotions": [
+    "think",
+    "quest"
+   ]
+  },
+  {
+   "key": "selfie",
+   "title": "селфи",
+   "emoji": "🤳",
+   "synonyms": [
+    "фото",
+    "телефон",
+    "снимаю"
+   ],
+   "emotions": [
+    "chat"
+   ]
+  },
+  {
+   "key": "here_pin",
+   "title": "я тут",
+   "emoji": "📍",
+   "synonyms": [
+    "на месте",
+    "геопозиция",
+    "метка",
+    "приехал"
+   ],
+   "emotions": [
+    "city",
+    "quest"
+   ]
+  },
+  {
+   "key": "friends",
+   "title": "друзья",
+   "emoji": "🫂",
+   "synonyms": [
+    "дружба",
+    "вместе",
+    "обнимаемся",
+    "компания"
+   ],
+   "emotions": [
+    "friend",
+    "love"
+   ]
+  },
+  {
+   "key": "ticket",
+   "title": "билет",
+   "emoji": "🎟️",
+   "synonyms": [
+    "мероприятие",
+    "концерт",
+    "вход"
+   ],
+   "emotions": [
+    "party",
+    "quest"
+   ]
+  },
+  {
+   "key": "megaphone",
+   "title": "объявление",
+   "emoji": "📢",
+   "synonyms": [
+    "новость",
+    "важно",
+    "рупор",
+    "кричу"
+   ],
+   "emotions": [
+    "chat",
+    "party"
+   ]
+  },
+  {
+   "key": "treasure_map",
+   "title": "карта сокровищ",
+   "emoji": "🗺️",
+   "synonyms": [
+    "квест",
+    "клад",
+    "приключение",
+    "маршрут"
+   ],
+   "emotions": [
+    "quest"
+   ]
+  },
+  {
+   "key": "qr_card",
+   "title": "qr-код",
+   "emoji": "📱",
+   "synonyms": [
+    "сканируй",
+    "код",
+    "вход",
+    "бонус"
+   ],
+   "emotions": [
+    "quest",
+    "chat"
+   ]
+  },
+  {
+   "key": "laurel",
+   "title": "победитель",
+   "emoji": "🏆",
+   "synonyms": [
+    "лавры",
+    "чемпион",
+    "выиграл"
+   ],
+   "emotions": [
+    "quest",
+    "joy"
+   ]
+  },
+  {
+   "key": "medal",
+   "title": "медаль",
+   "emoji": "🥇",
+   "synonyms": [
+    "награда",
+    "приз",
+    "достижение",
+    "первое место"
+   ],
+   "emotions": [
+    "quest",
+    "joy"
+   ]
+  },
+  {
+   "key": "flag_hill",
+   "title": "флаг на вершине",
+   "emoji": "🚩",
+   "synonyms": [
+    "добрался",
+    "цель",
+    "финиш",
+    "покорил"
+   ],
+   "emotions": [
+    "quest"
+   ]
+  },
+  {
+   "key": "compass",
+   "title": "компас",
+   "emoji": "🧭",
+   "synonyms": [
+    "направление",
+    "навигация",
+    "путь"
+   ],
+   "emotions": [
+    "quest",
+    "city"
+   ]
+  },
+  {
+   "key": "sprint",
+   "title": "бегу",
+   "emoji": "🏃",
+   "synonyms": [
+    "спешу",
+    "быстро",
+    "опаздываю",
+    "скорость"
+   ],
+   "emotions": [
+    "energy"
+   ]
+  },
+  {
+   "key": "glow",
+   "title": "сияю",
+   "emoji": "✨",
+   "synonyms": [
+    "вдохновение",
+    "блеск",
+    "в потоке",
+    "блестки"
+   ],
+   "emotions": [
+    "joy",
+    "cool"
+   ]
+  },
+  {
+   "key": "lightbulb",
+   "title": "идея",
+   "emoji": "💡",
+   "synonyms": [
+    "лампочка",
+    "придумал",
+    "мысль",
+    "осенило"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "hearts_orbit",
+   "title": "влюблённость",
+   "emoji": "🥰",
+   "synonyms": [
+    "сердечки",
+    "любовь",
+    "мило",
+    "романтика",
+    "любовь"
+   ],
+   "emotions": [
+    "love"
+   ]
+  },
+  {
+   "key": "low_battery",
+   "title": "нет сил",
+   "emoji": "🪫",
+   "synonyms": [
+    "разряжен",
+    "устал",
+    "выгорел",
+    "батарейка"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "charged",
+   "title": "полон сил",
+   "emoji": "🔋",
+   "synonyms": [
+    "заряжен",
+    "бодр",
+    "молния",
+    "энергия"
+   ],
+   "emotions": [
+    "energy",
+    "joy"
+   ]
+  },
+  {
+   "key": "heartbeat",
+   "title": "волнуюсь",
+   "emoji": "💓",
+   "synonyms": [
+    "сердцебиение",
+    "пульс",
+    "трепет",
+    "предвкушение"
+   ],
+   "emotions": [
+    "love",
+    "fear"
+   ]
+  },
+  {
+   "key": "peek_wall",
+   "title": "выглядываю",
+   "emoji": "👀",
+   "synonyms": [
+    "подглядываю",
+    "прячусь",
+    "любопытно"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "sunset",
+   "title": "закат",
+   "emoji": "🌅",
+   "synonyms": [
+    "море",
+    "вечер",
+    "романтика",
+    "сочи"
+   ],
+   "emotions": [
+    "city",
+    "love"
+   ]
+  },
+  {
+   "key": "mountain_peak",
+   "title": "вершина",
+   "emoji": "🏔️",
+   "synonyms": [
+    "горы",
+    "красная поляна",
+    "поход",
+    "цель"
+   ],
+   "emotions": [
+    "city",
+    "quest"
+   ]
+  },
+  {
+   "key": "ferris_wheel",
+   "title": "колесо обозрения",
+   "emoji": "🎡",
+   "synonyms": [
+    "парк",
+    "аттракцион",
+    "свидание",
+    "отдых"
+   ],
+   "emotions": [
+    "city",
+    "party"
+   ]
+  },
+  {
+   "key": "sailboat",
+   "title": "яхта",
+   "emoji": "⛵",
+   "synonyms": [
+    "парусник",
+    "море",
+    "отпуск",
+    "прогулка"
+   ],
+   "emotions": [
+    "city"
+   ]
+  },
+  {
+   "key": "khachapuri",
+   "title": "хачапури",
+   "emoji": "🧀",
+   "synonyms": [
+    "сыр",
+    "яйцо",
+    "вкусно",
+    "выпечка",
+    "еда"
+   ],
+   "emotions": [
+    "food",
+    "city"
+   ]
+  },
+  {
+   "key": "ice_cream",
+   "title": "мороженое",
+   "emoji": "🍦",
+   "synonyms": [
+    "сладкое",
+    "лето",
+    "десерт"
+   ],
+   "emotions": [
+    "food",
+    "joy"
+   ]
+  },
+  {
+   "key": "chat_heart",
+   "title": "сообщение с сердцем",
+   "emoji": "💌",
+   "synonyms": [
+    "люблю тебя",
+    "нежность",
+    "признание",
+    "личное",
+    "любовь"
+   ],
+   "emotions": [
+    "love",
+    "chat"
+   ]
+  }
+ ]
+}
