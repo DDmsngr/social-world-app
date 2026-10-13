@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/errors/friendly_error.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../chat/domain/schedule_format.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../chat/presentation/widgets/schedule_picker.dart';
@@ -123,6 +124,9 @@ class _ChannelArticleScreenState extends ConsumerState<ChannelArticleScreen> {
             padding: const EdgeInsets.only(right: 8),
             child: FilledButton(
               onPressed: _canPublish ? _publish : null,
+              // Без компактного стиля кнопка берёт всю ширину панели и сдвигает
+              // заголовок и «назад» в одну точку.
+              style: AppButtons.compact,
               child: _busy
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Text('Опубликовать'),
