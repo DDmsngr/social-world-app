@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/stickers.dart';
@@ -128,7 +129,9 @@ class StickerSuggestions extends StatelessWidget {
 
 /// Сетка одного пака в панели: крупно — стикеры, [compact] — свои эмодзи
 /// (мельче и плотнее, как обычные эмодзи).
-class StickerGrid extends StatelessWidget {
+///
+/// Пока стикер зажат — он раскрывается крупно над экраном, отпустил — исчез.
+class StickerGrid extends StatefulWidget {
   const StickerGrid({
     super.key,
     required this.stickers,
@@ -141,17 +144,52 @@ class StickerGrid extends StatelessWidget {
   final bool compact;
 
   @override
+  State<StickerGrid> createState() => _StickerGridState();
+}
+
+class _StickerGridState extends State<StickerGrid> {
+  OverlayEntry? _preview;
+
+  void _show(Sticker sticker) {
+    _hide();
+    final entry = OverlayEntry(
+      builder: (context) => _StickerPreview(sticker: sticker),
+    );
+    _preview = entry;
+    Overlay.of(context, rootOverlay: true).insert(entry);
+  }
+
+  void _hide() {
+    _preview?.remove();
+    _preview = null;
+  }
+
+  @override
+  void dispose() {
+    _hide();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final compact = widget.compact;
     return GridView.count(
       crossAxisCount: compact ? 7 : 4,
       padding: const EdgeInsets.all(8),
       mainAxisSpacing: 4,
       crossAxisSpacing: 4,
       children: [
-        for (final sticker in stickers)
-          InkResponse(
+        for (final sticker in widget.stickers)
+          GestureDetector(
             key: ValueKey('sticker-${sticker.id}'),
-            onTap: () => onPick(sticker),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => widget.onPick(sticker),
+            onLongPressStart: (_) {
+              HapticFeedback.selectionClick();
+              _show(sticker);
+            },
+            onLongPressEnd: (_) => _hide(),
+            onLongPressCancel: _hide,
             child: StickerImage(
               url: sticker.thumbUrl,
               fallback: sticker.emoji,
@@ -162,6 +200,44 @@ class StickerGrid extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Крупный показ зажатого стикера: затемнение и картинка почти во всю ширину.
+/// Жесты не перехватывает — отпускание доходит до сетки под ним.
+class _StickerPreview extends StatelessWidget {
+  const _StickerPreview({required this.sticker});
+
+  final Sticker sticker;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final size = (width * 0.8).clamp(200.0, 360.0);
+    return IgnorePointer(
+      child: Material(
+        key: const ValueKey('sticker-preview'),
+        color: Colors.black54,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              StickerImage(
+                url: sticker.imageUrl,
+                fallback: sticker.emoji,
+                size: size,
+                semanticLabel: 'Стикер «${sticker.title}» крупно',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                sticker.title,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

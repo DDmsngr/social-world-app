@@ -459,6 +459,23 @@ void main() {
       expect(backend.installedIds, ['basic', 'alexa']);
     });
 
+    testWidgets('зажатый стикер раскрывается крупно, отпустил — исчез и не отправился', (tester) async {
+      await tester.pumpWidget(app(const ChatComposer(conversationId: 'conv-1')));
+      await tester.pumpAndSettle();
+      await openStickers(tester);
+      expect(find.byKey(const ValueKey('sticker-preview')), findsNothing);
+
+      final gesture = await tester.startGesture(tester.getCenter(find.byKey(const ValueKey('sticker-alexa.wave'))));
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(find.byKey(const ValueKey('sticker-preview')), findsOneWidget);
+      expect(find.text('привет'), findsOneWidget);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('sticker-preview')), findsNothing);
+      expect(repository.sent, isEmpty);
+    });
+
     testWidgets('стикер не ушёл — ошибка под полем', (tester) async {
       repository.fail = true;
       await tester.pumpWidget(app(const ChatComposer(conversationId: 'conv-1')));
