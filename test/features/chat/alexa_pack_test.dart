@@ -35,6 +35,19 @@ void main() {
     }
   });
 
+  test('пак «Викинг»: два листа по 8, помечен 18+, у каждого есть файл', () {
+    final viking = packs.firstWhere((p) => p['id'] == 'viking');
+    expect(viking['title'], 'Викинг');
+    expect(viking['description'], contains('18+'));
+    final stickers = (viking['stickers'] as List).cast<Map<String, dynamic>>();
+    expect(stickers, hasLength(16));
+    expect(stickers.first['key'], 'vse_pod_kontrolem');
+    expect(stickers.last['key'], 'nu_davay_udivi');
+    for (final s in stickers) {
+      expect(File('${root.path}/viking/${s['key']}.webp').existsSync(), isTrue, reason: s['key']);
+    }
+  });
+
   test('пак «Алекса»: два листа (23 + 24), без «победы», у каждого есть файл', () {
     final alexa = packs.firstWhere((p) => p['id'] == 'alexa');
     expect(alexa['title'], 'Алекса');

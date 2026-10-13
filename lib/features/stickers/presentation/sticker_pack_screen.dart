@@ -200,14 +200,15 @@ class _StickerPackScreenState extends ConsumerState<StickerPackScreen> {
 }
 
 /// Тот самый стикер из переписки — крупно над паком.
-class _HighlightBanner extends StatelessWidget {
+class _HighlightBanner extends ConsumerWidget {
   const _HighlightBanner({required this.sticker, required this.pack});
 
   final Sticker sticker;
   final StickerPack pack;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final installed = ref.watch(installedStickerPacksProvider).value?.contains(pack.id) ?? false;
     return Container(
       key: const ValueKey('sticker-highlight-banner'),
       margin: const EdgeInsets.only(bottom: 18),
@@ -228,7 +229,9 @@ class _HighlightBanner extends StatelessWidget {
                 Text('Стикер «${sticker.title}»', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.text)),
                 const SizedBox(height: 4),
                 Text(
-                  'Из пака «${pack.title}». Добавьте пак, чтобы отправлять его стикеры.',
+                  installed
+                      ? 'Из пака «${pack.title}». Он уже у вас: стикер можно отправлять.'
+                      : 'Из пака «${pack.title}». Добавьте пак, чтобы отправлять его стикеры.',
                   style: TextStyle(fontSize: 13, color: AppColors.textDim),
                 ),
               ],

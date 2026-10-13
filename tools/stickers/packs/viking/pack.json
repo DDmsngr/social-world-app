@@ -1,0 +1,268 @@
+{
+ "id": "viking",
+ "title": "Викинг",
+ "description": "Девчонка в кепке с косой и острым языком. Всё под контролем. Почти. С матом — 18+.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 80,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "vse_pod_kontrolem",
+   "title": "всё под контролем",
+   "emoji": "☕",
+   "synonyms": [
+    "под контролем",
+    "спокойно",
+    "кофе",
+    "норм",
+    "справляюсь"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "kak_zaebalo",
+   "title": "как же заебало",
+   "emoji": "😤",
+   "synonyms": [
+    "заебало",
+    "достало",
+    "бесит",
+    "надоело",
+    "задолбало"
+   ],
+   "emotions": [
+    "anger",
+    "tired"
+   ]
+  },
+  {
+   "key": "zhizn_prekrasna",
+   "title": "жизнь прекрасна",
+   "emoji": "🤘",
+   "synonyms": [
+    "жизнь",
+    "прекрасно",
+    "рок",
+    "круто",
+    "ура"
+   ],
+   "emotions": [
+    "joy",
+    "party"
+   ]
+  },
+  {
+   "key": "ty_serezno",
+   "title": "ты серьёзно?",
+   "emoji": "🕶",
+   "synonyms": [
+    "серьёзно",
+    "шутишь",
+    "правда",
+    "очки",
+    "ну ты даёшь"
+   ],
+   "emotions": [
+    "surprise",
+    "think"
+   ]
+  },
+  {
+   "key": "kakaya_raznitsa",
+   "title": "какая разница",
+   "emoji": "🥱",
+   "synonyms": [
+    "разница",
+    "пофиг",
+    "всё равно",
+    "скучно",
+    "неважно"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  },
+  {
+   "key": "snachala_kofe",
+   "title": "сначала кофе",
+   "emoji": "🥤",
+   "synonyms": [
+    "кофе",
+    "утро",
+    "проснуться",
+    "потом",
+    "бодрость"
+   ],
+   "emotions": [
+    "tired",
+    "energy"
+   ]
+  },
+  {
+   "key": "ya_ni_pri_chem",
+   "title": "я ни при чём",
+   "emoji": "🤷",
+   "synonyms": [
+    "не я",
+    "ни при чём",
+    "не виновата",
+    "хз",
+    "развела руками"
+   ],
+   "emotions": [
+    "cool",
+    "think"
+   ]
+  },
+  {
+   "key": "derzhis_druzhok",
+   "title": "держись, дружок",
+   "emoji": "🤙",
+   "synonyms": [
+    "держись",
+    "дружок",
+    "крепись",
+    "бро",
+    "всё будет"
+   ],
+   "emotions": [
+    "friend",
+    "joy"
+   ]
+  },
+  {
+   "key": "ya_zhe_govorila",
+   "title": "я же говорила",
+   "emoji": "😏",
+   "synonyms": [
+    "говорила",
+    "предупреждала",
+    "а я говорила",
+    "так и знала",
+    "ну вот"
+   ],
+   "emotions": [
+    "think",
+    "cool"
+   ]
+  },
+  {
+   "key": "eto_drugoe",
+   "title": "это другое",
+   "emoji": "😠",
+   "synonyms": [
+    "другое",
+    "не то",
+    "не сравнивай",
+    "нет",
+    "обиделась"
+   ],
+   "emotions": [
+    "anger",
+    "think"
+   ]
+  },
+  {
+   "key": "nu_ya_tak_i_znala",
+   "title": "ну я так и знала",
+   "emoji": "👉",
+   "synonyms": [
+    "так и знала",
+    "знала",
+    "угадала",
+    "ага",
+    "вот видишь"
+   ],
+   "emotions": [
+    "think",
+    "joy"
+   ]
+  },
+  {
+   "key": "gospodi_dai_sil",
+   "title": "господи, дай сил",
+   "emoji": "🙄",
+   "synonyms": [
+    "дай сил",
+    "господи",
+    "терпение",
+    "устала",
+    "закатила глаза"
+   ],
+   "emotions": [
+    "tired",
+    "anger"
+   ]
+  },
+  {
+   "key": "bez_kommentariev",
+   "title": "без комментариев",
+   "emoji": "🤦",
+   "synonyms": [
+    "без комментариев",
+    "фейспалм",
+    "молчу",
+    "стыдно",
+    "капец"
+   ],
+   "emotions": [
+    "tired",
+    "sad"
+   ]
+  },
+  {
+   "key": "a_ya_tut_pri_chem",
+   "title": "а я тут при чём?",
+   "emoji": "😇",
+   "synonyms": [
+    "при чём",
+    "я тут",
+    "не знаю",
+    "невиновна",
+    "я?"
+   ],
+   "emotions": [
+    "surprise",
+    "think"
+   ]
+  },
+  {
+   "key": "ne_nachinay",
+   "title": "не начинай",
+   "emoji": "☝",
+   "synonyms": [
+    "не начинай",
+    "хватит",
+    "стоп",
+    "палец",
+    "замолчи"
+   ],
+   "emotions": [
+    "anger"
+   ]
+  },
+  {
+   "key": "nu_davay_udivi",
+   "title": "ну давай, удиви меня",
+   "emoji": "😑",
+   "synonyms": [
+    "удиви",
+    "ну давай",
+    "посмотрим",
+    "скучно",
+    "докажи"
+   ],
+   "emotions": [
+    "cool",
+    "think"
+   ]
+  }
+ ]
+}

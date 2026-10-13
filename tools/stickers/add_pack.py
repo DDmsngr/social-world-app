@@ -201,9 +201,9 @@ def main(argv):
     spec = json.load(open(spec_path, encoding='utf-8-sig'))
     check_spec(spec)
     if '--check' in argv:
-        print('ok', spec['id'])
+        print('ok', spec.get('id', spec.get('into')))
         return
-    pid = spec['id']
+    pid = spec.get('id') or spec['into']
     # "into": стикеры листа дописываются в уже существующий пак (второй лист
     # того же персонажа): шапка и чужие стикеры не трогаются.
     target = spec.get('into', pid)

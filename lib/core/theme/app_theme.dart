@@ -182,6 +182,8 @@ abstract final class AppTheme {
       snackBarTheme: SnackBarThemeData(
         backgroundColor: p.ink2,
         contentTextStyle: TextStyle(color: p.text),
+        // По умолчанию кнопка («Вернуть») белёсая на светлой плашке.
+        actionTextColor: p.primary,
         behavior: SnackBarBehavior.floating,
         // Поднято над полем ввода чата и нижней панелью: раньше плашки
         // закрывали ровно то, чем человек пользуется.

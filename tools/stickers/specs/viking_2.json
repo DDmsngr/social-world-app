@@ -1,0 +1,17 @@
+{
+ "into": "viking",
+ "sheet": "sheets/viking_2.png",
+ "grid": [4, 2],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {"key": "ya_zhe_govorila", "title": "я же говорила", "emoji": "😏", "emotions": ["think", "cool"], "synonyms": ["говорила", "предупреждала", "а я говорила", "так и знала", "ну вот"]},
+  {"key": "eto_drugoe", "title": "это другое", "emoji": "😠", "emotions": ["anger", "think"], "synonyms": ["другое", "не то", "не сравнивай", "нет", "обиделась"]},
+  {"key": "nu_ya_tak_i_znala", "title": "ну я так и знала", "emoji": "👉", "emotions": ["think", "joy"], "synonyms": ["так и знала", "знала", "угадала", "ага", "вот видишь"]},
+  {"key": "gospodi_dai_sil", "title": "господи, дай сил", "emoji": "🙄", "emotions": ["tired", "anger"], "synonyms": ["дай сил", "господи", "терпение", "устала", "закатила глаза"]},
+  {"key": "bez_kommentariev", "title": "без комментариев", "emoji": "🤦", "emotions": ["tired", "sad"], "synonyms": ["без комментариев", "фейспалм", "молчу", "стыдно", "капец"]},
+  {"key": "a_ya_tut_pri_chem", "title": "а я тут при чём?", "emoji": "😇", "emotions": ["surprise", "think"], "synonyms": ["при чём", "я тут", "не знаю", "невиновна", "я?"]},
+  {"key": "ne_nachinay", "title": "не начинай", "emoji": "☝", "emotions": ["anger"], "synonyms": ["не начинай", "хватит", "стоп", "палец", "замолчи"]},
+  {"key": "nu_davay_udivi", "title": "ну давай, удиви меня", "emoji": "😑", "emotions": ["cool", "think"], "synonyms": ["удиви", "ну давай", "посмотрим", "скучно", "докажи"]}
+ ]
+}

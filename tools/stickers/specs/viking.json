@@ -1,0 +1,25 @@
+{
+ "id": "viking",
+ "title": "Викинг",
+ "description": "Девчонка в кепке с косой и острым языком. Всё под контролем. Почти. С матом — 18+.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 80,
+ "version": 1,
+ "sheet": "sheets/viking.png",
+ "grid": [4, 2],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {"key": "vse_pod_kontrolem", "title": "всё под контролем", "emoji": "☕", "emotions": ["cool", "joy"], "synonyms": ["под контролем", "спокойно", "кофе", "норм", "справляюсь"]},
+  {"key": "kak_zaebalo", "title": "как же заебало", "emoji": "😤", "emotions": ["anger", "tired"], "synonyms": ["заебало", "достало", "бесит", "надоело", "задолбало"]},
+  {"key": "zhizn_prekrasna", "title": "жизнь прекрасна", "emoji": "🤘", "emotions": ["joy", "party"], "synonyms": ["жизнь", "прекрасно", "рок", "круто", "ура"]},
+  {"key": "ty_serezno", "title": "ты серьёзно?", "emoji": "🕶", "emotions": ["surprise", "think"], "synonyms": ["серьёзно", "шутишь", "правда", "очки", "ну ты даёшь"]},
+  {"key": "kakaya_raznitsa", "title": "какая разница", "emoji": "🥱", "emotions": ["tired", "cool"], "synonyms": ["разница", "пофиг", "всё равно", "скучно", "неважно"]},
+  {"key": "snachala_kofe", "title": "сначала кофе", "emoji": "🥤", "emotions": ["tired", "energy"], "synonyms": ["кофе", "утро", "проснуться", "потом", "бодрость"]},
+  {"key": "ya_ni_pri_chem", "title": "я ни при чём", "emoji": "🤷", "emotions": ["cool", "think"], "synonyms": ["не я", "ни при чём", "не виновата", "хз", "развела руками"]},
+  {"key": "derzhis_druzhok", "title": "держись, дружок", "emoji": "🤙", "emotions": ["friend", "joy"], "synonyms": ["держись", "дружок", "крепись", "бро", "всё будет"]}
+ ]
+}
