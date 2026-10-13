@@ -44,6 +44,38 @@ class _ChannelPostCardState extends State<ChannelPostCard> {
   /// Длинный пост в ленте идёт с обрезкой; тап по нему разворачивает на месте.
   bool _expanded = false;
 
+  final _moreKey = GlobalKey();
+
+  double? _y(BuildContext? target) {
+    final box = target?.findRenderObject();
+    return box is RenderBox && box.attached ? box.localToGlobal(Offset.zero).dy : null;
+  }
+
+  /// Разворот и сворачивание не должны сдвигать то, что читают: лента канала
+  /// растёт вверх от нижнего края, и «Читать дальше» уносило текст за экран.
+  /// Разворот держит на месте верх карточки — продолжение текста идёт ровно с
+  /// обрыва. Сворачивание держит саму кнопку: верх длинного поста обычно уже
+  /// за экраном, и человек остаётся там, где нажал.
+  void _toggle() {
+    final expanding = !_expanded;
+    final anchor = expanding ? () => _y(context) : () => _y(_moreKey.currentContext);
+    final before = anchor();
+    setState(() => _expanded = !_expanded);
+    if (before == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final after = anchor();
+      final scrollable = Scrollable.maybeOf(context);
+      if (after == null || scrollable == null) return;
+      final shift = before - after; // на сколько карточку надо опустить
+      if (shift.abs() < 1) return;
+      final position = scrollable.position;
+      final reversed = scrollable.axisDirection == AxisDirection.up;
+      final target = position.pixels + (reversed ? shift : -shift);
+      position.jumpTo(target.clamp(position.minScrollExtent, position.maxScrollExtent));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
@@ -64,7 +96,7 @@ class _ChannelPostCardState extends State<ChannelPostCard> {
       onTap: full
           ? null
           : collapsed
-          ? () => setState(() => _expanded = true)
+          ? _toggle
           : onTap != null
           ? () => onTap(context)
           : onComments,
@@ -92,8 +124,9 @@ class _ChannelPostCardState extends State<ChannelPostCard> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                 child: GestureDetector(
+                  key: _moreKey,
                   behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() => _expanded = !_expanded),
+                  onTap: _toggle,
                   child: Text(
                     _expanded ? 'Свернуть' : 'Читать дальше',
                     style: TextStyle(

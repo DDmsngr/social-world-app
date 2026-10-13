@@ -11,6 +11,11 @@ import '../../../chat/domain/entities/chat_message.dart';
 import '../../../chat/presentation/providers/chat_providers.dart';
 import '../../../chat/presentation/widgets/attachment_views.dart';
 
+/// В каналах превью видео подгружается само, пока пост виден на экране
+/// (в личных чатах — только небольшие ролики): иначе вместо кадра чёрный
+/// круг, пока не нажмёшь. Грузятся лишь те, что в зоне видимости списка.
+const _channelVideoAutoLoadBytes = 40 * 1024 * 1024;
+
 /// Вложение поста канала. Фото показывается целиком, в своих пропорциях
 /// (в разумных пределах 0.6–2.4); пока файл не пришёл, рамка 4:3. Пропорции
 /// запоминаются, поэтому пост, который уже показывали, при прокрутке не
@@ -25,7 +30,10 @@ class ChannelMedia extends StatelessWidget {
     if ((message.attachment?.album.length ?? 0) > 0) return _Album(message: message);
     return switch (message.kind) {
       MessageKind.image => _ChannelPhoto(message: message),
-      MessageKind.video => VideoPreview(message: message),
+      MessageKind.video => VideoPreview(
+        message: message,
+        autoLoadMaxBytes: _channelVideoAutoLoadBytes,
+      ),
       _ => Padding(
         padding: const EdgeInsets.all(10),
         child: Align(
@@ -177,7 +185,11 @@ class _AlbumState extends ConsumerState<_Album> {
                 width: cellW,
                 height: cellH,
                 child: item.kind == MessageKind.video
-                    ? VideoPreview(message: item, aspectRatio: cellW / cellH)
+                    ? VideoPreview(
+                        message: item,
+                        aspectRatio: cellW / cellH,
+                        autoLoadMaxBytes: _channelVideoAutoLoadBytes,
+                      )
                     : _AlbumPhoto(
                         message: item,
                         onTap: () => _openPhotos(context, items, item),

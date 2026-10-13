@@ -65,6 +65,50 @@ void main() {
     expect(find.textContaining('Абзац номер 39'), findsNothing);
   });
 
+  for (final reverse in [true, false]) {
+    testWidgets(
+      'разворот не сдвигает текст: верх поста на месте (${reverse ? 'лента растёт вверх' : 'обычный список'})',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: ListView(
+                reverse: reverse,
+                children: [
+                  const SizedBox(height: 50),
+                  ChannelPostCard(post: _post(_long)),
+                  const SizedBox(height: 1500),
+                ],
+              ),
+            ),
+          ),
+        );
+        // Верх самой карточки: текст внутри может уйти за границу кеша списка.
+        final key = find.byType(ChannelPostCard);
+        await tester.ensureVisible(find.text('Читать дальше'));
+        await tester.pumpAndSettle();
+        final before = tester.getTopLeft(key).dy;
+
+        await tester.tap(find.text('Читать дальше'));
+        await tester.pumpAndSettle();
+        expect(find.text('Свернуть'), findsOneWidget);
+        expect(tester.getTopLeft(key).dy, closeTo(before, 1));
+
+        // Сворачивание проверяем только в ленте канала (она растёт вверх): в
+        // обычном списке компенсировать нечем, если карточка у самого начала.
+        if (!reverse) return;
+        await tester.ensureVisible(find.text('Свернуть'));
+        await tester.pumpAndSettle();
+        // Сворачивание держит на месте кнопку: верх длинного поста уже за экраном.
+        final beforeCollapse = tester.getTopLeft(find.text('Свернуть')).dy;
+        await tester.tap(find.text('Свернуть'));
+        await tester.pumpAndSettle();
+        expect(find.text('Читать дальше'), findsOneWidget);
+        expect(tester.getTopLeft(find.text('Читать дальше')).dy, closeTo(beforeCollapse, 1));
+      },
+    );
+  }
+
   testWidgets('короткий пост без обрезки: тап сразу открывает реакции', (tester) async {
     final events = await _pump(tester, 'Короткий пост про город');
     expect(find.text('Читать дальше'), findsNothing);
