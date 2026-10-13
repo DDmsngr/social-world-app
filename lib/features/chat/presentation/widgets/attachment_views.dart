@@ -120,6 +120,7 @@ class _AttachmentViewState extends ConsumerState<AttachmentView> {
         placeholderSize: const Size(230, 44),
         builder: (path) => VoiceMessagePlayer(
           messageId: message.id,
+          sentAt: message.sentAt,
           filePath: path,
           attachment: attachment,
           mine: widget.mine,
@@ -967,6 +968,60 @@ final playbackSpeedProvider = NotifierProvider<PlaybackSpeed, double>(
   PlaybackSpeed.new,
 );
 
+// ── прослушано / нет ────────────────────────────────────────────────────────
+
+const _listenedPrefsKey = 'chat_voice_listened';
+const _listenedSincePrefsKey = 'chat_voice_listened_since';
+const _listenedKeep = 800;
+
+/// Какие чужие голосовые уже слушали (на этом телефоне). Непрослушанные
+/// помечаются точкой у длительности. Всё, что пришло до первого запуска этой
+/// возможности, считается прослушанным: иначе вся старая переписка вспыхнула
+/// бы точками.
+class ListenedVoice extends Notifier<Set<String>> {
+  DateTime? _since;
+
+  @override
+  Set<String> build() {
+    _restore();
+    return const {};
+  }
+
+  Future<void> _restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_listenedSincePrefsKey);
+      _since = saved == null ? null : DateTime.tryParse(saved);
+      if (_since == null) {
+        _since = DateTime.now();
+        await prefs.setString(_listenedSincePrefsKey, _since!.toIso8601String());
+      }
+      state = (prefs.getStringList(_listenedPrefsKey) ?? const []).toSet();
+    } catch (_) {}
+  }
+
+  bool isNew(String id, DateTime? sentAt) {
+    final since = _since;
+    return since != null && sentAt != null && sentAt.isAfter(since) && !state.contains(id);
+  }
+
+  void mark(String id) {
+    if (state.contains(id)) return;
+    state = {...state, id};
+    SharedPreferences.getInstance()
+        .then((prefs) {
+          final all = state.toList();
+          final keep = all.length > _listenedKeep ? all.sublist(all.length - _listenedKeep) : all;
+          return prefs.setStringList(_listenedPrefsKey, keep);
+        })
+        .catchError((_) => false);
+  }
+}
+
+final listenedVoiceProvider = NotifierProvider<ListenedVoice, Set<String>>(
+  ListenedVoice.new,
+);
+
 String speedLabel(double speed) =>
     '${speed == speed.roundToDouble() ? speed.toInt() : speed.toString().replaceAll('.', ',')}×';
 
@@ -1100,16 +1155,21 @@ class VoiceMessagePlayer extends ConsumerWidget {
     required this.filePath,
     required this.attachment,
     required this.mine,
+    this.sentAt,
   });
 
   final String messageId;
   final String filePath;
   final ChatAttachment attachment;
   final bool mine;
+  final DateTime? sentAt;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playback = ref.watch(voicePlaybackProvider);
+    ref.watch(listenedVoiceProvider);
+    // Чужое голосовое, которое ещё не слушали: точка у длительности.
+    final unheard = !mine && ref.read(listenedVoiceProvider.notifier).isNew(messageId, sentAt);
     final active = playback.playingId == messageId;
     final playing = active && !playback.paused;
     final total = active && playback.duration > Duration.zero
@@ -1130,7 +1190,10 @@ class VoiceMessagePlayer extends ConsumerWidget {
       child: Row(
         children: [
           InkResponse(
-            onTap: () => playback.toggle(messageId, filePath, speed: speed),
+            onTap: () {
+              if (!mine) ref.read(listenedVoiceProvider.notifier).mark(messageId);
+              playback.toggle(messageId, filePath, speed: speed);
+            },
             child: Container(
               width: 40,
               height: 40,
@@ -1190,14 +1253,30 @@ class VoiceMessagePlayer extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        active
-                            ? '${formatDuration(playback.position)} / ${formatDuration(total)}'
-                            : formatDuration(total),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: color.withValues(alpha: 0.75),
-                        ),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              active
+                                  ? '${formatDuration(playback.position)} / ${formatDuration(total)}'
+                                  : formatDuration(total),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: unheard ? FontWeight.w700 : FontWeight.w400,
+                                color: color.withValues(alpha: unheard ? 1 : 0.75),
+                              ),
+                            ),
+                          ),
+                          if (unheard) ...[
+                            const SizedBox(width: 5),
+                            Container(
+                              key: const ValueKey('voice-unheard'),
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     SpeedChip(

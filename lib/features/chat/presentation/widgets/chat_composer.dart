@@ -96,7 +96,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   Timer? _ticker;
 
   /// Кнопка справа показывает микрофон или кружок: тап переключает, удержание
-  /// 1,5 секунды начинает запись. Выбор помним между запусками.
+  /// 0,6 секунды начинает запись. Выбор помним между запусками.
   static const _modePref = 'composer.video_note_mode';
   bool _videoNoteMode = false;
 
@@ -124,8 +124,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           duration: const Duration(milliseconds: 1800),
           content: Text(
             next
-                ? 'Кружок. Удерживайте кнопку 1,5 секунды, чтобы записать'
-                : 'Голосовое. Удерживайте кнопку 1,5 секунды, чтобы записать',
+                ? 'Кружок. Удерживайте кнопку, чтобы записать'
+                : 'Голосовое. Удерживайте кнопку, чтобы записать',
           ),
         ),
       );
@@ -1180,7 +1180,9 @@ class HoldToRecordButton extends StatefulWidget {
     required this.onHold,
   });
 
-  static const holdDuration = Duration(milliseconds: 1500);
+  /// 0,6 с: 1,5 с оказалось слишком долго. Короче нельзя — случайное касание
+  /// не должно начинать запись, а обычный тап (переключение) заметно короче.
+  static const holdDuration = Duration(milliseconds: 600);
 
   final IconData icon;
   final String label;
