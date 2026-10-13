@@ -24,6 +24,8 @@ import '../domain/day_label.dart';
 import '../domain/timeline.dart';
 import '../live_location/live_location.dart';
 import '../live_location/live_location_screen.dart';
+import '../../stories/story_link.dart';
+import 'widgets/day_chip.dart';
 import '../data/reply_preview.dart';
 import '../domain/entities/chat_message.dart';
 import '../domain/entities/chat_meta.dart';
@@ -333,6 +335,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           },
           tooltip: 'Переслать',
           icon: const Icon(Icons.shortcut_rounded),
+        ),
+        IconButton(
+          key: const ValueKey('pick-delete'),
+          onPressed: () async {
+            final done = await deletePickedMessages(
+              context,
+              ref,
+              messages: messages,
+              myId: myId,
+              conversation: info,
+            );
+            if (done && mounted) _clearPick();
+          },
+          tooltip: 'Удалить',
+          icon: const Icon(Icons.delete_outline_rounded),
         ),
       ],
     );
@@ -808,7 +825,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Center(child: _DayChip(chatDayLabel(entry.at, DateTime.now()))),
+                          Center(child: DayChip(chatDayLabel(entry.at, DateTime.now()))),
                           tile,
                         ],
                       );
@@ -882,7 +899,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                     _openMenu(viewerContext, message, myId),
                                 onQuoteTap: message.replyTo == null
                                     ? null
-                                    : () => _jumpTo(message.replyTo!.messageId, items),
+                                    : () => message.replyTo!.messageId.startsWith(storyReplyPrefix)
+                                          ? openStoryFromReply(context, ref, message.replyTo!.messageId)
+                                          : _jumpTo(message.replyTo!.messageId, items),
                                 reactions: (reactions[message.id] ?? const []).isEmpty
                                     ? null
                                     : ReactionChips(
@@ -906,7 +925,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Center(child: _DayChip(chatDayLabel(message.sentAt, DateTime.now()))),
+                        Center(child: DayChip(chatDayLabel(message.sentAt, DateTime.now()))),
                         shown,
                       ],
                     );
@@ -964,7 +983,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                           builder: (context, state, _) => AnimatedOpacity(
                             duration: const Duration(milliseconds: 200),
                             opacity: state.visible && state.day != null ? 1 : 0,
-                            child: Center(child: _DayChip(state.day ?? '')),
+                            child: Center(child: DayChip(state.day ?? '')),
                           ),
                         ),
                       ),
@@ -1607,28 +1626,3 @@ class _VanishState extends State<_Vanish> with SingleTickerProviderStateMixin {
   }
 }
 
-class _DayChip extends StatelessWidget {
-  const _DayChip(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          child: Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-          ),
-        ),
-      ),
-    );
-  }
-}

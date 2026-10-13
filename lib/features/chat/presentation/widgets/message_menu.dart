@@ -955,6 +955,93 @@ Future<void> forwardPickedMessages(
   messenger.showSnackBar(SnackBar(content: Text(forwardSummary(result, all))));
 }
 
+/// Несколько выбранных сообщений: удалить. Свои (и всё, что можно удалить у
+/// всех по тем же правилам, что и одиночное) уходят у всех, если оставить
+/// галочку; остальное скрывается только у вас. Если у всех удалять нечего —
+/// без вопросов скрывается у вас с «Отменить».
+Future<bool> deletePickedMessages(
+  BuildContext context,
+  WidgetRef ref, {
+  required List<ChatMessage> messages,
+  required String myId,
+  required Conversation? conversation,
+}) async {
+  if (messages.isEmpty) return false;
+  final messenger = ScaffoldMessenger.of(context);
+  final hidden = ref.read(hiddenMessagesProvider.notifier);
+  final isDirect = conversation?.isDirect ?? true;
+  final everyone = [
+    for (final m in messages)
+      if (canDeleteForEveryone(
+        m,
+        myId: myId,
+        isDirect: isDirect,
+        isGroupOwner: conversation?.isOwner ?? false,
+      ))
+        m,
+  ];
+  final ids = [for (final m in messages) m.id];
+
+  final forEveryone = everyone.isEmpty
+      ? false
+      : await showDialog<bool>(
+          context: context,
+          useRootNavigator: true,
+          builder: (_) => _DeleteDialog(
+            title: 'Удалить ${messages.length} ${_messagesWord(messages.length)}?',
+            everyoneLabel: (isDirect && conversation != null
+                    ? 'Удалить и у ${conversation.displayName}'
+                    : 'Удалить у всех участников') +
+                (everyone.length == messages.length ? '' : ' (${everyone.length} из ${messages.length})'),
+          ),
+        );
+  if (forEveryone == null) return false;
+
+  hidden.hide(ids);
+  if (!forEveryone) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Скрыто у вас: ${messages.length}'),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(label: 'Отменить', onPressed: () => hidden.unhide(ids)),
+      ),
+    );
+    return true;
+  }
+
+  try {
+    final deleted = await ref.read(chatRepositoryProvider).deleteForEveryone(everyone);
+    final failed = [for (final m in everyone) if (!deleted.contains(m.id)) m.id];
+    if (failed.isNotEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('У всех удалилось не всё: ${failed.length} скрыто только у вас')),
+      );
+    }
+    ref.invalidate(conversationsProvider);
+  } catch (error) {
+    AppLog.add('Массовое удаление: $error');
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          error is ChatDeleteUnavailable
+              ? error.toString()
+              : friendlyError(error, fallback: 'Не удалось удалить у всех'),
+        ),
+        action: SnackBarAction(label: 'Вернуть', onPressed: () => hidden.unhide(ids)),
+      ),
+    );
+  }
+  return true;
+}
+
+String _messagesWord(int n) {
+  final mod10 = n % 10;
+  final mod100 = n % 100;
+  if (mod10 == 1 && mod100 != 11) return 'сообщение';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'сообщения';
+  return 'сообщений';
+}
+
 Future<bool> _delete(
   BuildContext context,
   WidgetRef ref, {
@@ -1035,9 +1122,10 @@ Future<bool> _delete(
 /// «Удалить сообщение?» с галочкой «и у собеседника». Галочка включена:
 /// удаляя своё, почти всегда хотят убрать его и у другого.
 class _DeleteDialog extends StatefulWidget {
-  const _DeleteDialog({required this.everyoneLabel});
+  const _DeleteDialog({required this.everyoneLabel, this.title = 'Удалить сообщение?'});
 
   final String everyoneLabel;
+  final String title;
 
   @override
   State<_DeleteDialog> createState() => _DeleteDialogState();
@@ -1049,7 +1137,7 @@ class _DeleteDialogState extends State<_DeleteDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Удалить сообщение?'),
+      title: Text(widget.title),
       contentPadding: const EdgeInsets.fromLTRB(12, 16, 24, 0),
       content: CheckboxListTile(
         value: _everyone,

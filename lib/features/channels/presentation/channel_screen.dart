@@ -18,7 +18,9 @@ import '../../chat/presentation/providers/chat_notify_providers.dart';
 import '../../chat/presentation/widgets/message_menu.dart';
 import '../../chat/presentation/providers/chat_providers.dart';
 import '../../chat/presentation/widgets/chat_composer.dart';
+import '../../chat/domain/day_label.dart';
 import '../../chat/presentation/widgets/chat_notify_sheet.dart';
+import '../../chat/presentation/widgets/day_chip.dart';
 import '../../chat/presentation/widgets/swipe_back.dart';
 import '../data/channels_repository.dart';
 import 'providers/channel_providers.dart';
@@ -76,6 +78,52 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         ? (-position.viewportDimension + 80).clamp(position.minScrollExtent, 0.0)
         : position.minScrollExtent;
     _scroll.animateTo(target, duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
+  }
+
+  /// Листают — сверху плавает дата верхнего видимого поста (как в чатах);
+  /// перестали — через секунду она уходит.
+  final _floating = ValueNotifier<({String? day, bool visible})>((day: null, visible: false));
+  Timer? _floatingHide;
+  DateTime _floatingChecked = DateTime(0);
+
+  void _onFeedScroll(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final now = DateTime.now();
+      if (now.difference(_floatingChecked) > const Duration(milliseconds: 120)) {
+        _floatingChecked = now;
+        final day = _topVisibleDay();
+        final current = _floating.value;
+        if (day != current.day || !current.visible) {
+          _floating.value = (day: day, visible: day != null);
+        }
+      }
+      _floatingHide?.cancel();
+    } else if (notification is ScrollEndNotification) {
+      _floatingHide?.cancel();
+      _floatingHide = Timer(const Duration(seconds: 1), () {
+        final state = _floating.value;
+        if (mounted && state.visible) _floating.value = (day: state.day, visible: false);
+      });
+    }
+  }
+
+  String? _topVisibleDay() {
+    final box = _viewKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.attached || !box.hasSize) return null;
+    final top = box.localToGlobal(Offset.zero).dy;
+    DateTime? best;
+    var bestY = double.infinity;
+    for (final probe in _probes) {
+      final item = probe.context.findRenderObject();
+      if (item is! RenderBox || !item.attached || !item.hasSize) continue;
+      final y = item.localToGlobal(Offset.zero).dy;
+      // Верхний из постов, чей низ ещё виден.
+      if (y + item.size.height > top && y < bestY) {
+        bestY = y;
+        best = probe.widget.sentAt;
+      }
+    }
+    return best == null ? null : chatDayLabel(best, DateTime.now());
   }
 
   final _probes = <_SeenProbeState>{};
@@ -137,6 +185,8 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
   @override
   void dispose() {
     _seenTimer?.cancel();
+    _floatingHide?.cancel();
+    _floating.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -433,8 +483,9 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         final feed = RefreshIndicator(
           onRefresh: () => ref.read(channelPostsProvider(widget.channelId).notifier).refreshTop(),
           child: NotificationListener<ScrollNotification>(
-            onNotification: (_) {
+            onNotification: (notification) {
               _scheduleSeen();
+              _onFeedScroll(notification);
               return false;
             },
             child: KeyedSubtree(
@@ -467,6 +518,21 @@ class _ChannelScreenState extends ConsumerState<ChannelScreen> {
         return Stack(
           children: [
             Positioned.fill(child: feed),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: ValueListenableBuilder(
+                  valueListenable: _floating,
+                  builder: (context, state, _) => AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: state.visible && state.day != null ? 1 : 0,
+                    child: Center(child: DayChip(state.day ?? '')),
+                  ),
+                ),
+              ),
+            ),
             Positioned(
               right: 16,
               bottom: 16 + _bottomInset,
