@@ -40,6 +40,8 @@ class LocalFeedRepository implements FeedRepository {
     final visible = _posts.where(
       (post) =>
           _visible(post) &&
+          // Общая лента без «только мне», даже своих: они в профиле.
+          (authorId != null || post.visibility != PostVisibility.onlyMe) &&
           (authorId == null || post.authorId == authorId) &&
           (wanted == null ||
               extractHashtags('${post.title ?? ''} ${post.body ?? ''}').contains(wanted)),

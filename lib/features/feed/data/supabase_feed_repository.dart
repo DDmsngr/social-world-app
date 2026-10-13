@@ -29,9 +29,10 @@ class SupabaseFeedRepository implements FeedRepository {
     if (forYou && authorId == null && city == null && tag == null) {
       try {
         final rows = await _client.rpc('for_you_feed', params: {'in_limit': limit}) as List<dynamic>;
-        return rows
-            .map((row) => _fromRow(row as Map<String, dynamic>))
-            .toList(growable: false);
+        return _withoutPrivate(
+          rows.map((row) => _fromRow(row as Map<String, dynamic>)),
+          authorId,
+        );
       } on PostgrestException catch (error) {
         // До миграции 0048 функции нет — показываем обычную ленту.
         if (error.code != 'PGRST202') rethrow;
@@ -49,10 +50,18 @@ class SupabaseFeedRepository implements FeedRepository {
       },
     ) as List<dynamic>;
 
-    return rows
-        .map((row) => _fromRow(row as Map<String, dynamic>))
-        .toList(growable: false);
+    return _withoutPrivate(
+      rows.map((row) => _fromRow(row as Map<String, dynamic>)),
+      authorId,
+    );
   }
+
+  /// Сервер отдаёт автору и его посты «только мне». В общей ленте (Flow, город,
+  /// хештег) им не место: человек видит их только у себя в профиле.
+  List<Post> _withoutPrivate(Iterable<Post> posts, String? authorId) => [
+    for (final post in posts)
+      if (authorId != null || post.visibility != PostVisibility.onlyMe) post,
+  ];
 
   @override
   Future<List<({String tag, int posts})>> trendingHashtags({int limit = 15}) async {

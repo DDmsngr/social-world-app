@@ -16,9 +16,11 @@ abstract final class ClickPlayer {
         AudioContext(
           android: const AudioContextAndroid(
             audioFocus: AndroidAudioFocus.none,
-            // Поток уведомлений: «системные звуки» интерфейса на многих
-            // телефонах выключены, и звук пропадал.
-            usageType: AndroidUsageType.notificationCommunicationInstant,
+            // Громкость медиа. Раньше стоял поток уведомлений (системные звуки
+            // на многих телефонах выключены), но и он глохнет при «Не
+            // беспокоить» и нулевой громкости уведомлений: щелчки и звук
+            // отправки пропадали целиком. Медиа-поток этого не касается.
+            usageType: AndroidUsageType.media,
             contentType: AndroidContentType.sonification,
           ),
           iOS: AudioContextIOS(

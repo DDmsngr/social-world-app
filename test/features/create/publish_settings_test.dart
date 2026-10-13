@@ -69,4 +69,21 @@ void main() {
     me = 'stranger';
     expect((await repo.loadFeed()).any((p) => p.id == secret.id), isFalse);
   });
+
+  test('«только мне» не показывается в общей ленте даже автору, но есть в его профиле', () async {
+    const me = 'me';
+    final repo = LocalFeedRepository(currentUserId: () => me, currentUserName: () => 'Я');
+    final secret = await repo.createPost(
+      body: 'секрет',
+      settings: const PublishSettings(visibility: PostVisibility.onlyMe),
+    );
+    final open = await repo.createPost(body: 'открытый');
+
+    final feed = await repo.loadFeed();
+    expect(feed.map((p) => p.id), contains(open.id));
+    expect(feed.map((p) => p.id), isNot(contains(secret.id)));
+
+    final profile = await repo.loadFeed(authorId: me);
+    expect(profile.map((p) => p.id), containsAll([open.id, secret.id]));
+  });
 }
