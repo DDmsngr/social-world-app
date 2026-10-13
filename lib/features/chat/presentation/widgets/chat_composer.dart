@@ -521,7 +521,16 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
           }
 
           rename('$label (сжимаем)');
-          sendPath = (await VideoCompressor.compress(path)).path;
+          var lastPercent = -1;
+          sendPath = (await VideoCompressor.compress(
+            path,
+            onProgress: (p) {
+              final percent = (p * 100).round();
+              if (percent == lastPercent) return;
+              lastPercent = percent;
+              rename('$label (сжимаем $percent%)');
+            },
+          )).path;
           rename(label);
         }
       }

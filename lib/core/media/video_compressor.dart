@@ -8,8 +8,14 @@ import 'file_too_large.dart';
 
 /// Ролики тяжелее этого сжимаются на телефоне перед отправкой: хранилище не
 /// принимает файлы больше 50 МБ, а ролик с камеры за полминуты легко весит
-/// сотню. Лёгкие ролики уходят как есть, без потери качества.
-const compressVideoAboveBytes = 20 * 1024 * 1024;
+/// сотню. Лёгкие ролики уходят как есть, без потери качества и без ожидания:
+/// сжатие на телефоне — десятки секунд, а до предела хранилища (49 МБ) ролик
+/// в 40 МБ ещё влезает.
+const compressVideoAboveBytes = 40 * 1024 * 1024;
+
+/// Совсем тяжёлый исходник в 720p почти наверняка не влезет в предел, и второй
+/// проход съел бы вдвое больше времени: такие сразу сжимаем в 480p.
+const compressStraightTo480Above = 150 * 1024 * 1024;
 
 /// Исходный ролик тяжелее этого не берём: сжимать его на телефоне слишком долго.
 const maxVideoSourceBytes = 500 * 1024 * 1024;
@@ -36,9 +42,12 @@ abstract final class VideoCompressor {
 
   /// Возвращает сжатый файл. Исходный не трогает. [onProgress] — доля 0–1.
   static Future<File> compress(String path, {void Function(double)? onProgress}) async {
-    var file = await _pass(path, VideoQuality.Res1280x720Quality, onProgress);
+    final source = await File(path).length();
+    var file = source > compressStraightTo480Above
+        ? await _pass(path, VideoQuality.Res640x480Quality, onProgress)
+        : await _pass(path, VideoQuality.Res1280x720Quality, onProgress);
     var size = await file.length();
-    if (size > maxUploadBytes) {
+    if (size > maxUploadBytes && source <= compressStraightTo480Above) {
       AppLog.add('Сжатие 720p дало ${size ~/ (1024 * 1024)} МБ, пробуем 480p');
       file = await _pass(file.path, VideoQuality.Res640x480Quality, null);
       size = await file.length();
