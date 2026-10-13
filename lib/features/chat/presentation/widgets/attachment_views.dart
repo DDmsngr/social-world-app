@@ -691,7 +691,16 @@ class VideoPreview extends ConsumerStatefulWidget {
   ConsumerState<VideoPreview> createState() => _VideoPreviewState();
 }
 
+// Предел пропорций рамки: совсем узкий ролик не должен вытягивать пузырь выше
+// экрана, а панорама — становиться ниткой.
+const _minAspect = 0.6;
+const _maxAspect = 1.78;
+
 class _VideoPreviewState extends ConsumerState<VideoPreview> {
+  /// Пропорции уже открывавшихся роликов по id сообщения: при прокрутке ленты
+  /// пузырь не должен каждый раз возвращаться в 16:9 и прыгать.
+  static final _knownAspect = <String, double>{};
+
   Timer? _delay;
   VideoPlayerController? _controller;
   String? _path;
@@ -733,6 +742,10 @@ class _VideoPreviewState extends ConsumerState<VideoPreview> {
       if (!mounted) {
         await controller.dispose();
         return path;
+      }
+      final ratio = controller.value.aspectRatio;
+      if (ratio.isFinite && ratio > 0) {
+        _knownAspect[widget.message.id] = ratio.clamp(_minAspect, _maxAspect);
       }
       setState(() {
         _controller = controller;
@@ -779,7 +792,9 @@ class _VideoPreviewState extends ConsumerState<VideoPreview> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: AspectRatio(
-            aspectRatio: widget.aspectRatio,
+            // Вертикальный ролик — вертикальная рамка. Пока пропорции
+            // неизвестны (тяжёлый ролик ещё не открывали), держим 16:9.
+            aspectRatio: _knownAspect[widget.message.id] ?? widget.aspectRatio,
             child: Stack(
               fit: StackFit.expand,
               children: [
