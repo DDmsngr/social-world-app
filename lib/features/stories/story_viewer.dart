@@ -74,7 +74,13 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   late List<StoryGroup> _groups = [...widget.groups];
   late int _g = widget.initialGroup;
   late int _s = _groups[_g].startIndex;
-  late final AnimationController _progress = AnimationController(vsync: this)
+  // preserve: это таймер показа, а не украшение. У тех, кто отключил анимации
+  // в системе или включил экономию батареи, обычный контроллер проматывается
+  // почти мгновенно, и блик закрывается через долю секунды.
+  late final AnimationController _progress = AnimationController(
+    vsync: this,
+    animationBehavior: AnimationBehavior.preserve,
+  )
     ..addStatusListener((status) {
       if (status == AnimationStatus.completed) _next();
     });
