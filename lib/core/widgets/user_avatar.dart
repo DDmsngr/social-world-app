@@ -27,7 +27,10 @@ void openProfile(BuildContext context, String userId) =>
 /// входа ([AvatarRings.load]); без него аватары просто без каймы.
 enum AvatarRing {
   gold(Color(0xFFC7A660)),
-  green(Color(0xFF5E9E73));
+  green(Color(0xFF5E9E73)),
+
+  /// Виртуальные авторы ChaWo (0090): честная метка «это не человек».
+  violet(Color(0xFF8E7CC3));
 
   const AvatarRing(this.color);
 
@@ -44,6 +47,7 @@ abstract final class AvatarRings {
       final ring = switch (row['ring']) {
         'gold' => AvatarRing.gold,
         'green' => AvatarRing.green,
+        'violet' => AvatarRing.violet,
         _ => null,
       };
       if (ring != null) rings[row['profile_id'] as String] = ring;

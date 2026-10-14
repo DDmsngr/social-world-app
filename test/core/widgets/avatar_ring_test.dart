@@ -18,6 +18,7 @@ void main() {
     AvatarRings.set([
       {'profile_id': 'lesha', 'ring': 'gold'},
       {'profile_id': 'artur', 'ring': 'green'},
+      {'profile_id': 'sonya', 'ring': 'violet'},
     ]);
     Future<void> show(String id) => tester.pumpWidget(
       MaterialApp(home: Center(child: UserAvatar(name: 'А', ringUserId: id))),
@@ -27,6 +28,8 @@ void main() {
     expect(_ringOf(tester)?.top.color, AvatarRing.gold.color);
     await show('artur');
     expect(_ringOf(tester)?.top.color, AvatarRing.green.color);
+    await show('sonya');
+    expect(_ringOf(tester)?.top.color, AvatarRing.violet.color);
     await show('vika');
     expect(_ringOf(tester), isNull);
   });
