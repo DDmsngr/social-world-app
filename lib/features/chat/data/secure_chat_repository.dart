@@ -281,6 +281,8 @@ class SecureChatRepository implements ChatRepository {
         feed.peerLastReadAt = await _peerLastReadAt(
           conversationId,
         ).timeout(_netTimeout);
+      } else {
+        feed.peerLastReadAt = await _groupLastReadAt(conversationId);
       }
       final rows = await _client
           .from('chat_messages')
@@ -337,7 +339,29 @@ class SecureChatRepository implements ChatRepository {
       );
     }
     final members = await loadMembers(conversationId).timeout(_netTimeout);
-    return _Feed.group({for (final member in members) member.id: member.name});
+    return _Feed.group({for (final member in members) member.id: member.name})
+      ..peerLastReadAt = await _groupLastReadAt(conversationId);
+  }
+
+  /// Самая свежая отметка «прочитано» среди остальных участников группы:
+  /// сообщение считается прочитанным, когда его увидел хотя бы один из них.
+  Future<DateTime?> _groupLastReadAt(String conversationId) async {
+    try {
+      final row = await _client
+          .from('chat_members')
+          .select('last_read_at')
+          .eq('conversation_id', conversationId)
+          .neq('profile_id', currentUserId)
+          .not('last_read_at', 'is', null)
+          .order('last_read_at', ascending: false)
+          .limit(1)
+          .maybeSingle()
+          .timeout(_netTimeout);
+      return _date(row?['last_read_at']);
+    } catch (error) {
+      AppLog.add('Отметка прочтения группы не загрузилась: $error');
+      return null;
+    }
   }
 
   Future<List<ChatMessage>> _decodeBatch(
@@ -389,6 +413,13 @@ class SecureChatRepository implements ChatRepository {
         names[p['id'] as String] = p['display_name'] as String? ?? 'Участник';
       }
     }
+    // Кто-то из группы написал после моего сообщения — значит, видел его.
+    var seen = feed.peerLastReadAt;
+    for (final row in rows) {
+      if (row['sender_id'] == currentUserId) continue;
+      final at = DateTime.tryParse('${row['sent_at']}')?.toLocal();
+      if (at != null && (seen == null || at.isAfter(seen))) seen = at;
+    }
     return [
       for (final row in rows)
         ChatMessage(
@@ -397,6 +428,7 @@ class SecureChatRepository implements ChatRepository {
           senderId: row['sender_id'] as String,
           senderName: names[row['sender_id']] ?? 'Участник',
           sentAt: DateTime.parse(row['sent_at'] as String).toLocal(),
+          status: _status(DateTime.parse(row['sent_at'] as String).toLocal(), seen),
           kind: MessageKind.parse(row['kind']),
           text: row['body'] as String?,
           attachment: ChatAttachment.fromJson(row['media']),

@@ -47,6 +47,9 @@ class _StickerPackScreenState extends ConsumerState<StickerPackScreen> {
     final fromChat = widget.highlight != null && Navigator.of(context).canPop();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        // С кнопкой плашка по умолчанию не уходит сама.
+        persist: false,
+        duration: const Duration(seconds: 3),
         content: Text('Пак «${pack.title}» в ваших стикерах'),
         action: fromChat
             ? SnackBarAction(label: 'К переписке', onPressed: () => Navigator.of(context).maybePop())

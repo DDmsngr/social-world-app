@@ -346,6 +346,20 @@ class ChannelsRepository {
         params: {'in_channel': channelId, 'in_profile': profileId, 'in_approve': approve},
       );
 
+  /// До какого поста человек дочитал по данным сервера: так канал открывается
+  /// на нужном месте и после переустановки, и если читал с другого телефона.
+  Future<DateTime?> myLastReadAt(String channelId) async {
+    final me = _client.auth.currentUser?.id;
+    if (me == null) return null;
+    final row = await _client
+        .from('chat_members')
+        .select('last_read_at')
+        .match({'conversation_id': channelId, 'profile_id': me})
+        .maybeSingle();
+    final raw = row?['last_read_at'];
+    return raw is String ? DateTime.tryParse(raw) : null;
+  }
+
   /// Отметка «прочитано до сих пор» — сбрасывает счётчик в списке чатов.
   /// Прочитано до [until] — самого свежего поста, побывавшего на экране.
   /// Только вперёд: прокрутка к старым постам прочитанное не откатывает.

@@ -59,14 +59,20 @@ class ChannelPostsController extends AsyncNotifier<List<ChannelPost>> {
   @override
   Future<List<ChannelPost>> build() async {
     final repo = ref.watch(channelsRepositoryProvider);
-    final seen = await ChannelSeen.load(channelId);
+    var seen = await ChannelSeen.load(channelId);
+    // Место на сервере бывает дальше (читали с другого телефона) или единственным
+    // (переустановка, первый заход после обновления) — берём более позднее.
+    try {
+      final server = await repo.myLastReadAt(channelId);
+      if (server != null && (seen == null || server.isAfter(seen))) seen = server;
+    } catch (_) {}
     var items = await repo.posts(channelId);
     _hasMore = items.length >= 30;
     anchor = null;
     if (seen != null && items.isNotEmpty && items.first.message.sentAt.isAfter(seen)) {
       // Есть непрочитанное: докручиваем историю до места, где остановились
       // (с запасом по числу страниц, чтобы не качать весь канал).
-      while (_hasMore && items.last.message.sentAt.isAfter(seen) && items.length < 400) {
+      while (_hasMore && items.last.message.sentAt.isAfter(seen) && items.length < 1500) {
         final page = await repo.posts(channelId, before: items.last.message.sentAt);
         _hasMore = page.length >= 30;
         items = [...items, ...page];
