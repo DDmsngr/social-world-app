@@ -496,13 +496,14 @@ class SecureChatRepository implements ChatRepository {
     SendOptions options = SendOptions.none,
   }) async {
     final clean = text.trim();
-    final id = _uuid.v4();
+    final id = options.messageId ?? _uuid.v4();
     await _insert(
       id: id,
       conversationId: conversationId,
       kind: kind,
       text: clean,
       options: options,
+      retry: options.messageId != null,
     );
     return ChatMessage(
       id: id,
@@ -783,6 +784,7 @@ class SecureChatRepository implements ChatRepository {
     String? text,
     ChatAttachment? attachment,
     SendOptions options = SendOptions.none,
+    bool retry = false,
   }) async {
     final row = await _buildRow(
       id: id,
@@ -795,6 +797,11 @@ class SecureChatRepository implements ChatRepository {
     try {
       await _client.from('chat_messages').insert(row);
     } on PostgrestException catch (error) {
+      // Повтор с тем же id: первая отправка уже дошла, потерялся только ответ.
+      if (retry && error.code == '23505') {
+        AppLog.add('Повтор отправки: сообщение $id уже доставлено');
+        return;
+      }
       // Колонок meta/silent ещё нет — не накатана миграция 0034. Сообщение
       // должно уйти в любом случае: без цитаты и без «тихого» флага.
       final missingColumn = error.code == 'PGRST204';

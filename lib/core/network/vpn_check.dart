@@ -9,6 +9,8 @@ import 'package:flutter/foundation.dart';
 /// висят на исчезнувшей сети, и карта с сервером перестают отвечать — тогда
 /// помогает перезапуск приложения.
 Future<bool> isVpnActive() async {
+  final override = vpnCheckOverride;
+  if (override != null) return override();
   if (kIsWeb) return false;
   try {
     final interfaces = await NetworkInterface.list();
@@ -19,3 +21,7 @@ Future<bool> isVpnActive() async {
     return false;
   }
 }
+
+/// В тестах системного списка сетевых интерфейсов нет: ответ задаёт тест.
+@visibleForTesting
+Future<bool> Function()? vpnCheckOverride;

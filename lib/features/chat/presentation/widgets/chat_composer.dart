@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:uuid/uuid.dart';
+
 import '../../../../core/audio/send_sound.dart';
 import '../../../../core/router/app_router.dart';
 import 'package:path_provider/path_provider.dart';
@@ -84,6 +86,14 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   final _recorder = AudioRecorder();
 
   bool _sendingText = false;
+
+  /// Черновик, отправка которого не подтвердилась (тайм-аут, обрыв): повтор того
+  /// же текста уходит с тем же id, чтобы не вышло два одинаковых сообщения,
+  /// если первое всё-таки дошло.
+  ({String text, String id})? _unconfirmed;
+
+  String _idFor(String text) =>
+      _unconfirmed != null && _unconfirmed!.text == text ? _unconfirmed!.id : const Uuid().v4();
   String? _error;
 
   /// Что сейчас загружается — показывается полоской над полем.
@@ -275,6 +285,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       _sendingText = true;
       _error = null;
     });
+    final messageId = _idFor(text);
+    _unconfirmed = (text: text, id: messageId);
     try {
       // Каналы и обычные чаты: карточка ссылки достаётся здесь, на телефоне
       // отправителя, и едет внутри сообщения. Не вышло — уходит просто текст.
@@ -289,9 +301,11 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               silent: silent,
               linkPreview: preview,
               customEmoji: emoji,
+              messageId: messageId,
             ),
           )
           .timeout(sendTimeout);
+      _unconfirmed = null;
       _controller.clear();
       ref.read(typingHubProvider(widget.conversationId))?.stop();
       widget.onReplyCleared?.call();
@@ -337,6 +351,9 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       _sendingText = true;
       _error = null;
     });
+    final key = 'sticker:${sticker.id}';
+    final messageId = _idFor(key);
+    _unconfirmed = (text: key, id: messageId);
     try {
       await ref
           .read(chatRepositoryProvider)
@@ -344,9 +361,10 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
             conversationId: widget.conversationId,
             text: sticker.emoji,
             kind: MessageKind.sticker,
-            options: SendOptions(replyTo: widget.replyTo, sticker: sticker.id),
+            options: SendOptions(replyTo: widget.replyTo, sticker: sticker.id, messageId: messageId),
           )
           .timeout(sendTimeout);
+      _unconfirmed = null;
       if (clearText) {
         _controller.clear();
         ref.read(typingHubProvider(widget.conversationId))?.stop();

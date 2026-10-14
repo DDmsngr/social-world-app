@@ -185,9 +185,16 @@ class SendOptions {
     this.linkPreview,
     this.sticker,
     this.customEmoji = const [],
+    this.messageId,
   });
 
   static const none = SendOptions();
+
+  /// Id сообщения, выбранный заранее. Нужен для повторной отправки того же
+  /// черновика: первая попытка могла дойти до сервера, а ответ потеряться
+  /// (слабая связь, тайм-аут). С тем же id повтор не создаёт второе сообщение:
+  /// сервер отвечает «такой id уже есть», и это считается успехом.
+  final String? messageId;
 
   final ChatReply? replyTo;
   final String? forwardedFrom;
