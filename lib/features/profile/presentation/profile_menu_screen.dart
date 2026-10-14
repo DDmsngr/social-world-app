@@ -16,6 +16,7 @@ class ProfileMenuScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final assistant = ref.watch(isAssistantOwnerProvider).value == true;
+    final tester = ref.watch(isTesterProvider).value == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -66,6 +67,12 @@ class ProfileMenuScreen extends ConsumerWidget {
               icon: Icons.support_agent,
               title: 'Помощник',
               onTap: () => context.push(Routes.assistant),
+            ),
+          if (tester)
+            _MenuTile(
+              icon: Icons.bug_report_outlined,
+              title: 'Для багов',
+              onTap: () => context.push(Routes.bugs),
             ),
         ],
       ),

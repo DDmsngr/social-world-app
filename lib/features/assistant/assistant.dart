@@ -7,6 +7,17 @@ import '../../core/config/env.dart';
 import '../../core/debug/app_log.dart';
 import '../auth/presentation/providers/auth_providers.dart';
 
+/// Чат «Помощник» у владельца проекта или «Для багов» у тестировщика
+/// (миграция 0086): одна таблица, разные каналы.
+enum AssistantChannel {
+  assistant('assistant'),
+  bugs('bugs');
+
+  const AssistantChannel(this.wire);
+
+  final String wire;
+}
+
 /// Сообщение в чате «Помощник»: либо от человека, либо ответ Claude из сессии.
 class AssistantMessage {
   const AssistantMessage({
@@ -49,9 +60,28 @@ class AssistantRepository {
   Future<bool> isOwner() async =>
       (await _client.rpc('is_assistant_owner')) == true;
 
-  Stream<List<AssistantMessage>> watch() => _client
+  /// Кем человек приходится проекту. До миграции 0086 функции нет — тогда
+  /// спрашиваем по-старому, только про владельца.
+  Future<({bool owner, bool tester})> roles() async {
+    try {
+      final raw = Map<String, dynamic>.from(await _client.rpc('my_app_roles') as Map);
+      return (owner: raw['owner'] == true, tester: raw['tester'] == true);
+    } on PostgrestException {
+      return (owner: await isOwner(), tester: false);
+    }
+  }
+
+  /// Назначить или снять тестировщика — только владелец (проверяет сервер).
+  Future<void> setTester(String profileId, bool on) =>
+      _client.rpc('set_app_tester', params: {'in_profile': profileId, 'in_on': on});
+
+  Future<bool> isTester(String profileId) async =>
+      (await _client.rpc('is_profile_tester', params: {'in_profile': profileId})) == true;
+
+  Stream<List<AssistantMessage>> watch(AssistantChannel channel) => _client
       .from('assistant_messages')
       .stream(primaryKey: ['id'])
+      .eq('channel', channel.wire)
       .order('created_at')
       .map(
         (rows) => [for (final row in rows) AssistantMessage.fromRow(row)]
@@ -61,7 +91,11 @@ class AssistantRepository {
       );
 
   /// [imagePath] — локальный файл скриншота, если он приложен.
-  Future<void> send({String? text, String? imagePath}) async {
+  Future<void> send({
+    String? text,
+    String? imagePath,
+    AssistantChannel channel = AssistantChannel.assistant,
+  }) async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) throw const AuthException('Нет активной сессии');
 
@@ -77,6 +111,7 @@ class AssistantRepository {
     final body = text?.trim();
     await _client.from('assistant_messages').insert({
       'from_user': true,
+      if (channel == AssistantChannel.bugs) ...{'channel': channel.wire, 'author_id': uid},
       'body': body == null || body.isEmpty ? null : body,
       'attachment_path': remote,
     });
@@ -109,22 +144,33 @@ final assistantRepositoryProvider = Provider<AssistantRepository?>((ref) {
   return AssistantRepository(Supabase.instance.client);
 });
 
-/// Показывать ли чат «Помощник»: только аккаунту-владельцу, это решает сервер.
-final isAssistantOwnerProvider = FutureProvider<bool>((ref) async {
+/// Роли человека в проекте: владелец видит «Помощник», тестировщик — «Для
+/// багов». Решает сервер.
+final appRolesProvider = FutureProvider<({bool owner, bool tester})>((ref) async {
   ref.keepAlive();
   final repo = ref.watch(assistantRepositoryProvider);
-  if (repo == null || ref.watch(currentUserProvider) == null) return false;
+  if (repo == null || ref.watch(currentUserProvider) == null) return (owner: false, tester: false);
   try {
-    return await repo.isOwner();
+    return await repo.roles();
   } catch (error) {
-    AppLog.add('Проверка «Помощника» не прошла: $error');
-    return false;
+    AppLog.add('Проверка ролей не прошла: $error');
+    return (owner: false, tester: false);
   }
 });
 
+/// Показывать ли чат «Помощник»: только аккаунту-владельцу.
+final isAssistantOwnerProvider = FutureProvider<bool>(
+  (ref) async => (await ref.watch(appRolesProvider.future)).owner,
+);
+
+/// Показывать ли «Для багов»: только тестировщику.
+final isTesterProvider = FutureProvider<bool>(
+  (ref) async => (await ref.watch(appRolesProvider.future)).tester,
+);
+
 final assistantMessagesProvider =
-    StreamProvider.autoDispose<List<AssistantMessage>>((ref) {
+    StreamProvider.autoDispose.family<List<AssistantMessage>, AssistantChannel>((ref, channel) {
       final repo = ref.watch(assistantRepositoryProvider);
       if (repo == null) return const Stream.empty();
-      return repo.watch();
+      return repo.watch(channel);
     });

@@ -52,6 +52,7 @@ import '../../features/profile/domain/profile_models.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/profile/presentation/follow_list_screen.dart';
 import '../../features/profile/presentation/user_profile_screen.dart';
+import '../../features/assistant/assistant.dart';
 import '../../features/assistant/assistant_screen.dart';
 import '../../features/feed/presentation/hashtag_screen.dart';
 import '../../features/migration/import_screen.dart';
@@ -119,6 +120,9 @@ abstract final class Routes {
   static const user = '/users';
   static const saved = '/saved';
   static const assistant = '/assistant';
+
+  /// «Для багов» тестировщика (0086).
+  static const bugs = '/bugs';
   static const importData = '/profile/import';
   static const profileMenu = '/profile/menu';
 
@@ -407,6 +411,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: Routes.saved, builder: (_, _) => const SavedScreen()),
       GoRoute(path: Routes.assistant, builder: (_, _) => const AssistantScreen()),
+      GoRoute(
+        path: Routes.bugs,
+        builder: (_, _) => const AssistantScreen(channel: AssistantChannel.bugs),
+      ),
       GoRoute(path: Routes.importData, builder: (_, _) => const ImportScreen()),
       GoRoute(path: Routes.profileMenu, builder: (_, _) => const ProfileMenuScreen()),
       GoRoute(path: Routes.invites, builder: (_, _) => const InvitesScreen()),

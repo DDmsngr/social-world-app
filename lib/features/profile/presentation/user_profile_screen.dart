@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../assistant/assistant.dart';
 import '../../../core/config/feature_flags.dart';
 import '../../../core/debug/app_log.dart';
 import '../../../core/errors/friendly_error.dart';
@@ -162,6 +163,8 @@ class _OtherMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final blocked = profile.blockKind != null;
+    final owner = ref.watch(isAssistantOwnerProvider).value == true;
+    final isTester = owner && (ref.watch(profileTesterProvider(profile.id)).value ?? false);
 
     return PopupMenuButton<String>(
       tooltip: 'Действия',
@@ -190,6 +193,29 @@ class _OtherMenu extends ConsumerWidget {
               avatarUrl: profile.avatarUrl,
               kind: value == 'block' ? BlockKind.block : BlockKind.mute,
             );
+          case 'tester-on' || 'tester-off':
+            final on = value == 'tester-on';
+            try {
+              await ref.read(assistantRepositoryProvider)?.setTester(profile.id, on);
+              ref.invalidate(profileTesterProvider(profile.id));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      on
+                          ? '${profile.displayName} — тестировщик. У него появится «Для багов»'
+                          : '${profile.displayName} больше не тестировщик',
+                    ),
+                  ),
+                );
+              }
+            } catch (error) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось выполнить'))),
+                );
+              }
+            }
           case 'unblock':
             try {
               await ref.read(blocksProvider.notifier).unblock(profile.id);
@@ -217,6 +243,12 @@ class _OtherMenu extends ConsumerWidget {
           PopupMenuItem(value: 'block', child: Text('Заблокировать')),
         ],
         const PopupMenuItem(value: 'report', child: Text('Пожаловаться')),
+        // Только владельцу проекта: назначить или снять тестировщика.
+        if (owner)
+          PopupMenuItem(
+            value: isTester ? 'tester-off' : 'tester-on',
+            child: Text(isTester ? 'Снять с тестировщиков' : 'Сделать тестировщиком'),
+          ),
       ],
     );
   }
@@ -688,3 +720,14 @@ class _Stat extends StatelessWidget {
   }
 }
 
+
+/// Тестировщик ли человек — знает только владелец проекта (0086).
+final profileTesterProvider = FutureProvider.autoDispose.family<bool, String>((ref, id) async {
+  final repo = ref.watch(assistantRepositoryProvider);
+  if (repo == null || ref.watch(isAssistantOwnerProvider).value != true) return false;
+  try {
+    return await repo.isTester(id);
+  } catch (_) {
+    return false;
+  }
+});

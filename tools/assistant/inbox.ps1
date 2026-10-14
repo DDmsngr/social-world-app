@@ -50,7 +50,7 @@ select coalesce(json_agg(t), '[]'::json) from (
   select m.id, m.body, m.attachment_path, m.created_at, o.version
   from assistant_messages m
   left join storage.objects o on o.bucket_id = 'assistant' and o.name = m.attachment_path
-  where m.from_user and m.handled_at is null
+  where m.from_user and m.handled_at is null and m.channel = 'assistant'
   order by m.created_at
 ) t;
 "@
@@ -72,7 +72,7 @@ select coalesce(json_agg(t), '[]'::json) from (
     }
   }
   'ack' {
-    Psql "update assistant_messages set handled_at = now() where from_user and handled_at is null;" | Out-Null
+    Psql "update assistant_messages set handled_at = now() where from_user and handled_at is null and channel = 'assistant';" | Out-Null
     'Отмечено.'
   }
   'reply' {

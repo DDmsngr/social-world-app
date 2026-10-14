@@ -15,8 +15,15 @@ import 'assistant.dart';
 
 /// Профиль → Помощник. Сюда владелец проекта скидывает правки и скриншоты;
 /// Claude забирает их из сессии и отвечает здесь же.
+///
+/// С [AssistantChannel.bugs] это «Для багов» тестировщика: тот же чат, но
+/// своя ветка; Claude раз в сутки забирает баги и отвечает «Принято на разбор».
 class AssistantScreen extends ConsumerStatefulWidget {
-  const AssistantScreen({super.key});
+  const AssistantScreen({super.key, this.channel = AssistantChannel.assistant});
+
+  final AssistantChannel channel;
+
+  bool get bugs => channel == AssistantChannel.bugs;
 
   @override
   ConsumerState<AssistantScreen> createState() => _AssistantScreenState();
@@ -66,10 +73,10 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
     await _run((repo) async {
       // Подпись уходит вместе с первым снимком, остальные — следом.
       if (shots.isEmpty) {
-        await repo.send(text: text);
+        await repo.send(text: text, channel: widget.channel);
       } else {
         for (var i = 0; i < shots.length; i++) {
-          await repo.send(text: i == 0 ? text : null, imagePath: shots[i]);
+          await repo.send(text: i == 0 ? text : null, imagePath: shots[i], channel: widget.channel);
         }
       }
       _text.clear();
@@ -79,12 +86,12 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final owner = ref.watch(isAssistantOwnerProvider);
-    final messages = ref.watch(assistantMessagesProvider);
+    final owner = ref.watch(widget.bugs ? isTesterProvider : isAssistantOwnerProvider);
+    final messages = ref.watch(assistantMessagesProvider(widget.channel));
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Помощник'),
+        title: Text(widget.bugs ? 'Для багов' : 'Помощник'),
         leading: IconButton(
           onPressed: () =>
               context.canPop() ? context.pop() : context.go(Routes.profile),
@@ -101,9 +108,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
         ),
         data: (isOwner) {
           if (!isOwner) {
-            return const StateMessage(
+            return StateMessage(
               title: 'Недоступно',
-              text: 'Этот раздел открыт только владельцу проекта.',
+              text: widget.bugs
+                  ? 'Этот раздел открыт только тестировщикам.'
+                  : 'Этот раздел открыт только владельцу проекта.',
               icon: Icons.lock_outline,
             );
           }
@@ -113,14 +122,17 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                 child: messages.when(
                   loading: () => const LoadingView(),
                   error: (_, _) => StateMessage.error(
-                    onAction: () => ref.invalidate(assistantMessagesProvider),
+                    onAction: () => ref.invalidate(assistantMessagesProvider(widget.channel)),
                   ),
                   data: (list) => list.isEmpty
-                      ? const StateMessage(
+                      ? StateMessage(
                           title: 'Пока пусто',
-                          text: 'Пишите правки и прикладывайте скриншоты. '
-                              'Помощник заберёт их, когда будет на связи.',
-                          icon: Icons.support_agent,
+                          text: widget.bugs
+                              ? 'Опишите, что сломалось: где, что делали, что ожидали '
+                                    'увидеть. Приложите скриншот. Раз в сутки баги забирают на разбор.'
+                              : 'Пишите правки и прикладывайте скриншоты. '
+                                    'Помощник заберёт их, когда будет на связи.',
+                          icon: widget.bugs ? Icons.bug_report_outlined : Icons.support_agent,
                         )
                       : ListView.builder(
                           reverse: true,
