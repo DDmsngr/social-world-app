@@ -36,7 +36,7 @@ function Psql([string]$sql) {
   [IO.File]::WriteAllText($sqlLocal, $sql.Replace("`r`n", "`n"), [Text.UTF8Encoding]::new($false))
   scp -q @sshOpts $sqlLocal "${server}:/tmp/bugs_q.sql"
   if ($LASTEXITCODE -ne 0) { throw 'scp не удался' }
-  Remote "docker cp /tmp/bugs_q.sql supabase-db:/tmp/bugs_q.sql`ndocker exec supabase-db psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -f /tmp/bugs_q.sql"
+  Remote "docker cp /tmp/bugs_q.sql supabase-db:/tmp/bugs_q.sql`ndocker exec supabase-db psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -f /tmp/bugs_q.sql 2>&1"
 }
 
 switch ($Action) {
@@ -51,7 +51,8 @@ select coalesce(json_agg(t), '[]'::json) from (
   order by p.display_name, m.created_at
 ) t;
 "@
-    $rows = @($json.Trim() | ConvertFrom-Json)
+    # PowerShell 5.1 отдаёт пустой массив из «[]» как один элемент — отсеиваем.
+    $rows = @($json.Trim() | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_.id })
     New-Item -ItemType Directory -Force $OutDir | Out-Null
     if ($rows.Count -eq 0) {
       [IO.File]::WriteAllText($listed, '[]')
@@ -79,11 +80,11 @@ select coalesce(json_agg(t), '[]'::json) from (
   }
   'ack' {
     if (-not (Test-Path $listed)) { throw 'Сначала list' }
-    $ids = @(Get-Content $listed -Raw | ConvertFrom-Json)
+    # Только настоящие id; пустой список PowerShell 5.1 отдаёт одним «элементом».
+    $ids = @(Get-Content $listed -Raw | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { "$_" -match '^[0-9a-f-]{36}$' })
     if ($ids.Count -eq 0) { 'Нечего отмечать.'; return }
-    foreach ($id in $ids) { if ($id -notmatch '^[0-9a-f-]{36}$') { throw "Странный id $id" } }
     $list = ($ids | ForEach-Object { "'$_'" }) -join ','
-    Psql @"
+    $out = Psql @"
 with done as (
   update assistant_messages set handled_at = now()
   where id in ($list) and channel = 'bugs' and handled_at is null
@@ -91,7 +92,8 @@ with done as (
 )
 insert into assistant_messages (from_user, channel, author_id, body)
 select distinct false, 'bugs', author_id, 'Принято на разбор.' from done;
-"@ | Out-Null
+"@
+    if ($out -match 'ERROR') { throw "Не отметилось: $out" }
     [IO.File]::WriteAllText($listed, '[]')
     "Отмечено: $($ids.Count), ответ «Принято на разбор.» отправлен."
   }
