@@ -156,6 +156,6 @@ final myStickerPacksProvider = Provider<List<StickerPack>>((ref) {
   if (catalog == null || installed == null) return const [];
   return [
     for (final id in installed)
-      if (catalog.pack(id) case final pack? when pack.stickers.isNotEmpty) pack,
+      if (catalog.pack(id) case final pack? when pack.stickers.isNotEmpty && pack.isPublished) pack,
   ];
 });
