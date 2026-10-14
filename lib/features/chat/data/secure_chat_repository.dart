@@ -13,6 +13,7 @@ import '../domain/entities/conversation.dart';
 import '../domain/repositories/chat_repository.dart';
 import 'chat_media_cache.dart';
 import 'crypto/chat_crypto_service.dart';
+import 'crypto/chat_key_backup.dart';
 import 'crypto/chat_key_storage.dart';
 import 'crypto/peer_key_pins.dart';
 import 'live_feed.dart';
@@ -38,8 +39,10 @@ class SecureChatRepository implements ChatRepository {
     this._client, {
     required this.currentUserId,
     ChatKeyStorage? keyStorage,
+    ChatKeyBackup? keyBackup,
     this._pins = const PrefsPeerKeyPins(),
-  }) : _keyStorage = keyStorage ?? SecureChatKeyStorage() {
+  }) : _keyStorage = keyStorage ?? SecureChatKeyStorage(),
+       _keyBackup = keyBackup ?? SupabaseChatKeyBackup(_client) {
     _ready = _initialize();
     // Ошибку публикации ключей получит тот, кто дождётся _ready; без
     // ожидающих она не должна всплывать как необработанная.
@@ -52,6 +55,7 @@ class SecureChatRepository implements ChatRepository {
   final SupabaseClient _client;
   final String currentUserId;
   final ChatKeyStorage _keyStorage;
+  final ChatKeyBackup _keyBackup;
   final _uuid = const Uuid();
   late final Future<ChatCryptoService> _ready;
 
@@ -72,6 +76,8 @@ class SecureChatRepository implements ChatRepository {
   bool get endToEndEncryptionEnabled => true;
 
   Future<ChatCryptoService> _initialize() async {
+    // Ключ из копии на сервере, если на телефоне его нет (переустановка).
+    await syncChatKeys(userId: currentUserId, storage: _keyStorage, backup: _keyBackup);
     final crypto = await ChatCryptoService.initialize(
       userId: currentUserId,
       storage: _keyStorage,

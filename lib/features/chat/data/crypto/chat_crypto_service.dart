@@ -60,9 +60,14 @@ class ChatCryptoService {
 
   /// Есть ли на телефоне ключи этого человека. Фоновым задачам (пуш) нельзя
   /// звать [initialize] без них: он создал бы новые, неопубликованные ключи.
-  static Future<bool> hasKeys({required String userId, required ChatKeyStorage storage}) async =>
-      await storage.read('$_keyPrefix.$userId.x25519') != null &&
-      await storage.read('$_keyPrefix.$userId.ed25519') != null;
+  static Future<bool> hasKeys({required String userId, required ChatKeyStorage storage}) async {
+    final names = storageKeyNames(userId);
+    return await storage.read(names.exchange) != null && await storage.read(names.signing) != null;
+  }
+
+  /// Под какими именами лежат закрытые ключи человека в хранилище.
+  static ({String exchange, String signing}) storageKeyNames(String userId) =>
+      (exchange: '$_keyPrefix.$userId.x25519', signing: '$_keyPrefix.$userId.ed25519');
 
   static Future<ChatCryptoService> initialize({
     required String userId,
