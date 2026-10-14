@@ -63,6 +63,15 @@ final stickerCatalogProvider = AsyncNotifierProvider<StickerCatalogController, S
   retry: _noRetry,
 );
 
+/// Каталог для показа: магазин, панель, подсказки. Паки 18+ видят только
+/// совершеннолетние. Полный [stickerCatalogProvider] нужен лишь для разбора
+/// сообщений.
+final visibleStickerCatalogProvider = Provider<AsyncValue<StickerCatalog>>((ref) {
+  final catalog = ref.watch(stickerCatalogProvider);
+  final adult = ref.watch(currentUserProvider.select((user) => user?.isAdult ?? true));
+  return adult ? catalog : catalog.whenData((c) => c.withoutAdult());
+});
+
 /// Коллекция текущего пользователя — id паков в порядке вкладок панели.
 /// Хранится в базе (user_sticker_packs) и копией на телефоне.
 class InstalledStickerPacks extends AsyncNotifier<List<String>> {
@@ -142,7 +151,7 @@ final installedStickerPacksProvider = AsyncNotifierProvider<InstalledStickerPack
 
 /// Установленные паки, которые есть в каталоге, — вкладки панели стикеров.
 final myStickerPacksProvider = Provider<List<StickerPack>>((ref) {
-  final catalog = ref.watch(stickerCatalogProvider).value;
+  final catalog = ref.watch(visibleStickerCatalogProvider).value;
   final installed = ref.watch(installedStickerPacksProvider).value;
   if (catalog == null || installed == null) return const [];
   return [

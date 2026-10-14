@@ -50,7 +50,7 @@ class MyStickersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final installed = ref.watch(installedStickerPacksProvider);
-    final catalog = ref.watch(stickerCatalogProvider);
+    final catalog = ref.watch(visibleStickerCatalogProvider);
     final packs = ref.watch(myStickerPacksProvider);
 
     Future<void> refresh() => Future.wait([

@@ -75,6 +75,7 @@ class StickerPack {
     this.category,
     this.cover,
     this.status = StickerPackStatus.published,
+    this.adult = false,
   });
 
   final String id;
@@ -87,6 +88,9 @@ class StickerPack {
   /// Путь обложки в бакете; null — превью первого стикера.
   final String? cover;
   final StickerPackStatus status;
+
+  /// Только для совершеннолетних: остальным пак не показывается и не ставится.
+  final bool adult;
 
   bool get isPublished => status == StickerPackStatus.published;
 
@@ -239,6 +243,7 @@ class StickerCatalog {
             category: text(raw['category']),
             cover: text(raw['cover']),
             status: StickerPackStatus.parse(raw['status']),
+            adult: raw['adult'] == true,
             stickers: [
               for (final s in raw['stickers'] as List? ?? const [])
                 if (_idPattern.firstMatch(s['id'] as String? ?? '')
@@ -275,6 +280,13 @@ class StickerCatalog {
   final _index = <_Indexed>[];
   final _inline = <String, int>{};
   final _familyStems = <String, List<String>>{};
+
+  /// Каталог без паков 18+: то, что видит человек младше 18 или не назвавший
+  /// возраст. Картинки из уже полученных сообщений это не касается: они
+  /// открываются по адресу, а не через каталог.
+  StickerCatalog withoutAdult() => packs.any((p) => p.adult)
+      ? StickerCatalog(packs: [for (final p in packs) if (!p.adult) p], families: families)
+      : this;
 
   Sticker? byId(String? id) => id == null ? null : _byId[id];
 

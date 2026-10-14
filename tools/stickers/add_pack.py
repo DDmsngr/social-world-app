@@ -40,7 +40,7 @@ from scipy import ndimage as ndi  # noqa: E402
 import cut  # noqa: E402
 
 HEADER = ('id', 'title', 'description', 'publisher', 'category', 'status',
-          'is_default', 'sort_order', 'version', 'cover')
+          'is_default', 'sort_order', 'version', 'cover', 'adult')
 KEY_RE = re.compile(r'^[a-z0-9_]{1,48}$')
 
 

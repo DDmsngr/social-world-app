@@ -12,6 +12,8 @@ class AppUser {
     this.locationBlurM = 500,
     this.username,
     this.onboarded = true,
+    this.birthDate,
+    this.ageRequired = false,
   });
 
   final String id;
@@ -39,6 +41,32 @@ class AppUser {
   /// имя, поэтому одного имени для этого мало.
   final bool onboarded;
 
+  /// Дата рождения: видна только самому человеку (таблица profile_ages).
+  final DateTime? birthDate;
+
+  /// Возраст обязателен: настоящий сервер просит его у всех. В тестах и
+  /// локальном режиме не требуется (как и [onboarded], по умолчанию «да»).
+  final bool ageRequired;
+
+  /// Нужно спросить дату рождения: гоним на экран возраста.
+  bool get needsAge => ageRequired && birthDate == null;
+
+  /// Полных лет на [now]; null — дата неизвестна.
+  int? ageOn(DateTime now) {
+    final born = birthDate;
+    if (born == null) return null;
+    var years = now.year - born.year;
+    if (now.month < born.month || (now.month == born.month && now.day < born.day)) years--;
+    return years;
+  }
+
+  /// Совершеннолетний ли. Дата не указана: при обязательном возрасте — нет
+  /// (стикеры 18+ скрыты, пока человек её не назовёт), без него — да.
+  bool get isAdult {
+    final years = ageOn(DateTime.now());
+    return years == null ? !ageRequired : years >= 18;
+  }
+
   /// Пока профиль не заполнен — гоним пользователя в онбординг.
   bool get hasProfile => (displayName ?? '').trim().isNotEmpty && onboarded;
 
@@ -63,6 +91,7 @@ class AppUser {
     int? socialScore,
     int? locationBlurM,
     String? username,
+    DateTime? birthDate,
   }) =>
       AppUser(
         id: id,
@@ -77,5 +106,7 @@ class AppUser {
         locationBlurM: locationBlurM ?? this.locationBlurM,
         username: username ?? this.username,
         onboarded: onboarded,
+        birthDate: birthDate ?? this.birthDate,
+        ageRequired: ageRequired,
       );
 }

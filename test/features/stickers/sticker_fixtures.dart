@@ -27,6 +27,7 @@ Map<String, dynamic> catalogJsonFromSources() {
       'version': meta['version'],
       'status': meta['status'],
       'sort_order': meta['sort_order'],
+      'adult': meta['adult'] ?? false,
       'stickers': [
         for (final s in meta['stickers'] as List)
           {

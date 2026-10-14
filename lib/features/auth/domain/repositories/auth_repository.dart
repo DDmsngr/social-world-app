@@ -56,6 +56,9 @@ abstract interface class AuthRepository {
     String? username,
   });
 
+  /// Дата рождения: задаётся один раз, видна только самому человеку.
+  Future<AppUser> setBirthDate(DateTime date);
+
   /// Правка собственной анкеты. `null` — поле не трогаем, пустая строка у
   /// [bio]/[city]/[username] — очищаем. [avatarLocalPath] — файл с
   /// устройства: в хранилище его кладёт репозиторий, а ссылка попадает в

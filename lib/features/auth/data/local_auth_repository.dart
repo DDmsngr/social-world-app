@@ -124,6 +124,13 @@ class LocalAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> setBirthDate(DateTime date) async {
+    final current = _user;
+    if (current == null) throw Exception('Нет активной сессии');
+    return _openSession(current.copyWith(birthDate: current.birthDate ?? date));
+  }
+
+  @override
   Future<AppUser> updateLocationBlur(int meters) async {
     final current = _user;
     if (current == null) throw Exception('Нет активной сессии');

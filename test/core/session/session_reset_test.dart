@@ -62,6 +62,9 @@ class _FakeAuthRepository implements AuthRepository {
   }) async => _current!;
 
   @override
+  Future<AppUser> setBirthDate(DateTime date) async => _current!;
+
+  @override
   Future<AppUser> updateLocationBlur(int meters) async => _current!;
 
   void dispose() => unawaited(_controller.close());

@@ -17,6 +17,7 @@ import '../../features/chat/presentation/chats_soon_screen.dart';
 import '../../features/chat/presentation/conversations_screen.dart';
 import '../../features/chat/presentation/group_screens.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
+import '../../features/auth/presentation/screens/age_screen.dart';
 import '../../features/auth/presentation/screens/onboarding_screen.dart';
 import '../../features/auth/presentation/screens/sign_in_screen.dart';
 import '../../features/create/data/post_drafts.dart';
@@ -79,6 +80,7 @@ abstract final class Routes {
   static const splash = '/splash';
   static const signIn = '/sign-in';
   static const onboarding = '/onboarding';
+  static const age = '/age';
   static const feed = '/feed';
   static const discover = '/discover';
   static const home = discover;
@@ -157,7 +159,7 @@ abstract final class Routes {
   static String stickerPack(String packId, {String? sticker}) =>
       sticker == null ? '/stickers/pack/$packId' : '/stickers/pack/$packId?s=$sticker';
 
-  static const authFlow = {splash, signIn, onboarding};
+  static const authFlow = {splash, signIn, onboarding, age};
 }
 
 /// Роутеру нужно синхронно знать, кто вошёл, прямо в момент редиректа.
@@ -250,6 +252,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         return location == Routes.onboarding ? null : Routes.onboarding;
       }
 
+      // Возраст обязателен для всех, в том числе для тех, кто вошёл давно.
+      if (user.needsAge) {
+        return location == Routes.age ? null : Routes.age;
+      }
+
       // Главный экран — карта города: с неё начинается всё остальное.
       return Routes.authFlow.contains(location) ? Routes.home : null;
     },
@@ -269,6 +276,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.onboarding,
         builder: (_, _) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: Routes.age,
+        builder: (_, _) => const AgeScreen(),
       ),
       GoRoute(
         path: Routes.routeRecorder,

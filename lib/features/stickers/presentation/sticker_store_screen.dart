@@ -48,7 +48,7 @@ class _StickerStoreScreenState extends ConsumerState<StickerStoreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = ref.watch(stickerCatalogProvider);
+    final catalog = ref.watch(visibleStickerCatalogProvider);
 
     return Scaffold(
       appBar: AppBar(

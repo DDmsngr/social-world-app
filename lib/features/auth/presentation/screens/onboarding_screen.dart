@@ -18,6 +18,7 @@ import '../../../discover/presentation/widgets/city_picker.dart';
 import '../../../shell/presentation/app_tour.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../providers/auth_providers.dart';
+import '../widgets/birth_date_field.dart';
 
 /// Знакомство после первого входа: имя, город, по желанию @ник. Город не
 /// подставляется сам — раньше всем ставился Сочи, и человек открывал карту
@@ -33,6 +34,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _nickController;
   City? _city;
+  DateTime? _birth;
 
   /// Фото с телефона, выбранное вместо картинки от VK/Яндекса.
   String? _avatarPath;
@@ -58,7 +60,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
+  /// Возраст спрашиваем здесь, если он ещё неизвестен.
+  bool get _needsAge => ref.read(currentUserProvider)?.needsAge ?? false;
+
   bool get _valid =>
+      (!_needsAge || _birth != null) &&
       _nameController.text.trim().length >= 2 &&
       _city != null &&
       Username.validate(_nickController.text) == null;
@@ -95,6 +101,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       // вкладки, и они должны открыться уже на выбранном городе.
       await ref.read(cityProvider.notifier).choose(city);
       await AppTour.markPending();
+      // Возраст до завершения знакомства: иначе роутер сразу перекинет на
+      // экран возраста.
+      final birth = _birth;
+      if (birth != null && _needsAge) {
+        await ref.read(authRepositoryProvider).setBirthDate(birth);
+      }
       // Своё фото — до завершения знакомства: completeProfile переключит
       // роутер на вкладки, и аватар должен уже стоять.
       final avatar = _avatarPath;
@@ -153,6 +165,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 onChanged: (_) => setState(() => _nickError = null),
               ),
+              if (_needsAge) ...[
+                const SizedBox(height: 12),
+                BirthDateField(
+                  value: _birth,
+                  enabled: !_busy,
+                  onChanged: (d) => setState(() => _birth = d),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Дату видите только вы. Изменить её потом нельзя.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 20),
               const SectionLabel('Ваш город'),
               const SizedBox(height: 10),

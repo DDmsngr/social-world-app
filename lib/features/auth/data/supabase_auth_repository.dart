@@ -39,12 +39,17 @@ class SupabaseAuthRepository implements AuthRepository {
   var _generation = 0;
   AppUser? _lastKnown;
 
+  /// Дата рождения текущего человека: лежит в отдельной таблице (видна только
+  /// ему), читается вместе с профилем и подмешивается в [AppUser].
+  DateTime? _birthDate;
+
   Future<void> _handleAuthEvent(AuthState state) async {
     final myGeneration = ++_generation;
     final user = state.session?.user;
 
     if (user == null) {
       _lastKnown = null;
+      _birthDate = null;
       _publish(null);
       return;
     }
@@ -212,6 +217,29 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AppUser> setBirthDate(DateTime date) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthException('Нет активной сессии');
+    final day = DateTime(date.year, date.month, date.day);
+    await _client
+        .rpc('set_my_birth_date', params: {'p_date': day.toIso8601String().substring(0, 10)})
+        .timeout(const Duration(seconds: 15));
+    // Возраст задаётся один раз: читаем, что на самом деле записано.
+    final saved = await _client
+        .from('profile_ages')
+        .select('birth_date')
+        .eq('profile_id', user.id)
+        .single()
+        .timeout(const Duration(seconds: 10));
+    _birthDate = DateTime.parse(saved['birth_date'] as String);
+    final merged = (_lastKnown ?? _fromAuthUser(user)).copyWith(birthDate: _birthDate);
+    ++_generation;
+    _lastKnown = merged;
+    _publish(merged);
+    return merged;
+  }
+
+  @override
   Future<AppUser> updateLocationBlur(int meters) async {
     final user = _auth.currentUser;
     if (user == null) throw const AuthException('Нет активной сессии');
@@ -259,12 +287,24 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   Future<AppUser> _withProfile(User user, {AppUser? fallbackTo}) async {
-    Future<Map<String, dynamic>?> fetch() => _client
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle()
-        .timeout(const Duration(seconds: 8));
+    Future<Map<String, dynamic>?> fetch() async {
+      final row = await _client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
+      if (row != null) {
+        final age = await _client
+            .from('profile_ages')
+            .select('birth_date')
+            .eq('profile_id', user.id)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 8));
+        _birthDate = age == null ? null : DateTime.parse(age['birth_date'] as String);
+      }
+      return row;
+    }
 
     try {
       final row = await fetch();
@@ -293,6 +333,8 @@ class SupabaseAuthRepository implements AuthRepository {
         email: user.email,
         phone: user.phone,
         onboarded: false,
+        birthDate: _birthDate,
+        ageRequired: true,
       );
 
   AppUser _merge(User user, Map<String, dynamic> row) => AppUser(
@@ -308,5 +350,7 @@ class SupabaseAuthRepository implements AuthRepository {
         locationBlurM: (row['location_blur_m'] as num?)?.toInt() ?? 500,
         username: row['username'] as String?,
         onboarded: row['onboarded_at'] != null,
+        birthDate: _birthDate,
+        ageRequired: true,
       );
 }

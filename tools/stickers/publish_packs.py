@@ -134,6 +134,8 @@ def publish(api, pid):
         'cover_path': f'{pid}/thumb/{cover_key}.webp', 'version': meta.get('version', 1),
         'is_default': meta.get('is_default', False), 'sort_order': meta.get('sort_order', 0),
     }
+    if 'adult' in meta:  # колонка появилась в миграции 0082
+        pack['adult'] = bool(meta['adult'])
     api.upsert('sticker_packs', [{**pack, 'status': 'draft'}] if not existing else [pack], 'id')
     api.upsert('stickers', rows, 'id')
     api.patch(f'sticker_packs?id=eq.{pid}', {'status': meta.get('status', 'draft')})

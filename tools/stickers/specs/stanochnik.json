@@ -5,6 +5,7 @@
  "publisher": "Команда ChaWo",
  "category": "мемы",
  "status": "published",
+ "adult": true,
  "is_default": false,
  "sort_order": 90,
  "version": 1,

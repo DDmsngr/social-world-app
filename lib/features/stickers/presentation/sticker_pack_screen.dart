@@ -77,7 +77,7 @@ class _StickerPackScreenState extends ConsumerState<StickerPackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = ref.watch(stickerCatalogProvider);
+    final catalog = ref.watch(visibleStickerCatalogProvider);
     final pack = catalog.value?.pack(widget.packId);
 
     final Widget body;
