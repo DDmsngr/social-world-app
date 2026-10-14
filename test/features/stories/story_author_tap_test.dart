@@ -71,4 +71,53 @@ void main() {
     expect(find.byKey(const Key('story-author')), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('лайкнутый блик после перезапуска показывает закрашенное сердце', (tester) async {
+    SharedPreferences.resetStatic();
+    SharedPreferences.setMockInitialValues({'stories.liked.v1': ['s1']});
+    final story = Story(
+      id: 's1',
+      authorId: 'author-1',
+      authorName: 'Вика',
+      kind: StoryKind.text,
+      body: 'привет',
+      createdAt: DateTime.now(),
+    );
+    final group = StoryGroup(authorId: 'author-1', authorName: 'Вика', stories: [story], isMine: false);
+    final container = ProviderContainer(
+      overrides: [
+        currentUserProvider.overrideWithValue(const AppUser(id: 'me')),
+        storiesRepositoryProvider.overrideWithValue(StoriesRepository(null)),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.runAsync(() => container.read(storiesProvider.future));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          routerConfig: GoRouter(
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (context, _) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => showStories(context, groups: [group], initialGroup: 0),
+                    child: const Text('открыть'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('открыть'));
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byIcon(Icons.favorite), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_border), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

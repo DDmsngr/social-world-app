@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/env.dart';
@@ -373,3 +374,26 @@ class StoriesController extends AsyncNotifier<List<StoryGroup>> {
 final storiesProvider = AsyncNotifierProvider<StoriesController, List<StoryGroup>>(
   StoriesController.new,
 );
+
+/// Блики, которые я лайкнул, — на телефоне. Блик живёт сутки, поэтому храним
+/// только последние 300 отметок.
+abstract final class LikedStories {
+  static const _key = 'stories.liked.v1';
+
+  static Future<bool> contains(String storyId) async {
+    try {
+      return (await SharedPreferences.getInstance()).getStringList(_key)?.contains(storyId) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> add(String storyId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = [...?prefs.getStringList(_key)]..remove(storyId);
+      list.add(storyId);
+      await prefs.setStringList(_key, list.length > 300 ? list.sublist(list.length - 300) : list);
+    } catch (_) {}
+  }
+}

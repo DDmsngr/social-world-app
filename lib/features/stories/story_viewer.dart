@@ -516,6 +516,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                     const SizedBox(height: 10),
                     _StoryReply(
                       key: ValueKey('reply-${story.id}'),
+                      storyId: story.id,
                       onFocusChanged: (focused) => focused ? _pause() : _resume(),
                       onSend: (text) => _reply(story, text),
                       onLike: () => _reply(story, '❤️', quiet: true),
@@ -635,11 +636,13 @@ class _StoryReply extends StatefulWidget {
     required this.onFocusChanged,
     required this.onSend,
     required this.onLike,
+    required this.storyId,
   });
 
   final ValueChanged<bool> onFocusChanged;
   final Future<bool> Function(String text) onSend;
   final Future<bool> Function() onLike;
+  final String storyId;
 
   @override
   State<_StoryReply> createState() => _StoryReplyState();
@@ -655,6 +658,11 @@ class _StoryReplyState extends State<_StoryReply> {
   @override
   void initState() {
     super.initState();
+    // Лайк — сердечко автору в личку; на экране он должен остаться и после
+    // перезапуска, иначе сердце гаснет и уходит повторно.
+    LikedStories.contains(widget.storyId).then((liked) {
+      if (liked && mounted) setState(() => _liked = true);
+    });
     _focus.addListener(() {
       if (!_focus.hasFocus && _open && _controller.text.isEmpty) {
         setState(() => _open = false);
@@ -700,7 +708,11 @@ class _StoryReplyState extends State<_StoryReply> {
     if (_liked) return;
     HapticFeedback.lightImpact();
     setState(() => _liked = true);
-    if (!await widget.onLike() && mounted) setState(() => _liked = false);
+    if (await widget.onLike()) {
+      await LikedStories.add(widget.storyId);
+    } else if (mounted) {
+      setState(() => _liked = false);
+    }
   }
 
   @override
