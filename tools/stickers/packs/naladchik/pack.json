@@ -1,0 +1,462 @@
+{
+ "id": "naladchik",
+ "title": "Наладчик",
+ "description": "Бородатый наладчик ЧПУ: «щас поправим», «не трогай» и «где размер?». Станок, допуски и крепкое слово. С матом — 18+.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "adult": true,
+ "is_default": false,
+ "sort_order": 110,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "privet_stanok",
+   "title": "привет!",
+   "emoji": "👋",
+   "synonyms": [
+    "привет",
+    "здорово",
+    "салют",
+    "здравствуй",
+    "хай"
+   ],
+   "emotions": [
+    "greet",
+    "cool"
+   ]
+  },
+  {
+   "key": "idi_nahuy",
+   "title": "иди нахуй",
+   "emoji": "🖕",
+   "synonyms": [
+    "нахуй",
+    "пошёл",
+    "отвали",
+    "отстань",
+    "бесишь"
+   ],
+   "emotions": [
+    "anger",
+    "cool"
+   ]
+  },
+  {
+   "key": "super",
+   "title": "супер!",
+   "emoji": "👍",
+   "synonyms": [
+    "супер",
+    "отлично",
+    "класс",
+    "здорово",
+    "годится"
+   ],
+   "emotions": [
+    "joy",
+    "cool"
+   ]
+  },
+  {
+   "key": "blin",
+   "title": "блин...",
+   "emoji": "😩",
+   "synonyms": [
+    "блин",
+    "досада",
+    "устал",
+    "печаль",
+    "вздох"
+   ],
+   "emotions": [
+    "tired",
+    "sad"
+   ]
+  },
+  {
+   "key": "chto_za_herny",
+   "title": "что за херня?!",
+   "emoji": "🤬",
+   "synonyms": [
+    "херня",
+    "что за",
+    "бред",
+    "чушь",
+    "ничего себе"
+   ],
+   "emotions": [
+    "anger",
+    "surprise"
+   ]
+  },
+  {
+   "key": "pyatnitsa_blyat",
+   "title": "пятница, блядь!",
+   "emoji": "🍻",
+   "synonyms": [
+    "пятница",
+    "выходные",
+    "наконец",
+    "отдых",
+    "ура"
+   ],
+   "emotions": [
+    "joy",
+    "party"
+   ]
+  },
+  {
+   "key": "vse_pidory",
+   "title": "всё пидоры",
+   "emoji": "🤘",
+   "synonyms": [
+    "все пидоры",
+    "рок",
+    "плевать",
+    "безразлично",
+    "жги"
+   ],
+   "emotions": [
+    "cool",
+    "party"
+   ]
+  },
+  {
+   "key": "ebuchiy_stanok",
+   "title": "ебучий станок!",
+   "emoji": "🚨",
+   "synonyms": [
+    "станок",
+    "авария",
+    "сломался",
+    "сбой",
+    "ошибка"
+   ],
+   "emotions": [
+    "anger",
+    "tired"
+   ]
+  },
+  {
+   "key": "kak_est",
+   "title": "как есть...",
+   "emoji": "🤷",
+   "synonyms": [
+    "как есть",
+    "что поделать",
+    "развёл руками",
+    "так вышло",
+    "бывает"
+   ],
+   "emotions": [
+    "cool",
+    "tired"
+   ]
+  },
+  {
+   "key": "nu_kak_to_tak",
+   "title": "ну как-то так",
+   "emoji": "☕",
+   "synonyms": [
+    "как-то так",
+    "вот так",
+    "примерно",
+    "кофе",
+    "итого"
+   ],
+   "emotions": [
+    "cool",
+    "think"
+   ]
+  },
+  {
+   "key": "ty_serezno",
+   "title": "ты серьёзно?!",
+   "emoji": "🤨",
+   "synonyms": [
+    "серьёзно",
+    "правда",
+    "всерьёз",
+    "не может быть",
+    "что с тобой"
+   ],
+   "emotions": [
+    "surprise",
+    "anger"
+   ]
+  },
+  {
+   "key": "vot_i_popali",
+   "title": "вот и попали",
+   "emoji": "🤦",
+   "synonyms": [
+    "попали",
+    "приплыли",
+    "влипли",
+    "засада",
+    "позор"
+   ],
+   "emotions": [
+    "sad",
+    "tired"
+   ]
+  },
+  {
+   "key": "spat_blyat",
+   "title": "спать, блядь...",
+   "emoji": "😴",
+   "synonyms": [
+    "спать",
+    "сон",
+    "засыпаю",
+    "устал",
+    "спокойной ночи"
+   ],
+   "emotions": [
+    "tired",
+    "sad"
+   ]
+  },
+  {
+   "key": "vnimanie",
+   "title": "внимание, ебать!",
+   "emoji": "☝️",
+   "synonyms": [
+    "внимание",
+    "слушай",
+    "важно",
+    "запомни",
+    "учти"
+   ],
+   "emotions": [
+    "anger",
+    "cool"
+   ]
+  },
+  {
+   "key": "da_kak_tak_to",
+   "title": "да как так-то?!",
+   "emoji": "😤",
+   "synonyms": [
+    "как так",
+    "почему",
+    "не понимаю",
+    "возмущён",
+    "как же"
+   ],
+   "emotions": [
+    "anger",
+    "surprise"
+   ]
+  },
+  {
+   "key": "poka_blyat",
+   "title": "пока, блядь!",
+   "emoji": "✌️",
+   "synonyms": [
+    "пока",
+    "прощай",
+    "увидимся",
+    "ушёл",
+    "бывай"
+   ],
+   "emotions": [
+    "greet",
+    "cool"
+   ]
+  },
+  {
+   "key": "shchas_popravim",
+   "title": "щас поправим",
+   "emoji": "⌨️",
+   "synonyms": [
+    "поправим",
+    "починим",
+    "исправлю",
+    "сейчас",
+    "сделаю"
+   ],
+   "emotions": [
+    "cool",
+    "think"
+   ]
+  },
+  {
+   "key": "kto_napisal",
+   "title": "кто это написал?",
+   "emoji": "📄",
+   "synonyms": [
+    "кто написал",
+    "программа",
+    "ошибки",
+    "накосячил",
+    "кто это"
+   ],
+   "emotions": [
+    "anger",
+    "surprise"
+   ]
+  },
+  {
+   "key": "hands_off",
+   "title": "не трогай",
+   "emoji": "✋",
+   "synonyms": [
+    "не трогай",
+    "руки",
+    "не лезь",
+    "нельзя",
+    "стоп"
+   ],
+   "emotions": [
+    "anger",
+    "cool"
+   ]
+  },
+  {
+   "key": "nol_ne_tam",
+   "title": "у тебя нуль не там",
+   "emoji": "📏",
+   "synonyms": [
+    "нуль",
+    "ноль",
+    "привязка",
+    "координаты",
+    "ошибся"
+   ],
+   "emotions": [
+    "think",
+    "anger"
+   ]
+  },
+  {
+   "key": "absolyutno_normalno",
+   "title": "абсолютно нормально",
+   "emoji": "😌",
+   "synonyms": [
+    "абсолютно",
+    "нормально",
+    "стружка",
+    "порядок",
+    "штатно"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "postav_normalno",
+   "title": "поставь нормально",
+   "emoji": "🔩",
+   "synonyms": [
+    "поставь",
+    "ровно",
+    "как надо",
+    "переставь",
+    "закрепи"
+   ],
+   "emotions": [
+    "anger",
+    "think"
+   ]
+  },
+  {
+   "key": "gde_razmer",
+   "title": "где размер?",
+   "emoji": "❓",
+   "synonyms": [
+    "размер",
+    "чертёж",
+    "где",
+    "не указан",
+    "потерял"
+   ],
+   "emotions": [
+    "think",
+    "surprise"
+   ]
+  },
+  {
+   "key": "ne_lez_v_parametry",
+   "title": "не лезь в параметры",
+   "emoji": "🛑",
+   "synonyms": [
+    "параметры",
+    "настройки",
+    "не лезь",
+    "не трогай",
+    "сломаешь"
+   ],
+   "emotions": [
+    "fear",
+    "anger"
+   ]
+  },
+  {
+   "key": "pervyy_progon",
+   "title": "первый прогон",
+   "emoji": "🤞",
+   "synonyms": [
+    "прогон",
+    "запуск",
+    "страшно",
+    "первый раз",
+    "пробуем"
+   ],
+   "emotions": [
+    "fear",
+    "think"
+   ]
+  },
+  {
+   "key": "vot_teper_normalno",
+   "title": "вот теперь нормально",
+   "emoji": "✨",
+   "synonyms": [
+    "теперь нормально",
+    "готово",
+    "красота",
+    "получилось",
+    "идеально"
+   ],
+   "emotions": [
+    "joy",
+    "cool"
+   ]
+  },
+  {
+   "key": "dopusk_001",
+   "title": "0.01 мм, говоришь?",
+   "emoji": "🔬",
+   "synonyms": [
+    "допуск",
+    "микрон",
+    "точность",
+    "сотка",
+    "говоришь"
+   ],
+   "emotions": [
+    "think",
+    "surprise"
+   ]
+  },
+  {
+   "key": "zavtra_dopilim",
+   "title": "завтра допилим",
+   "emoji": "🌙",
+   "synonyms": [
+    "завтра",
+    "допилим",
+    "потом",
+    "отложим",
+    "хватит на сегодня"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  }
+ ]
+}

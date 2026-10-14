@@ -1,6 +1,15 @@
 {
- "into": "stanochnik",
- "sheet": "sheets/stanochnik_2.png",
+ "id": "naladchik",
+ "title": "Наладчик",
+ "description": "Бородатый наладчик ЧПУ: «щас поправим», «не трогай» и «где размер?». Станок, допуски и крепкое слово. С матом — 18+.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "adult": true,
+ "is_default": false,
+ "sort_order": 110,
+ "version": 1,
+ "sheet": "sheets/naladchik.png",
  "grid": [
   4,
   4
