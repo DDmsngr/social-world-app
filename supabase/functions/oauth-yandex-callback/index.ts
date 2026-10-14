@@ -68,6 +68,8 @@ Deno.serve(async (req: Request) => {
       email: info.default_email ?? null,
       displayName: info.display_name ?? info.real_name ?? null,
       avatarUrl,
+      // Номер нужен до создания профиля: у кого он уже есть, тому не заводим второй.
+      phone: info.default_phone?.number,
     });
     // login:default_phone: {id, number: "+7900…"}; если у человека нет номера
     // или право не выдано, поля просто нет.

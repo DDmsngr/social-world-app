@@ -171,6 +171,33 @@ export interface ExternalProfile {
   email: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  /** Номер, который провайдер уже подтвердил (Яндекс default_phone, VK phone).
+   * Нужен до создания профиля, чтобы не завести второй аккаунт тому, у кого он
+   * уже есть. */
+  phone?: unknown;
+}
+
+/** Чей это подтверждённый номер (RPC из миграции 0080). null — ничей, номера нет
+ * или функции ещё нет в базе: вход тогда идёт как раньше, новым профилем. */
+export async function profileByVerifiedPhone(rawPhone: unknown): Promise<string | null> {
+  try {
+    const hash = await phoneHashFrom(rawPhone);
+    if (!hash) return null;
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/profile_by_verified_phone`, {
+      method: "POST",
+      headers: restHeaders(),
+      body: JSON.stringify({ p_hash: hash }),
+    });
+    if (!res.ok) {
+      console.error("profile_by_verified_phone failed", res.status, await res.text());
+      return null;
+    }
+    const id = await res.json();
+    return typeof id === "string" ? id : null;
+  } catch (e) {
+    console.error("profileByVerifiedPhone", e);
+    return null;
+  }
 }
 
 /**
@@ -189,6 +216,25 @@ export async function resolveProfile(
     if (Array.isArray(rows) && rows.length > 0) {
       return rows[0].profile_id as string;
     }
+  }
+
+  // Тот же человек пришёл другим провайдером: у аккаунта уже есть его
+  // подтверждённый номер. Новый профиль не заводим — привязываем этот вход к
+  // существующему, и оба способа входа открывают один аккаунт.
+  const owner = await profileByVerifiedPhone(profile.phone);
+  if (owner) {
+    const link = await fetch(`${SUPABASE_URL}/rest/v1/oauth_identities`, {
+      method: "POST",
+      headers: restHeaders({ Prefer: "return=minimal" }),
+      body: JSON.stringify({
+        provider,
+        external_id: profile.externalId,
+        profile_id: owner,
+        email: profile.email,
+      }),
+    });
+    if (link.ok) return owner;
+    console.error("oauth_identities link failed", link.status, await link.text());
   }
 
   // Синтетический email — не почтовый ящик, а стабильный идентификатор
@@ -271,11 +317,37 @@ export async function saveVerifiedPhone(profileId: string, rawPhone: unknown): P
 /** Стандартный приём для входа через провайдера, которого GoTrue не знает:
  * generate_link выдаёт одноразовый токен на существующего пользователя,
  * verify его сразу гасит и возвращает настоящую сессию. */
+/**
+ * Email пользователя в auth.users для входа provider+externalId. У обычного
+ * входа это синтетический адрес из resolveProfile, но у входа, привязанного к
+ * чужому аккаунту по номеру, адрес другой — по нему и нужно выпускать сессию.
+ */
+export async function authEmailFor(provider: string, externalId: string): Promise<string> {
+  const synthetic = `${provider}.${externalId}@id.socialworld.internal`;
+  try {
+    const found = await fetch(
+      `${SUPABASE_URL}/rest/v1/oauth_identities?provider=eq.${provider}&external_id=eq.${encodeURIComponent(externalId)}&select=profile_id`,
+      { headers: restHeaders() },
+    );
+    if (!found.ok) return synthetic;
+    const rows = await found.json();
+    const profileId = Array.isArray(rows) && rows.length > 0 ? rows[0].profile_id : null;
+    if (!profileId) return synthetic;
+    const user = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${profileId}`, { headers: restHeaders() });
+    if (!user.ok) return synthetic;
+    const data = await user.json();
+    return (data.email ?? data.user?.email ?? synthetic) as string;
+  } catch (e) {
+    console.error("authEmailFor", e);
+    return synthetic;
+  }
+}
+
 export async function mintSession(
   provider: string,
   externalId: string,
 ): Promise<{ access_token: string; refresh_token: string }> {
-  const email = `${provider}.${externalId}@id.socialworld.internal`;
+  const email = await authEmailFor(provider, externalId);
 
   const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
     method: "POST",

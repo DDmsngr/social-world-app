@@ -85,6 +85,8 @@ Deno.serve(async (req: Request) => {
       email: emailFromIdToken,
       displayName,
       avatarUrl: (vkUser.avatar as string | undefined) ?? null,
+      // Номер нужен до создания профиля: у кого он уже есть, тому не заводим второй.
+      phone: vkUser.phone,
     });
     // Номер приходит, только если в oauth-vk-start запрошено право `phone` и
     // оно одобрено в кабинете VK ID. Без права поля нет — вход не страдает.

@@ -35,9 +35,11 @@ Deno.serve(async (req: Request) => {
     response_type: "code",
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    // Право `phone` добавить сюда ("email phone"), когда VK одобрит его в
-    // кабинете VK ID: до этого запрос с ним может отклониться.
-    scope: "email",
+    // Право `phone` включается переменной VK_REQUEST_PHONE=true, когда VK
+    // одобрит его в кабинете VK ID: до этого запрос с ним может отклониться и
+    // сломать вход. С правом номер приходит подтверждённым, и вход через VK
+    // узнаёт человека, который уже входил через Яндекс.
+    scope: Deno.env.get("VK_REQUEST_PHONE") === "true" ? "email phone" : "email",
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
