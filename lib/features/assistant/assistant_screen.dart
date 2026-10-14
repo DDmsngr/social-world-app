@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../../core/debug/app_log.dart';
 import '../../core/errors/friendly_error.dart';
+import '../../core/media/video_compressor.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/link_text.dart';
@@ -32,12 +36,66 @@ class AssistantScreen extends ConsumerStatefulWidget {
 class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   final _text = TextEditingController();
   final _picker = ImagePicker();
+  final _recorder = AudioRecorder();
   var _busy = false;
+
+  /// Идёт запись голосового: с какого момента (для таймера).
+  DateTime? _recordingSince;
+  Timer? _recordTick;
 
   @override
   void dispose() {
     _text.dispose();
+    _recordTick?.cancel();
+    _recorder.dispose();
     super.dispose();
+  }
+
+  /// Голосовое: нажал — пишем, нажал «отправить» — уходит, «отмена» — нет.
+  /// Помощник расшифрует его у себя (faster-whisper), текст набирать не нужно.
+  Future<void> _startVoice() async {
+    try {
+      if (!await _recorder.hasPermission()) {
+        _toast('Нет доступа к микрофону');
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000),
+        path: '${dir.path}/assistant_${DateTime.now().millisecondsSinceEpoch}.m4a',
+      );
+      setState(() => _recordingSince = DateTime.now());
+      _recordTick = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } catch (error) {
+      AppLog.add('Запись голосового не началась: $error');
+      _toast('Не получилось начать запись');
+    }
+  }
+
+  Future<void> _stopVoice({required bool send}) async {
+    _recordTick?.cancel();
+    final since = _recordingSince;
+    setState(() => _recordingSince = null);
+    String? path;
+    try {
+      path = await _recorder.stop();
+    } catch (error) {
+      AppLog.add('Запись голосового не остановилась: $error');
+    }
+    if (!send || path == null) return;
+    if (since != null && DateTime.now().difference(since) < const Duration(seconds: 1)) {
+      _toast('Слишком коротко');
+      return;
+    }
+    final file = path;
+    await _run((repo) => repo.send(imagePath: file, channel: widget.channel));
+  }
+
+  void _toast(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _run(Future<void> Function(AssistantRepository repo) job) async {
@@ -60,8 +118,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
   /// Приложенные, но ещё не отправленные снимки.
   final _pending = <String>[];
 
+  /// Скриншоты и видео (запись экрана). Большое видео сжимается перед отправкой.
   Future<void> _attach() async {
-    final files = await _picker.pickMultiImage(imageQuality: 85);
+    final files = await _picker.pickMultipleMedia(imageQuality: 85);
     if (files.isEmpty || !mounted) return;
     setState(() => _pending.addAll(files.map((f) => f.path)));
   }
@@ -76,7 +135,12 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
         await repo.send(text: text, channel: widget.channel);
       } else {
         for (var i = 0; i < shots.length; i++) {
-          await repo.send(text: i == 0 ? text : null, imagePath: shots[i], channel: widget.channel);
+          var path = shots[i];
+          final bytes = await File(path).length();
+          if (VideoCompressor.shouldCompress(path, bytes)) {
+            path = (await VideoCompressor.compress(path)).path;
+          }
+          await repo.send(text: i == 0 ? text : null, imagePath: path, channel: widget.channel);
         }
       }
       _text.clear();
@@ -155,13 +219,20 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            File(_pending[i]),
-                            width: 72,
-                            height: 72,
-                            fit: BoxFit.cover,
-                            cacheWidth: 216,
-                          ),
+                          child: isVideoPath(_pending[i])
+                              ? Container(
+                                  width: 72,
+                                  height: 72,
+                                  color: AppColors.card,
+                                  child: Icon(Icons.movie_outlined, color: AppColors.textDim),
+                                )
+                              : Image.file(
+                                  File(_pending[i]),
+                                  width: 72,
+                                  height: 72,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 216,
+                                ),
                         ),
                         Positioned(
                           right: 0,
@@ -183,12 +254,35 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                 top: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-                  child: Row(
+                  child: _recordingSince != null
+                      ? Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => _stopVoice(send: false),
+                              tooltip: 'Отмена',
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                            Icon(Icons.fiber_manual_record, color: AppColors.danger, size: 14),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Запись ${_elapsed(DateTime.now().difference(_recordingSince!))}',
+                                key: const Key('assistant-recording'),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => _stopVoice(send: true),
+                              tooltip: 'Отправить голосовое',
+                              icon: Icon(Icons.send, color: AppColors.primary),
+                            ),
+                          ],
+                        )
+                      : Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       IconButton(
                         onPressed: _busy ? null : _attach,
-                        tooltip: 'Скриншоты',
+                        tooltip: 'Скриншоты и видео',
                         icon: const Icon(Icons.attach_file),
                       ),
                       Expanded(
@@ -202,6 +296,12 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                           textCapitalization: TextCapitalization.sentences,
                           decoration: const InputDecoration(hintText: 'Что поправить'),
                         ),
+                      ),
+                      IconButton(
+                        key: const Key('assistant-voice'),
+                        onPressed: _busy ? null : _startVoice,
+                        tooltip: 'Голосовое',
+                        icon: const Icon(Icons.mic_none),
                       ),
                       IconButton(
                         onPressed: _busy ? null : _send,
@@ -309,7 +409,13 @@ class _Bubble extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (path != null) _Shot(path: path),
+            if (path != null)
+              if (_isAudio(path))
+                const _FileTile(icon: Icons.mic_none, label: 'Голосовое')
+              else if (isVideoPath(path))
+                const _FileTile(icon: Icons.movie_outlined, label: 'Видео')
+              else
+                _Shot(path: path),
             if (path != null && message.body != null) const SizedBox(height: 6),
             if (message.body != null) LinkText(message.body!, selectable: true),
             const SizedBox(height: 4),
@@ -364,6 +470,30 @@ class _SmallAction extends StatelessWidget {
         child: Icon(icon, size: 16, color: AppColors.textDim),
       ),
     ),
+  );
+}
+
+String _elapsed(Duration d) =>
+    '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+
+bool _isAudio(String path) => RegExp(r'\.(m4a|aac|mp3|ogg|wav|opus)$', caseSensitive: false).hasMatch(path);
+
+/// Видео или голосовое в пузыре: Помощник забирает файл целиком, здесь
+/// достаточно видеть, что он ушёл.
+class _FileTile extends StatelessWidget {
+  const _FileTile({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, color: AppColors.textDim),
+      const SizedBox(width: 6),
+      Text(label),
+    ],
   );
 }
 

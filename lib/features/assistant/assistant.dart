@@ -105,9 +105,8 @@ class AssistantRepository {
       final dot = imagePath.lastIndexOf('.');
       final ext = dot == -1 ? 'jpg' : imagePath.substring(dot + 1).toLowerCase();
       remote = '$uid/${DateTime.now().millisecondsSinceEpoch}.$ext';
-      await _client.storage
-          .from(bucket)
-          .uploadBinary(remote, await File(imagePath).readAsBytes());
+      // Видео и голосовые бывают большими — файлом, а не байтами в памяти.
+      await _client.storage.from(bucket).upload(remote, File(imagePath));
     }
     final body = text?.trim();
     await _client.from('assistant_messages').insert({

@@ -67,7 +67,15 @@ select coalesce(json_agg(t), '[]'::json) from (
         scp -q @sshOpts "${server}:$tmp" $file
         if ($LASTEXITCODE -ne 0) { throw "Не скачался скриншот $($r.attachment_path)" }
         Remote "shred -u '$tmp' 2>/dev/null || true" | Out-Null
-        "[скриншот] $file"
+        if ($file -match '\.(m4a|aac|mp3|ogg|wav|opus|mp4|mov|3gp|webm|mkv)$') {
+          # Голосовое или видео: речь расшифровывает faster-whisper здесь же.
+          "[файл] $file"
+          $env:HF_HOME = 'D:\hf-cache'
+          $said = & python -I (Join-Path $PSScriptRoot 'transcribe.py') $file 2>$null
+          if ($LASTEXITCODE -eq 0 -and $said) { "[расшифровка] $($said -join ' ')" } else { '[расшифровка не удалась]' }
+        } else {
+          "[скриншот] $file"
+        }
       }
     }
   }
