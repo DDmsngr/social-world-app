@@ -58,6 +58,28 @@ test('альбом: все фото поста, по порядку', () => {
   assert.deepEqual(post.album.map((m) => m.url), ['https://cdn/2.jpg', 'https://cdn/3.jpg']);
 });
 
+test('видео в разметке дважды (плеер и автоповтор) — один ролик, не альбом из двух', () => {
+  const html = `
+    <div class="tgme_widget_message_wrap"><div data-post="ch/9">
+      <video src="https://cdn/file/a1.mp4?token=AAA" class="tgme_widget_message_video js-message_video"></video>
+      <video src="https://cdn/file/a1.mp4?token=BBB" class="tgme_widget_message_video js-message_video"></video>
+      <div class="tgme_widget_message_text js-message_text">Кот</div>
+      <time datetime="2026-10-01T10:00:00+00:00"></time></div></div>`;
+  const [post] = parseChannelPage(html, 'ch');
+  assert.equal(post.media.kind, 'video');
+  assert.deepEqual(post.album, []);
+});
+
+test('два разных видео в одном посте остаются альбомом', () => {
+  const html = `
+    <div class="tgme_widget_message_wrap"><div data-post="ch/10">
+      <video src="https://cdn/file/a1.mp4?token=AAA"></video>
+      <video src="https://cdn/file/b2.mp4?token=BBB"></video>
+      <time datetime="2026-10-01T10:00:00+00:00"></time></div></div>`;
+  const [post] = parseChannelPage(html, 'ch');
+  assert.equal(post.album.length, 1);
+});
+
 const at = (iso) => ({ ref: iso, date: new Date(iso) });
 
 test('план постов: по порядку времени, с зазором, только новее последнего', () => {

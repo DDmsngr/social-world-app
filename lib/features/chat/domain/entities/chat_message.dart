@@ -71,6 +71,19 @@ class ChatAttachment {
   /// Все файлы по порядку: это вложение и альбом за ним.
   List<ChatAttachment> get all => [this, ...album];
 
+  /// [all] без повторов: часть постов каналов приехала с одним роликом дважды
+  /// (два тега в разметке источника), файлы разные по адресу, но одинаковые по
+  /// размеру и типу. Показывать такой пост надо одним роликом.
+  List<ChatAttachment> get distinct {
+    final out = <ChatAttachment>[];
+    for (final item in all) {
+      final twin = item.size > 0 &&
+          out.any((o) => o.size == item.size && o.mime == item.mime && o.durationMs == item.durationMs);
+      if (!twin) out.add(item);
+    }
+    return out;
+  }
+
   Map<String, Object?> toJson({bool withKey = true}) => {
     'path': path,
     'size': size,

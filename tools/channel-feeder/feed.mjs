@@ -175,8 +175,16 @@ export function parseChannelPage(html, channel) {
     // Альбом — один пост с несколькими фото/видео (grouped_wrap). Раньше брали
     // только первое, и посты «из 6 картинок» приезжали с одной.
     const items = [];
+    // У части видео-постов в разметке два тега <video> с одним и тем же файлом
+    // (плеер и автоповтор): без этой проверки пост приезжал альбомом из двух
+    // одинаковых роликов. Сравниваем адрес без токена доступа.
+    const seen = new Set();
     const mediaRe = /<video[^>]*\ssrc=["']([^"']+)["']|tgme_widget_message_photo_wrap[^>]*?background-image:url\('([^']+)'/g;
     for (const m of block.matchAll(mediaRe)) {
+      const url = m[1] ?? m[2];
+      const key = url.split('?')[0];
+      if (seen.has(key)) continue;
+      seen.add(key);
       if (m[1]) items.push({ kind: 'video', url: m[1], mime: 'video/mp4' });
       else if (m[2]) items.push({ kind: 'image', url: m[2], mime: 'image/jpeg' });
       if (items.length >= MAX_ALBUM) break;

@@ -27,7 +27,8 @@ class ChannelMedia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if ((message.attachment?.album.length ?? 0) > 0) return _Album(message: message);
+    // Альбом из одинаковых файлов (задвоенный ролик) — это один файл.
+    if ((message.attachment?.distinct.length ?? 0) > 1) return _Album(message: message);
     return switch (message.kind) {
       MessageKind.image => _ChannelPhoto(message: message),
       MessageKind.video => VideoPreview(
@@ -131,7 +132,7 @@ class _AlbumState extends ConsumerState<_Album> {
   /// Каждый файл альбома — как отдельное сообщение: так работают и кэш
   /// файлов (по id сообщения), и готовые виджеты фото и видео.
   List<ChatMessage> _items() {
-    final all = message.attachment!.all;
+    final all = message.attachment!.distinct;
     return [
       for (var i = 0; i < all.length; i++)
         ChatMessage(
