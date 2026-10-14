@@ -130,7 +130,9 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
     });
 
     final story = _story;
-    ref.read(storiesProvider.notifier).markViewed(story);
+    // Не синхронно: _load зовётся и из initState, а менять провайдер во
+    // время построения дерева нельзя.
+    Future(() => ref.read(storiesProvider.notifier).markViewed(story));
 
     var length = Duration(seconds: story.durationSec);
     VideoPlayerController? video;
@@ -224,6 +226,13 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
   }
 
   void _close() => Navigator.of(context).maybePop();
+
+  /// Просмотр блика — отдельный маршрут поверх роутера: сначала закрываем его,
+  /// потом открываем профиль, иначе профиль оказался бы под бликом.
+  void _openAuthor(String authorId) {
+    Navigator.of(context).pop();
+    widget.router.push('${Routes.user}/$authorId');
+  }
 
   void _next() {
     if (_s < _group.stories.length - 1) {
@@ -411,18 +420,31 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      UserAvatar(
-                        name: story.authorName,
-                        url: story.authorAvatarUrl,
-                        radius: 16,
-                      ),
-                      const SizedBox(width: 10),
+                      // Аватар и имя ведут в профиль автора: просмотр
+                      // закрывается, профиль открывается поверх вкладки.
                       Expanded(
-                        child: Text(
-                          '${story.authorName} · ${storyAgo(story.createdAt)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                        child: GestureDetector(
+                          key: const Key('story-author'),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _openAuthor(story.authorId),
+                          child: Row(
+                            children: [
+                              UserAvatar(
+                                name: story.authorName,
+                                url: story.authorAvatarUrl,
+                                radius: 16,
+                              ),
+                              const SizedBox(width: 10),
+                              Flexible(
+                                child: Text(
+                                  '${story.authorName} · ${storyAgo(story.createdAt)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       if (mine)
