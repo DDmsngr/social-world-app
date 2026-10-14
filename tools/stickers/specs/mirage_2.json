@@ -1,0 +1,204 @@
+{
+ "into": "mirage",
+ "sheet": "sheets/mirage_2.png",
+ "grid": [
+  4,
+  3
+ ],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {
+   "key": "shchas_provarim",
+   "title": "щас проварим",
+   "emoji": "🔥",
+   "emotions": [
+    "cool",
+    "energy"
+   ],
+   "synonyms": [
+    "проварим",
+    "сварка",
+    "варить",
+    "сварю",
+    "заварим"
+   ]
+  },
+  {
+   "key": "blya_povelo",
+   "title": "бля, повело!",
+   "emoji": "😮",
+   "emotions": [
+    "surprise",
+    "anger"
+   ],
+   "synonyms": [
+    "повело",
+    "деформация",
+    "кривое",
+    "погнуло",
+    "ничего себе"
+   ]
+  },
+  {
+   "key": "ugol_90",
+   "title": "угол 90°, говоришь?",
+   "emoji": "📐",
+   "emotions": [
+    "think",
+    "surprise"
+   ],
+   "synonyms": [
+    "угол",
+    "девяносто",
+    "градусов",
+    "говоришь",
+    "кривой"
+   ]
+  },
+  {
+   "key": "kto_sognul",
+   "title": "кто это согнул?",
+   "emoji": "🤨",
+   "emotions": [
+    "anger",
+    "think"
+   ],
+   "synonyms": [
+    "согнул",
+    "кто",
+    "гибка",
+    "криво",
+    "кто это"
+   ]
+  },
+  {
+   "key": "lazer_ne_vinovat",
+   "title": "лазер не виноват",
+   "emoji": "🔴",
+   "emotions": [
+    "cool",
+    "think"
+   ],
+   "synonyms": [
+    "лазер",
+    "не виноват",
+    "резка",
+    "раскрой",
+    "оправдание"
+   ]
+  },
+  {
+   "key": "pochti_po_razmeru",
+   "title": "почти по размеру",
+   "emoji": "📏",
+   "emotions": [
+    "think",
+    "cool"
+   ],
+   "synonyms": [
+    "размер",
+    "почти",
+    "штангенциркуль",
+    "допуск",
+    "замер"
+   ]
+  },
+  {
+   "key": "davay_na_prihvatki",
+   "title": "давай на прихватки",
+   "emoji": "☝️",
+   "emotions": [
+    "think",
+    "cool"
+   ],
+   "synonyms": [
+    "прихватки",
+    "прихватим",
+    "собираем",
+    "давай",
+    "сборка"
+   ]
+  },
+  {
+   "key": "kto_chertezh",
+   "title": "кто чертёж делал?!",
+   "emoji": "📄",
+   "emotions": [
+    "anger",
+    "surprise"
+   ],
+   "synonyms": [
+    "чертёж",
+    "кто делал",
+    "проект",
+    "размеры",
+    "конструктор"
+   ]
+  },
+  {
+   "key": "ne_trogay_nastroyki",
+   "title": "не трогай настройки",
+   "emoji": "✋",
+   "emotions": [
+    "anger",
+    "fear"
+   ],
+   "synonyms": [
+    "настройки",
+    "не трогай",
+    "не лезь",
+    "станок",
+    "руки"
+   ]
+  },
+  {
+   "key": "pizdec_peredelka",
+   "title": "пиздец, переделка",
+   "emoji": "🤯",
+   "emotions": [
+    "sad",
+    "tired"
+   ],
+   "synonyms": [
+    "пиздец",
+    "переделка",
+    "брак",
+    "всё заново",
+    "кошмар"
+   ]
+  },
+  {
+   "key": "vot_teper_krasivo",
+   "title": "вот теперь красиво",
+   "emoji": "✨",
+   "emotions": [
+    "joy",
+    "cool"
+   ],
+   "synonyms": [
+    "красиво",
+    "вот теперь",
+    "получилось",
+    "шов",
+    "идеально"
+   ]
+  },
+  {
+   "key": "zavtra_dognem",
+   "title": "завтра догоним",
+   "emoji": "🌙",
+   "emotions": [
+    "tired",
+    "cool"
+   ],
+   "synonyms": [
+    "завтра",
+    "догоним",
+    "потом",
+    "отложим",
+    "хватит на сегодня"
+   ]
+  }
+ ]
+}

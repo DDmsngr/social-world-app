@@ -9,7 +9,7 @@ import 'sticker_fixtures.dart';
 
 // Возраст и стикеры 18+: паки с матом видят только совершеннолетние.
 
-const _adultPacks = ['palych', 'viking', 'stanochnik', 'naladchik', 'arturio'];
+const _adultPacks = ['palych', 'viking', 'stanochnik', 'naladchik', 'arturio', 'mirage'];
 
 DateTime _yearsAgo(int years, {int days = 0}) {
   final now = DateTime.now();
