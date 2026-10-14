@@ -13,6 +13,7 @@ import 'core/analytics/analytics.dart';
 import 'core/config/env.dart';
 import 'core/config/mapkit_boot.dart';
 import 'core/debug/app_log.dart';
+import 'core/network/app_http_client.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_choice.dart';
@@ -62,6 +63,7 @@ Future<void> main() async {
       await Supabase.initialize(
         url: Env.supabaseUrl,
         publishableKey: Env.supabaseAnonKey,
+        httpClient: AppHttpClient(),
       ).timeout(const Duration(seconds: 10));
     } on TimeoutException {
       AppLog.add('Supabase.initialize не уложился в 10 с — идём дальше');

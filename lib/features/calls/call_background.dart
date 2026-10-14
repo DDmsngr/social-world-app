@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/env.dart';
+import '../../core/network/app_http_client.dart';
 import '../../core/push/push_preview.dart';
 import 'call_kit.dart';
 import 'call_models.dart';
@@ -101,6 +102,10 @@ Future<void> _ensureSupabase() async {
   if (_supabaseReady) return;
   await Env.load();
   if (!Env.isConfigured) return;
-  await Supabase.initialize(url: Env.supabaseUrl, publishableKey: Env.supabaseAnonKey);
+  await Supabase.initialize(
+    url: Env.supabaseUrl,
+    publishableKey: Env.supabaseAnonKey,
+    httpClient: AppHttpClient(),
+  );
   _supabaseReady = true;
 }
