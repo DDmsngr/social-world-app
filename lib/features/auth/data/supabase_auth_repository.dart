@@ -43,6 +43,9 @@ class SupabaseAuthRepository implements AuthRepository {
   /// ему), читается вместе с профилем и подмешивается в [AppUser].
   DateTime? _birthDate;
 
+  /// На сервере есть таблица возраста (миграция 0082).
+  var _ageSupported = true;
+
   Future<void> _handleAuthEvent(AuthState state) async {
     final myGeneration = ++_generation;
     final user = state.session?.user;
@@ -295,13 +298,22 @@ class SupabaseAuthRepository implements AuthRepository {
           .maybeSingle()
           .timeout(const Duration(seconds: 8));
       if (row != null) {
-        final age = await _client
-            .from('profile_ages')
-            .select('birth_date')
-            .eq('profile_id', user.id)
-            .maybeSingle()
-            .timeout(const Duration(seconds: 8));
-        _birthDate = age == null ? null : DateTime.parse(age['birth_date'] as String);
+        try {
+          final age = await _client
+              .from('profile_ages')
+              .select('birth_date')
+              .eq('profile_id', user.id)
+              .maybeSingle()
+              .timeout(const Duration(seconds: 8));
+          _ageSupported = true;
+          _birthDate = age == null ? null : DateTime.parse(age['birth_date'] as String);
+        } on PostgrestException catch (error) {
+          // Сервер без миграции 0082 (таблицы возраста нет): профиль всё равно
+          // загружается, возраст не требуем. Сетевые сбои сюда не попадают.
+          AppLog.add('Возраст недоступен на сервере: ${error.code} ${error.message}');
+          _ageSupported = false;
+          _birthDate = null;
+        }
       }
       return row;
     }
@@ -334,7 +346,7 @@ class SupabaseAuthRepository implements AuthRepository {
         phone: user.phone,
         onboarded: false,
         birthDate: _birthDate,
-        ageRequired: true,
+        ageRequired: _ageSupported,
       );
 
   AppUser _merge(User user, Map<String, dynamic> row) => AppUser(
@@ -351,6 +363,6 @@ class SupabaseAuthRepository implements AuthRepository {
         username: row['username'] as String?,
         onboarded: row['onboarded_at'] != null,
         birthDate: _birthDate,
-        ageRequired: true,
+        ageRequired: _ageSupported,
       );
 }
