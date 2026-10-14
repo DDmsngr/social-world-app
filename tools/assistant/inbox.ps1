@@ -1,13 +1,15 @@
 ﻿param(
   [Parameter(Mandatory = $true)][ValidateSet('list', 'ack', 'reply')][string]$Action,
   [string]$Text,
+  [string]$File,
   [string]$OutDir = 'D:\temp\assistant'
 )
 # Почта «Помощника»: читаем сообщения владельца из чата ChaWo, скачиваем
 # скриншоты, отмечаем забранное и отвечаем.
 #   list  — новые сообщения (скриншоты скачиваются в $OutDir)
 #   ack   — пометить все новые как забранные
-#   reply — ответить в чат текстом: -Text "..."
+#   reply — ответить в чат текстом: -Text "..."; с файлом (картинка, видео,
+#           pdf до 25 МБ): -File путь [-Text подпись]
 #
 # С 08.10.2026 база живёт на собственном сервере в Яндекс Облаке (раньше —
 # Supabase Cloud, через Management API). Ходим на сервер по ssh (алиас
@@ -71,7 +73,11 @@ select coalesce(json_agg(t), '[]'::json) from (
           # Голосовое или видео: речь расшифровывает faster-whisper здесь же.
           "[файл] $file"
           $env:HF_HOME = 'D:\hf-cache'
+          # python печатает UTF-8, а консоль PowerShell по умолчанию читает cp866.
+          $oldEncoding = [Console]::OutputEncoding
+          [Console]::OutputEncoding = [Text.Encoding]::UTF8
           $said = & python -I (Join-Path $PSScriptRoot 'transcribe.py') $file 2>$null
+          [Console]::OutputEncoding = $oldEncoding
           if ($LASTEXITCODE -eq 0 -and $said) { "[расшифровка] $($said -join ' ')" } else { '[расшифровка не удалась]' }
         } else {
           "[скриншот] $file"
@@ -84,6 +90,22 @@ select coalesce(json_agg(t), '[]'::json) from (
     'Отмечено.'
   }
   'reply' {
+    if ($File) {
+      if (-not (Test-Path -LiteralPath $File)) { throw "Нет файла $File" }
+      $remote = "grep '^SERVICE_ROLE_KEY=' /opt/supabase/docker/.env | cut -d= -f2- | tr -d '
+'"
+      $env:SUPABASE_SERVICE_KEY = ssh @sshOpts $server $remote
+      if ($LASTEXITCODE -ne 0 -or -not $env:SUPABASE_SERVICE_KEY) { throw 'Не удалось прочитать ключ на сервере' }
+      $env:SUPABASE_URL = 'https://api-socialworld.deepdrift.tech'
+      $env:PYTHONIOENCODING = 'utf-8'
+      try {
+        python -I (Join-Path $PSScriptRoot 'send_file.py') $File $Text
+        if ($LASTEXITCODE -ne 0) { throw 'Файл не отправлен' }
+      } finally {
+        $env:SUPABASE_SERVICE_KEY = ''
+      }
+      return
+    }
     if (-not $Text) { throw 'Нужен -Text' }
     $safe = $Text.Replace("'", "''")
     Psql "insert into assistant_messages (from_user, body) values (false, '$safe');" | Out-Null
