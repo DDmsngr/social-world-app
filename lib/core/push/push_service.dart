@@ -20,6 +20,7 @@ import '../debug/app_log.dart';
 import '../../features/chat/presentation/chat_looks.dart';
 import '../links/deep_links.dart';
 import '../router/app_router.dart';
+import 'push_preview.dart';
 
 /// Push-уведомления (FCM). Шлёт их сервер (Edge Function `push-send`,
 /// миграция 0031); здесь — регистрация токена устройства, показ пуша при
@@ -213,7 +214,7 @@ class PushService {
     }
   }
 
-  void _onForeground(RemoteMessage message) {
+  Future<void> _onForeground(RemoteMessage message) async {
     final data = message.data;
     if (data['type'] == 'call' || data['type'] == 'call_update') {
       _ref.read(callControllerProvider).onPush(data);
@@ -233,6 +234,13 @@ class PushService {
 
     final notification = message.notification;
     if (notification == null || !_localReady) return;
+    // Личный чат: сервер прислал «Новое сообщение», текст достаём сами.
+    String? body = notification.body;
+    try {
+      body = await directMessagePreview(data) ?? body;
+    } catch (error) {
+      AppLog.add('Текст сообщения для уведомления не получен: $error');
+    }
     final mode = !isMessage
         ? _activity
         : switch (data['channel']) {
@@ -254,7 +262,7 @@ class PushService {
     _local.show(
       id: 0,
       title: notification.title,
-      body: notification.body,
+      body: body,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           channel.id,

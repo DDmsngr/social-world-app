@@ -58,6 +58,12 @@ class ChatCryptoService {
   final _cipher = Chacha20.poly1305Aead();
   final _kdf = Hkdf(hmac: Hmac.sha256(), outputLength: 32);
 
+  /// Есть ли на телефоне ключи этого человека. Фоновым задачам (пуш) нельзя
+  /// звать [initialize] без них: он создал бы новые, неопубликованные ключи.
+  static Future<bool> hasKeys({required String userId, required ChatKeyStorage storage}) async =>
+      await storage.read('$_keyPrefix.$userId.x25519') != null &&
+      await storage.read('$_keyPrefix.$userId.ed25519') != null;
+
   static Future<ChatCryptoService> initialize({
     required String userId,
     required ChatKeyStorage storage,

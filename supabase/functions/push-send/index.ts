@@ -4,7 +4,8 @@
 //
 // Тело: {type: 'message', message_id} или {type: 'notification', notification_id}.
 // Текст личных сообщений в пуш не попадает никогда: сервер его и не знает
-// (сквозное шифрование), в пуше только «Новое сообщение».
+// (сквозное шифрование), в пуше «Новое сообщение» и id: текст телефон
+// расшифровывает сам и подменяет уведомление.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { decide, type Prefs } from "./decide.ts";
 
@@ -154,6 +155,10 @@ async function forMessage(messageId: string): Promise<Job[]> {
         type: "message",
         conversation_id: conversation.id,
         title: senderName,
+        // Телефон получателя по id сам достанет и расшифрует текст и подменит
+        // «Новое сообщение» в шторке (lib/core/push/push_preview.dart).
+        message_id: message.id,
+        e2e: "1",
       },
     };
   } else {

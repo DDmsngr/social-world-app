@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/friendly_error.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/sw_widgets.dart';
@@ -31,8 +33,21 @@ class _PackInstallButtonState extends ConsumerState<PackInstallButton> {
     } catch (error) {
       if (mounted) {
         setState(() => _busy = false);
+        // Пак 18+, а возраст не указан (или меньше 18): база отказала.
+        // Объясняем и ведём туда, где дату можно указать.
+        final adultOnly = widget.pack.adult && error.toString().contains('42501');
+        final router = GoRouter.maybeOf(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(error, fallback: 'Не удалось добавить пак'))),
+          SnackBar(
+            content: Text(
+              adultOnly
+                  ? 'Пак 18+. Укажите дату рождения в профиле'
+                  : friendlyError(error, fallback: 'Не удалось добавить пак'),
+            ),
+            action: adultOnly && router != null
+                ? SnackBarAction(label: 'Указать', onPressed: () => router.push(Routes.editProfile))
+                : null,
+          ),
         );
       }
       return;

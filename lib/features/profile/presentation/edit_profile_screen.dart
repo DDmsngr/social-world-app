@@ -12,6 +12,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/domain/repositories/auth_repository.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../auth/presentation/widgets/birth_date_field.dart';
 import '../../chat/presentation/widgets/video_note_recorder.dart';
 import '../../feed/presentation/providers/feed_providers.dart';
 import 'avatar_crop_screen.dart';
@@ -120,6 +121,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late final TextEditingController _city;
   late final TextEditingController _bio;
   late final TextEditingController _nick;
+
+  /// Дата рождения, выбранная здесь. Задаётся один раз: если уже есть,
+  /// поле только показывает её.
+  DateTime? _birth;
   String? _nickError;
   final _picker = ImagePicker();
 
@@ -205,6 +210,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _save() async {
     setState(() => _busy = true);
     try {
+      final birth = _birth;
+      if (birth != null && ref.read(currentUserProvider)?.birthDate == null) {
+        await ref.read(authRepositoryProvider).setBirthDate(birth);
+      }
       final user = await ref.read(authRepositoryProvider).updateProfile(
         displayName: _name.text,
         city: _city.text,
@@ -335,6 +344,28 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(labelText: 'Город'),
           ),
+          const SizedBox(height: 10),
+          if (me?.birthDate case final born?)
+            ListTile(
+              key: const Key('birth-date-fixed'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.cake_outlined),
+              title: Text('Дата рождения: ${BirthDateField.format(born)}'),
+              subtitle: const Text('Видна только вам. Изменить можно через поддержку'),
+            )
+          else ...[
+            BirthDateField(
+              value: _birth,
+              enabled: !_busy,
+              onChanged: (d) => setState(() => _birth = d),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Нужна для стикеров 18+. Видна только вам, изменить потом нельзя.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          const SizedBox(height: 10),
           const SizedBox(height: 10),
           TextField(
             controller: _bio,
