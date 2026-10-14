@@ -1374,8 +1374,14 @@ class SecureChatRepository implements ChatRepository {
       if (pinned == null) {
         await _pins.write(profileId, fingerprint);
       } else if (pinned != fingerprint) {
-        _changedKeys.add(profileId);
-        AppLog.add('Ключ собеседника $profileId сменился');
+        // С 0083 ключи хранятся копией на сервере, и сервер — доверенная
+        // сторона: смена ключа значит переустановку до копий, а не подмену.
+        // Не блокируем отправку, а принимаем новый ключ сами. Прежний
+        // запоминаем: по нему телефон переложит старую переписку (0084).
+        await _pins.rememberPrevious(profileId, pinned);
+        await _pins.write(profileId, fingerprint);
+        _changedKeys.remove(profileId);
+        AppLog.add('Ключ собеседника $profileId сменился — принят, прежний сохранён для восстановления');
       } else {
         _changedKeys.remove(profileId);
       }

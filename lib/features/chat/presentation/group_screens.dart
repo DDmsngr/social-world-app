@@ -47,15 +47,25 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     super.dispose();
   }
 
+  /// Название не ввели — группа называется по участникам: «Лев, Вика и ещё 2».
+  String get _effectiveTitle {
+    final typed = _title.text.trim();
+    if (typed.isNotEmpty) return typed;
+    final names = [for (final p in _selected.values) p.displayName.split(' ').first];
+    if (names.length <= 3) return names.join(', ');
+    return '${names.take(2).join(', ')} и ещё ${names.length - 2}';
+  }
+
   Future<void> _create() async {
     setState(() => _saving = true);
+    final title = _effectiveTitle;
     try {
       final id = await ref
           .read(chatRepositoryProvider)
-          .createGroup(title: _title.text, memberIds: _selected.keys.toList());
+          .createGroup(title: title, memberIds: _selected.keys.toList());
       ref.invalidate(conversationsProvider);
       if (mounted) {
-        context.pushReplacement('${Routes.chats}/$id', extra: _title.text.trim());
+        context.pushReplacement('${Routes.chats}/$id', extra: title);
       }
     } catch (error) {
       if (mounted) _showError(context, error, 'Не удалось создать группу');
@@ -66,7 +76,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = _title.text.trim().isNotEmpty && !_saving;
+    // Создать можно, когда есть название или хотя бы один участник.
+    final ready = (_title.text.trim().isNotEmpty || _selected.isNotEmpty) && !_saving;
 
     return Scaffold(
       appBar: AppBar(
