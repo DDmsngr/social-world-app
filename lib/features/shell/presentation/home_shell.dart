@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../assistant/assistant.dart';
 import '../../../core/config/feature_flags.dart';
 import '../../../core/debug/app_log.dart';
 import '../../../core/push/push_service.dart';
@@ -117,6 +118,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
         }
       }
       ref.read(pushServiceProvider).start();
+      unawaited(reloadAvatarRings());
       ref.read(callControllerProvider).start();
       // Всё, чем делились из других приложений, пока ChaWo был закрыт.
       unawaited(ref.read(incomingShareProvider.notifier).start());

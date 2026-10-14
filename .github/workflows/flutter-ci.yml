@@ -20,9 +20,12 @@ on:
         type: string
         default: ""
 
+# На main сборки встают в очередь, а не отменяют друг друга: 14.10 частые
+# пуши подряд отменяли каждую сборку, и обновление не выходило три часа.
+# В очереди ждёт только самый свежий пуш — промежуточные GitHub пропускает сам.
 concurrency:
   group: flutter-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read

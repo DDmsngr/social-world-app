@@ -22,6 +22,36 @@ ImageProvider imageProviderFor(String url) {
 void openProfile(BuildContext context, String userId) =>
     context.push('${Routes.user}/$userId');
 
+/// Кайма вокруг аватара: золотая у команды проекта, зелёная у
+/// тестировщиков (миграция 0087). Список короткий, грузится один раз после
+/// входа ([AvatarRings.load]); без него аватары просто без каймы.
+enum AvatarRing {
+  gold(Color(0xFFC7A660)),
+  green(Color(0xFF5E9E73));
+
+  const AvatarRing(this.color);
+
+  final Color color;
+}
+
+abstract final class AvatarRings {
+  static final byUser = ValueNotifier<Map<String, AvatarRing>>(const {});
+
+  /// [rows] — ответ profile_rings(): `[{profile_id, ring}]`.
+  static void set(Iterable<Map<String, dynamic>> rows) {
+    final rings = <String, AvatarRing>{};
+    for (final row in rows) {
+      final ring = switch (row['ring']) {
+        'gold' => AvatarRing.gold,
+        'green' => AvatarRing.green,
+        _ => null,
+      };
+      if (ring != null) rings[row['profile_id'] as String] = ring;
+    }
+    byUser.value = rings;
+  }
+}
+
 /// Аватар человека. С [userId] он ещё и нажимается — открывает профиль:
 /// так во всех местах, где виден человек (пост, комментарий, участник события,
 /// уведомление), тап по аватару или имени ведёт в одно и то же место.
@@ -32,12 +62,17 @@ class UserAvatar extends StatelessWidget {
     this.url,
     this.userId,
     this.radius = 18,
+    this.ringUserId,
   });
 
   final String name;
   final String? url;
   final String? userId;
   final double radius;
+
+  /// Чья кайма, если аватар не нажимается ([userId] не задан), но известно,
+  /// чей он: шапка чата, профиль, блик.
+  final String? ringUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -56,8 +91,31 @@ class UserAvatar extends StatelessWidget {
             ),
     );
 
+    final ringId = ringUserId ?? userId;
+    final ringed = ringId == null
+        ? avatar
+        : ValueListenableBuilder<Map<String, AvatarRing>>(
+            valueListenable: AvatarRings.byUser,
+            child: avatar,
+            builder: (_, rings, child) {
+              final ring = rings[ringId];
+              if (ring == null) return child!;
+              // Кольцо снаружи, с тонким зазором: размер аватара не меняется
+              // для соседей по строке — кольцо ложится поверх отступа.
+              final width = radius >= 30 ? 2.5 : 1.8;
+              return Container(
+                padding: EdgeInsets.all(width + 1),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: ring.color, width: width),
+                ),
+                child: child,
+              );
+            },
+          );
+
     final id = userId;
-    if (id == null) return avatar;
+    if (id == null) return ringed;
 
     return Semantics(
       button: true,
@@ -65,7 +123,7 @@ class UserAvatar extends StatelessWidget {
       child: InkResponse(
         onTap: () => openProfile(context, id),
         radius: radius + 6,
-        child: avatar,
+        child: ringed,
       ),
     );
   }

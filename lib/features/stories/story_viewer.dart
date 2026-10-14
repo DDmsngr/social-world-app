@@ -433,6 +433,7 @@ class _StoryViewerScreenState extends ConsumerState<StoryViewerScreen>
                                 name: story.authorName,
                                 url: story.authorAvatarUrl,
                                 radius: 16,
+                                ringUserId: story.authorId,
                               ),
                               const SizedBox(width: 10),
                               Flexible(

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/env.dart';
 import '../../core/debug/app_log.dart';
+import '../../core/widgets/user_avatar.dart';
 import '../auth/presentation/providers/auth_providers.dart';
 
 /// Чат «Помощник» у владельца проекта или «Для багов» у тестировщика
@@ -174,3 +175,15 @@ final assistantMessagesProvider =
       if (repo == null) return const Stream.empty();
       return repo.watch(channel);
     });
+
+/// Кто с каймой у аватара (команда, тестировщики, 0087). Без миграции или
+/// сети — без каймы.
+Future<void> reloadAvatarRings() async {
+  if (!Env.isConfigured) return;
+  try {
+    final rows = await Supabase.instance.client.rpc('profile_rings') as List;
+    AvatarRings.set([for (final row in rows) Map<String, dynamic>.from(row as Map)]);
+  } catch (error) {
+    AppLog.add('Каймы аватаров не загрузились: $error');
+  }
+}

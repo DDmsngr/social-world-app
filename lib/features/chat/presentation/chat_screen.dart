@@ -577,6 +577,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   name: info?.displayName ?? widget.peerName,
                   url: info?.peerAvatarUrl,
                   radius: 19,
+                  ringUserId: info?.peerId,
                 )
               else
                 CircleAvatar(

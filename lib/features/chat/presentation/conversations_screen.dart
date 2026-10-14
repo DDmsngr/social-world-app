@@ -487,6 +487,7 @@ class _ConversationTile extends StatelessWidget {
                 name: conversation.displayName,
                 url: conversation.peerAvatarUrl,
                 radius: 22,
+                ringUserId: conversation.peerId,
               ),
             )
           else if (conversation.isChannel)

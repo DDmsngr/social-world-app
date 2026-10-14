@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -198,6 +200,7 @@ class _OtherMenu extends ConsumerWidget {
             try {
               await ref.read(assistantRepositoryProvider)?.setTester(profile.id, on);
               ref.invalidate(profileTesterProvider(profile.id));
+              unawaited(reloadAvatarRings());
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -370,12 +373,14 @@ class _BodyState extends ConsumerState<_Body> {
                         name: profile.displayName,
                         url: profile.avatarUrl,
                         radius: 38,
+                        ringUserId: profile.id,
                       ),
                     )
                   : UserAvatar(
                       name: profile.displayName,
                       url: profile.avatarUrl,
                       radius: 38,
+                      ringUserId: profile.id,
                     ),
             ),
             const SizedBox(width: 12),
