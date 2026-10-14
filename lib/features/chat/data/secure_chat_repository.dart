@@ -72,6 +72,13 @@ class SecureChatRepository implements ChatRepository {
   /// Собеседники, чей ключ на сервере не совпал с запомненным.
   final _changedKeys = <String>{};
 
+  /// Копии сообщений, переложенные собеседником под мой новый ключ (0084):
+  /// id сообщения → строка копии; null — копии нет (уже спрашивали).
+  final _rekeys = <String, Map<String, dynamic>?>{};
+
+  /// Чаты, переписку которых телефон сейчас перекладывает для собеседника.
+  final _rekeying = <String>{};
+
   @override
   bool get endToEndEncryptionEnabled => true;
 
@@ -124,6 +131,7 @@ class SecureChatRepository implements ChatRepository {
     final peerKeys = kind == ConversationKind.direct && peerId != null
         ? await _loadPublicKeys(peerId)
         : null;
+    if (peerKeys != null) unawaited(_rekeyForPeer(id, peerId!, peerKeys));
 
     ChatMessage? last;
     final lastId = row['last_id'] as String?;
@@ -347,6 +355,7 @@ class SecureChatRepository implements ChatRepository {
       // Если собеседник сам написал после моего сообщения, он его видел, даже
       // когда его отметка «прочитано» ещё не дошла (или его приложение
       // старой версии и вовсе её не двигает).
+      await _prefetchRekeys([for (final row in rows) row['id'] as String]);
       var peerSeen = feed.peerLastReadAt;
       for (final row in rows) {
         if (row['sender_id'] == currentUserId) continue;
@@ -1051,22 +1060,44 @@ class SecureChatRepository implements ChatRepository {
     final sentAt = DateTime.parse(row['sent_at'] as String).toLocal();
 
     try {
-      final decrypted = await crypto.decrypt(
-        conversationId: conversationId,
-        messageId: row['id'] as String,
-        senderId: senderId,
-        peerExchangeKey: peerKeys.exchangeKey,
-        senderSigningKey: senderKeys.signingKey,
-        payload: EncryptedChatPayload(
-          ciphertext: row['ciphertext'] as String,
-          nonce: row['nonce'] as String,
-          mac: row['mac'] as String,
-          signature: row['signature'] as String,
-        ),
-      );
+      DecryptedChatPayload decrypted;
+      try {
+        decrypted = await crypto.decrypt(
+          conversationId: conversationId,
+          messageId: row['id'] as String,
+          senderId: senderId,
+          peerExchangeKey: peerKeys.exchangeKey,
+          senderSigningKey: senderKeys.signingKey,
+          payload: EncryptedChatPayload(
+            ciphertext: row['ciphertext'] as String,
+            nonce: row['nonce'] as String,
+            mac: row['mac'] as String,
+            signature: row['signature'] as String,
+          ),
+        );
+      } catch (_) {
+        decrypted = const DecryptedChatPayload(signatureValid: false);
+      }
+      // Не открылось — сообщение под моим прежним ключом (переустановка).
+      // Может, собеседник уже переложил его под нынешний.
+      if (decrypted.text == null) {
+        final rescued = await _openRekey(row['id'] as String, conversationId, peerKeys);
+        if (rescued != null) {
+          decrypted = DecryptedChatPayload(text: rescued, signatureValid: true);
+        } else {
+          return ChatMessage(
+            id: row['id'] as String,
+            conversationId: conversationId,
+            senderId: senderId,
+            sentAt: sentAt,
+            text: unavailableMessageText,
+            status: _status(sentAt, peerLastReadAt),
+          );
+        }
+      }
       final clear = decrypted.text;
       var kind = MessageKind.text;
-      var text = clear ?? 'Сообщение не прошло проверку подписи';
+      var text = clear ?? unavailableMessageText;
       ChatAttachment? attachment;
       var meta = ChatMeta.empty;
       if (clear != null) {
@@ -1106,6 +1137,166 @@ class SecureChatRepository implements ChatRepository {
         status: MessageStatus.failed,
         signatureValid: false,
       );
+    }
+  }
+
+  /// Подпись вместо сообщения, которое не расшифровать: оно под прежним ключом,
+  /// а собеседник его ещё не переложил (или не может).
+  static const unavailableMessageText = 'Сообщение недоступно: ключ шифрования сменился после переустановки';
+
+  /// Копии для пачки сообщений одним запросом. Нет таблицы (0084 не накатана)
+  /// или сети — просто без копий.
+  Future<void> _prefetchRekeys(List<String> ids) async {
+    final missing = [for (final id in ids) if (!_rekeys.containsKey(id)) id];
+    if (missing.isEmpty) return;
+    try {
+      final myKey = (await (await _ready).publicKeys).exchangeKey;
+      for (var i = 0; i < missing.length; i += 200) {
+        final part = missing.sublist(i, i + 200 > missing.length ? missing.length : i + 200);
+        final rows = await _client
+            .from('chat_message_rekeys')
+            .select('message_id, helper_id, ciphertext, nonce, mac, signature')
+            .eq('recipient_key', myKey)
+            .inFilter('message_id', part)
+            .timeout(_netTimeout);
+        for (final id in part) {
+          _rekeys.putIfAbsent(id, () => null);
+        }
+        for (final row in rows) {
+          _rekeys[row['message_id'] as String] = Map<String, dynamic>.from(row);
+        }
+      }
+    } catch (error) {
+      AppLog.add('Копии переписки не загрузились: $error');
+    }
+  }
+
+  /// Текст из копии, которую собеседник переложил под мой нынешний ключ.
+  Future<String?> _openRekey(String messageId, String conversationId, ChatPublicKeys peerKeys) async {
+    if (!_rekeys.containsKey(messageId)) await _prefetchRekeys([messageId]);
+    final copy = _rekeys[messageId];
+    if (copy == null) return null;
+    // Копию делает и подписывает только собеседник этого личного чата.
+    if (copy['helper_id'] != await _peerId(conversationId)) return null;
+    try {
+      final opened = await (await _ready).decrypt(
+        conversationId: conversationId,
+        messageId: messageId,
+        senderId: copy['helper_id'] as String,
+        peerExchangeKey: peerKeys.exchangeKey,
+        senderSigningKey: peerKeys.signingKey,
+        payload: EncryptedChatPayload(
+          ciphertext: copy['ciphertext'] as String,
+          nonce: copy['nonce'] as String,
+          mac: copy['mac'] as String,
+          signature: copy['signature'] as String,
+        ),
+      );
+      return opened.text;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Собеседник сменил ключ (переустановил приложение до копий ключей), а
+  /// его прежний ключ у нас запомнен: расшифровываем нашу общую переписку
+  /// прежним ключом и кладём копии под новый (0084). Один раз на каждый его
+  /// новый ключ. Любой сбой — попробуем при следующей загрузке чатов.
+  Future<void> _rekeyForPeer(String conversationId, String peerId, ChatPublicKeys current) async {
+    final currentFp = peerKeyFingerprint(current);
+    if (_rekeying.contains(conversationId)) return;
+    _rekeying.add(conversationId);
+    try {
+      final pinned = await _pins.read(peerId);
+      final olds = <String>{
+        if (pinned != null && pinned != currentFp) pinned,
+        ...await _pins.previous(peerId),
+      }..remove(currentFp);
+      if (olds.isEmpty || await _pins.rekeyed(peerId, currentFp)) return;
+
+      final crypto = await _ready;
+      final myKeys = await crypto.publicKeys;
+      final oldKeys = [
+        for (final fp in olds)
+          if (fp.split('|') case [final exchange, final signing])
+            ChatPublicKeys(exchangeKey: exchange, signingKey: signing),
+      ];
+      var copied = 0;
+      for (var from = 0;; from += 500) {
+        final rows = await _client
+            .from('chat_messages')
+            .select('id, sender_id, ciphertext, nonce, mac, signature')
+            .eq('conversation_id', conversationId)
+            .order('sent_at')
+            .range(from, from + 499)
+            .timeout(_netTimeout);
+        final copies = <Map<String, dynamic>>[];
+        for (final row in rows) {
+          // Удалённое у всех — без содержимого, перекладывать нечего.
+          if (row['ciphertext'] == null || row['signature'] == null) continue;
+          final messageId = row['id'] as String;
+          final senderId = row['sender_id'] as String;
+          for (final old in oldKeys) {
+            String? clear;
+            try {
+              clear = (await crypto.decrypt(
+                conversationId: conversationId,
+                messageId: messageId,
+                senderId: senderId,
+                peerExchangeKey: old.exchangeKey,
+                senderSigningKey: senderId == currentUserId ? myKeys.signingKey : old.signingKey,
+                payload: EncryptedChatPayload(
+                  ciphertext: row['ciphertext'] as String,
+                  nonce: row['nonce'] as String,
+                  mac: row['mac'] as String,
+                  signature: row['signature'] as String,
+                ),
+              )).text;
+            } catch (_) {
+              clear = null;
+            }
+            if (clear == null) continue;
+            final copy = await crypto.encrypt(
+              conversationId: conversationId,
+              messageId: messageId,
+              senderId: currentUserId,
+              recipientExchangeKey: current.exchangeKey,
+              text: clear,
+            );
+            copies.add({
+              'message_id': messageId,
+              'recipient_key': current.exchangeKey,
+              'recipient_id': peerId,
+              'helper_id': currentUserId,
+              'ciphertext': copy.ciphertext,
+              'nonce': copy.nonce,
+              'mac': copy.mac,
+              'signature': copy.signature,
+            });
+            break;
+          }
+        }
+        for (var i = 0; i < copies.length; i += 100) {
+          await _client
+              .from('chat_message_rekeys')
+              .upsert(
+                copies.sublist(i, i + 100 > copies.length ? copies.length : i + 100),
+                onConflict: 'message_id,recipient_key',
+                ignoreDuplicates: true,
+              )
+              .timeout(_netTimeout);
+        }
+        copied += copies.length;
+        if (rows.length < 500) break;
+      }
+      await _pins.markRekeyed(peerId, currentFp);
+      AppLog.add('Переписка с $peerId переложена под его новый ключ: $copied сообщений');
+    } on PostgrestException catch (error) {
+      if (!_missingRelation(error)) AppLog.add('Переписка не переложилась: ${error.message}');
+    } catch (error) {
+      AppLog.add('Переписка не переложилась: $error');
+    } finally {
+      _rekeying.remove(conversationId);
     }
   }
 
@@ -1218,6 +1409,10 @@ class SecureChatRepository implements ChatRepository {
     final peerId = await _peerId(conversationId);
     final keys = await _loadPublicKeys(peerId);
     if (keys == null) return;
+    final pinned = await _pins.read(peerId);
+    if (pinned != null && pinned != peerKeyFingerprint(keys)) {
+      await _pins.rememberPrevious(peerId, pinned);
+    }
     await _pins.write(peerId, peerKeyFingerprint(keys));
     _changedKeys.remove(peerId);
   }
