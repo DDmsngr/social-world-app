@@ -189,6 +189,7 @@ abstract final class PendingInvite {
   static const _codeKey = 'invites.pending_code';
   static const _sourceKey = 'invites.pending_source';
   static const _clipboardKey = 'invites.clipboard_checked';
+  static const _promptedKey = 'invites.prompted';
 
   static Future<void> save(String code, String source) async {
     final prefs = await SharedPreferences.getInstance();
@@ -207,6 +208,17 @@ abstract final class PendingInvite {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_codeKey);
     await prefs.remove(_sourceKey);
+  }
+
+  /// Вопрос «Вас пригласили в ChaWo?» задаём один раз за установку.
+  static Future<bool> wasPrompted() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_promptedKey) ?? false;
+  }
+
+  static Future<void> markPrompted() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_promptedKey, true);
   }
 
   /// Буфер обмена смотрим один раз за установку: Android показывает человеку
@@ -262,6 +274,21 @@ class InviteRepository {
       params: {'in_code': code, 'in_device': await DeviceFingerprint.get(), 'in_source': source},
     );
     return (raw as Map?)?['inviter_name'] as String?;
+  }
+
+  /// Можно ли ещё указать пригласившего (профиль новый, связи нет).
+  Future<bool> claimOpen() async => (await _client.rpc('referral_claim_open')) == true;
+
+  /// «Я позвал людей с такими номерами» (хеши, как в сверке контактов): когда
+  /// человек войдёт с подтверждённым номером, сервер сам засчитает приглашение.
+  Future<void> recordPhoneInvites(Iterable<String> hashes) async {
+    final list = hashes.take(20).toList();
+    if (list.isEmpty) return;
+    try {
+      await _client.rpc('record_phone_invites', params: {'p_hashes': list});
+    } catch (error) {
+      AppLog.add('Приглашение по номеру не записалось: $error');
+    }
   }
 
   Future<void> reportDevice() async {

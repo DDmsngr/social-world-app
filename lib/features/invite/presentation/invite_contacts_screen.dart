@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +16,7 @@ import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../profile/presentation/providers/profile_providers.dart';
+import '../../referrals/invites.dart';
 import '../data/contacts_match.dart';
 
 /// Прямая ссылка на файл последней сборки: открыл — пошло скачивание.
@@ -22,10 +25,10 @@ const _downloadUrl =
 
 enum _Phase { intro, loading, ready, denied, failed }
 
-/// Отдаёт ли VK номер телефона при входе. Пока право `phone` не одобрено в
-/// кабинете VK ID (и не добавлено в scope в oauth-vk-start), кнопка «Подтвердить
-/// через VK» ничего не меняла бы, поэтому её нет. Одобрили — поставить true.
-const vkReturnsPhone = false;
+/// Отдаёт ли VK номер телефона при входе. Право `phone` одобрено в кабинете
+/// VK ID (14.10.2026) и включено в scope в oauth-vk-start, поэтому кнопка
+/// «Подтвердить через VK» работает. Если право отзовут — поставить false.
+const vkReturnsPhone = true;
 
 /// Приглашение из записной книжки: сверху те, кто уже в ChaWo, ниже — остальные
 /// контакты с кнопкой «Пригласить». Номера контактов на сервер не уходят,
@@ -151,8 +154,19 @@ class _InviteContactsScreenState extends ConsumerState<InviteContactsScreen>
   }
 
   Future<void> _invite(PhoneContact contact) async {
+    // Запоминаем номер: когда человек войдёт с этим подтверждённым номером,
+    // сервер сам засчитает приглашение, даже если код он не вводил.
+    unawaited(ref.read(inviteRepositoryProvider)?.recordPhoneInvites(contact.hashes) ?? Future<void>.value());
+    // В СМС — личная ссылка: страница положит код в буфер обмена и даст скачать.
+    var link = _downloadUrl;
+    try {
+      final overview = await ref.read(referralOverviewProvider.future);
+      if (overview != null) link = overview.link.toString();
+    } catch (error) {
+      AppLog.add('Личная ссылка для приглашения: $error');
+    }
     final body = Uri.encodeComponent(
-      'Я в ChaWo — присоединяйся! Приложение для Android: $_downloadUrl',
+      'Я в ChaWo — присоединяйся! Приложение для Android: $link',
     );
     final uri = Uri.parse('sms:${contact.phones.first}?body=$body');
     final ok = await launchUrl(uri);

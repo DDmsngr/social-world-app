@@ -1,3 +1,4 @@
+import 'invite_code_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -215,27 +216,8 @@ class _Body extends ConsumerWidget {
   }
 
   Future<void> _enterCode(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final code = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Код пригласившего'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.characters,
-          maxLength: 10,
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]'))],
-          decoration: const InputDecoration(hintText: 'ABC234', counterText: ''),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('Готово')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (code == null || code.length < 6 || !context.mounted) return;
+    final code = await askInviteCode(context);
+    if (code == null || !context.mounted) return;
     final repo = ref.read(inviteRepositoryProvider);
     if (repo == null) return;
     try {
