@@ -1,0 +1,29 @@
+{
+ "id": "stanochnik",
+ "title": "Станочник",
+ "description": "Станочник с гаечным ключом и вечным «щас сделаем». Пятница, станок и немного лирики. Про выпивку, 18+.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 90,
+ "version": 1,
+ "sheet": "sheets/stanochnik.png",
+ "grid": [4, 3],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {"key": "shchas_sdelaem", "title": "щас сделаем", "emoji": "👍", "emotions": ["cool", "joy"], "synonyms": ["щас", "сделаем", "сделаю", "ладно", "потом"]},
+  {"key": "ya_ne_pyanyy", "title": "я не пьяный", "emoji": "🥴", "emotions": ["tired", "cool"], "synonyms": ["не пьяный", "трезвый", "устал", "пошатывает", "выпил"]},
+  {"key": "pyatnitsa_zhe", "title": "пятница же", "emoji": "🍺", "emotions": ["joy", "party"], "synonyms": ["пятница", "пиво", "выходные", "расслабиться", "ура"]},
+  {"key": "gde_klyuch", "title": "где мой ключ", "emoji": "🔧", "emotions": ["think", "tired"], "synonyms": ["ключ", "потерял", "искать", "инструмент", "где"]},
+  {"key": "ne_trogay", "title": "не трогай, я настроил", "emoji": "✋", "emotions": ["anger", "cool"], "synonyms": ["не трогай", "настроил", "станок", "руки", "моё"]},
+  {"key": "a_ya_govoril", "title": "а я говорил", "emoji": "😒", "emotions": ["think", "cool"], "synonyms": ["говорил", "предупреждал", "вот видишь", "я же", "ну вот"]},
+  {"key": "da_normalno_vse", "title": "да нормально всё", "emoji": "🤷", "emotions": ["cool", "tired"], "synonyms": ["нормально", "всё ок", "ерунда", "пустяки", "да ладно"]},
+  {"key": "opa", "title": "опа...", "emoji": "😳", "emotions": ["surprise", "fear"], "synonyms": ["опа", "ой", "упс", "сломалось", "ничего себе"]},
+  {"key": "poslednyaya_i_domoy", "title": "последняя и домой", "emoji": "🥃", "emotions": ["tired", "party"], "synonyms": ["последняя", "домой", "рюмка", "по одной", "хватит"]},
+  {"key": "kto_prikrutil", "title": "кто это сюда прикрутил?", "emoji": "🤨", "emotions": ["surprise", "anger"], "synonyms": ["кто", "прикрутил", "зачем", "что за", "откуда"]},
+  {"key": "ne_mozhet_byt", "title": "не может быть", "emoji": "😱", "emotions": ["surprise", "fear"], "synonyms": ["не может быть", "шок", "как так", "ужас", "ого"]},
+  {"key": "zavtra_razberemsya", "title": "завтра разберёмся", "emoji": "😴", "emotions": ["tired", "cool"], "synonyms": ["завтра", "потом", "разберёмся", "лень", "отложим"]}
+ ]
+}

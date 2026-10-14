@@ -1,0 +1,205 @@
+{
+ "id": "stanochnik",
+ "title": "Станочник",
+ "description": "Станочник с гаечным ключом и вечным «щас сделаем». Пятница, станок и немного лирики. Про выпивку, 18+.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 90,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "shchas_sdelaem",
+   "title": "щас сделаем",
+   "emoji": "👍",
+   "synonyms": [
+    "щас",
+    "сделаем",
+    "сделаю",
+    "ладно",
+    "потом"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "ya_ne_pyanyy",
+   "title": "я не пьяный",
+   "emoji": "🥴",
+   "synonyms": [
+    "не пьяный",
+    "трезвый",
+    "устал",
+    "пошатывает",
+    "выпил"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  },
+  {
+   "key": "pyatnitsa_zhe",
+   "title": "пятница же",
+   "emoji": "🍺",
+   "synonyms": [
+    "пятница",
+    "пиво",
+    "выходные",
+    "расслабиться",
+    "ура"
+   ],
+   "emotions": [
+    "joy",
+    "party"
+   ]
+  },
+  {
+   "key": "gde_klyuch",
+   "title": "где мой ключ",
+   "emoji": "🔧",
+   "synonyms": [
+    "ключ",
+    "потерял",
+    "искать",
+    "инструмент",
+    "где"
+   ],
+   "emotions": [
+    "think",
+    "tired"
+   ]
+  },
+  {
+   "key": "ne_trogay",
+   "title": "не трогай, я настроил",
+   "emoji": "✋",
+   "synonyms": [
+    "не трогай",
+    "настроил",
+    "станок",
+    "руки",
+    "моё"
+   ],
+   "emotions": [
+    "anger",
+    "cool"
+   ]
+  },
+  {
+   "key": "a_ya_govoril",
+   "title": "а я говорил",
+   "emoji": "😒",
+   "synonyms": [
+    "говорил",
+    "предупреждал",
+    "вот видишь",
+    "я же",
+    "ну вот"
+   ],
+   "emotions": [
+    "think",
+    "cool"
+   ]
+  },
+  {
+   "key": "da_normalno_vse",
+   "title": "да нормально всё",
+   "emoji": "🤷",
+   "synonyms": [
+    "нормально",
+    "всё ок",
+    "ерунда",
+    "пустяки",
+    "да ладно"
+   ],
+   "emotions": [
+    "cool",
+    "tired"
+   ]
+  },
+  {
+   "key": "opa",
+   "title": "опа...",
+   "emoji": "😳",
+   "synonyms": [
+    "опа",
+    "ой",
+    "упс",
+    "сломалось",
+    "ничего себе"
+   ],
+   "emotions": [
+    "surprise",
+    "fear"
+   ]
+  },
+  {
+   "key": "poslednyaya_i_domoy",
+   "title": "последняя и домой",
+   "emoji": "🥃",
+   "synonyms": [
+    "последняя",
+    "домой",
+    "рюмка",
+    "по одной",
+    "хватит"
+   ],
+   "emotions": [
+    "tired",
+    "party"
+   ]
+  },
+  {
+   "key": "kto_prikrutil",
+   "title": "кто это сюда прикрутил?",
+   "emoji": "🤨",
+   "synonyms": [
+    "кто",
+    "прикрутил",
+    "зачем",
+    "что за",
+    "откуда"
+   ],
+   "emotions": [
+    "surprise",
+    "anger"
+   ]
+  },
+  {
+   "key": "ne_mozhet_byt",
+   "title": "не может быть",
+   "emoji": "😱",
+   "synonyms": [
+    "не может быть",
+    "шок",
+    "как так",
+    "ужас",
+    "ого"
+   ],
+   "emotions": [
+    "surprise",
+    "fear"
+   ]
+  },
+  {
+   "key": "zavtra_razberemsya",
+   "title": "завтра разберёмся",
+   "emoji": "😴",
+   "synonyms": [
+    "завтра",
+    "потом",
+    "разберёмся",
+    "лень",
+    "отложим"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  }
+ ]
+}
