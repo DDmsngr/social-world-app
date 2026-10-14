@@ -24,6 +24,7 @@ import '../../feed/presentation/providers/feed_providers.dart';
 import '../../feed/presentation/providers/publish_settings_provider.dart';
 import '../../feed/presentation/widgets/publish_settings_panel.dart';
 import '../../stories/story_composer.dart';
+import '../../profile/presentation/widgets/mention_suggestions.dart';
 import '../data/post_drafts.dart';
 import 'widgets/article_editor.dart';
 import 'widgets/tag_row.dart';
@@ -642,6 +643,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
                 maxLength: 500,
                 onChanged: () => setState(() {}),
               ),
+              MentionSuggestions(controller: _bodyController),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -732,6 +734,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
                   alignLabelWithHint: true,
                 ),
               ),
+              MentionSuggestions(controller: _descriptionController),
             ],
             if (_kind.isPost) ...[
               const SizedBox(height: 14),

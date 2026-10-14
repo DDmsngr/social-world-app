@@ -18,7 +18,10 @@ enum LinkTarget {
   chat('chat'),
 
   /// Операция в истории баллов (уведомления о приглашениях).
-  points('points');
+  points('points'),
+
+  /// Блик: упоминание в нём приходит уведомлением, тап открывает его.
+  story('story');
 
   const LinkTarget(this.segment);
 
@@ -204,5 +207,6 @@ abstract final class DeepLinks {
         LinkTarget.need => '${Routes.needDetail}/$id',
         LinkTarget.chat => '${Routes.chats}/$id',
         LinkTarget.points => Routes.activityPoints,
+        LinkTarget.story => Routes.story(id),
       };
 }

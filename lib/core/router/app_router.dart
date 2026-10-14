@@ -74,6 +74,7 @@ import '../../features/shell/presentation/home_shell.dart';
 import '../../features/stickers/presentation/my_stickers_screen.dart';
 import '../../features/stickers/presentation/sticker_pack_screen.dart';
 import '../../features/stickers/presentation/sticker_store_screen.dart';
+import '../../features/stories/story_link.dart';
 import '../widgets/splash_screen.dart';
 
 abstract final class Routes {
@@ -81,6 +82,9 @@ abstract final class Routes {
   static const signIn = '/sign-in';
   static const onboarding = '/onboarding';
   static const age = '/age';
+
+  /// Один блик по id (из уведомления): открывает просмотр поверх.
+  static String story(String id) => '/stories/$id';
   static const feed = '/feed';
   static const discover = '/discover';
   static const home = discover;
@@ -280,6 +284,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.age,
         builder: (_, _) => const AgeScreen(),
+      ),
+      GoRoute(
+        path: '/stories/:storyId',
+        builder: (_, state) => StoryOpenScreen(storyId: state.pathParameters['storyId']!),
       ),
       GoRoute(
         path: Routes.routeRecorder,

@@ -13,7 +13,12 @@ const storyReplyPrefix = 'story-';
 /// говорим, что его уже нет, а не молчим.
 Future<void> openStoryFromReply(BuildContext context, WidgetRef ref, String replyMessageId) async {
   if (!replyMessageId.startsWith(storyReplyPrefix)) return;
-  final id = replyMessageId.substring(storyReplyPrefix.length);
+  await openStoryById(context, ref, replyMessageId.substring(storyReplyPrefix.length));
+}
+
+/// Открыть один блик по id: из цитаты в чате или из уведомления об
+/// упоминании. Блика уже нет (живут сутки) — так и говорим.
+Future<void> openStoryById(BuildContext context, WidgetRef ref, String id) async {
   final messenger = ScaffoldMessenger.of(context);
   Story? found;
   StoryGroup? group;
@@ -42,5 +47,33 @@ Future<void> openStoryFromReply(BuildContext context, WidgetRef ref, String repl
     context,
     groups: [group.copyWith(stories: [found])],
     initialGroup: 0,
+  );
+}
+
+/// Экран-переходник для адреса `/stories/<id>` (уведомление об упоминании):
+/// открывает просмотр блика и закрывается, когда его закрыли.
+class StoryOpenScreen extends ConsumerStatefulWidget {
+  const StoryOpenScreen({super.key, required this.storyId});
+
+  final String storyId;
+
+  @override
+  ConsumerState<StoryOpenScreen> createState() => _StoryOpenScreenState();
+}
+
+class _StoryOpenScreenState extends ConsumerState<StoryOpenScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await openStoryById(context, ref, widget.storyId);
+      if (mounted) Navigator.of(context).maybePop();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+    backgroundColor: Colors.black,
+    body: Center(child: CircularProgressIndicator()),
   );
 }

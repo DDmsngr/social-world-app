@@ -13,6 +13,7 @@ import '../../core/text/markdown_preview.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/user_avatar.dart';
 import '../feed/domain/entities/post.dart';
+import '../profile/presentation/widgets/mention_suggestions.dart';
 import 'stories.dart';
 
 /// Что войдёт в сторис. Файл с телефона ([localPath]) перед публикацией
@@ -413,6 +414,8 @@ class _StoryComposerScreenState extends ConsumerState<StoryComposerScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          // Подсказка @ника и для текста блика, и для подписи к фото/видео.
+          MentionSuggestions(controller: _text),
           if (_kind == StoryKind.text)
             SizedBox(
               height: 40,
