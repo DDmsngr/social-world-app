@@ -3,22 +3,34 @@ name: channel-feeder
 # Наполняет системные каналы ChaWo (@chawo_*) постами из публичных
 # Telegram-каналов. Как часто постить в каждый канал, решает сам скрипт
 # (everyMin в tools/channel-feeder/feed.mjs), здесь — только частота проверки.
+#
+# GitHub отдаёт расписанию `*/10` лишь один запуск в 3–7 часов, и лента вставала
+# на полдня. Поэтому каждый запуск после работы ждёт ~8 минут и сам запускает
+# следующий (цепочка), а cron оставлен страховкой на случай обрыва цепочки.
+# Репозиторий публичный: минуты Actions не тратятся.
+#
+# Остановить цепочку: переменная репозитория FEEDER_CHAIN = off
+# (Settings → Secrets and variables → Actions → Variables). Тогда работает
+# только расписание.
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
+# Один запуск за раз; пока идёт текущий, ждёт не больше одного следующего —
+# цепочка и cron не удваивают друг друга.
 concurrency:
   group: channel-feeder
   cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   feed:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,3 +52,13 @@ jobs:
           SUPABASE_URL: https://api-socialworld.deepdrift.tech
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CHAWO_SERVICE_KEY }}
         run: node tools/channel-feeder/feed.mjs
+
+      # Следующий заход через ~8 минут, даже если этот упал (временный сбой
+      # источника не должен рвать цепочку). Отмена вручную цепочку не продолжает.
+      - name: Chain next run
+        if: ${{ always() && !cancelled() && vars.FEEDER_CHAIN != 'off' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 480
+          gh workflow run channel-feeder.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"

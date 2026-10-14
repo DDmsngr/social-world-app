@@ -30,6 +30,9 @@ const CHANNELS = [
   { handle: 'chawo_travel', sources: ['tutu_travel', 'aviasales'], everyMin: 60, perRun: 2, maxAgeH: 48 },
   { handle: 'chawo_kino', sources: ['kinopoisk', 'kineman'], everyMin: 60, perRun: 2, maxAgeH: 96 },
   { handle: 'chawo_sport', sources: ['sportsru', 'championat', 'sovsport'], everyMin: 20, perRun: 4 },
+  // Котики: проверено 14.10.2026 — prikotik и memyprokotow пишут каждый день,
+  // koticatsme реже (раз в несколько дней), поэтому у него окно свежести шире.
+  { handle: 'chawo_cats', sources: ['prikotik', 'memyprokotow', 'koticatsme'], everyMin: 30, perRun: 4, maxAgeH: 72 },
 ];
 
 const MAX_AGE_HOURS = 12;
