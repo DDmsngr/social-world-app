@@ -1,0 +1,268 @@
+{
+ "into": "stanochnik",
+ "sheet": "sheets/stanochnik_2.png",
+ "grid": [
+  4,
+  4
+ ],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {
+   "key": "privet_stanok",
+   "title": "привет!",
+   "emoji": "👋",
+   "emotions": [
+    "greet",
+    "cool"
+   ],
+   "synonyms": [
+    "привет",
+    "здорово",
+    "салют",
+    "здравствуй",
+    "хай"
+   ]
+  },
+  {
+   "key": "idi_nahuy",
+   "title": "иди нахуй",
+   "emoji": "🖕",
+   "emotions": [
+    "anger",
+    "cool"
+   ],
+   "synonyms": [
+    "нахуй",
+    "пошёл",
+    "отвали",
+    "отстань",
+    "бесишь"
+   ]
+  },
+  {
+   "key": "super",
+   "title": "супер!",
+   "emoji": "👍",
+   "emotions": [
+    "joy",
+    "cool"
+   ],
+   "synonyms": [
+    "супер",
+    "отлично",
+    "класс",
+    "здорово",
+    "годится"
+   ]
+  },
+  {
+   "key": "blin",
+   "title": "блин...",
+   "emoji": "😩",
+   "emotions": [
+    "tired",
+    "sad"
+   ],
+   "synonyms": [
+    "блин",
+    "досада",
+    "устал",
+    "печаль",
+    "вздох"
+   ]
+  },
+  {
+   "key": "chto_za_herny",
+   "title": "что за херня?!",
+   "emoji": "🤬",
+   "emotions": [
+    "anger",
+    "surprise"
+   ],
+   "synonyms": [
+    "херня",
+    "что за",
+    "бред",
+    "чушь",
+    "ничего себе"
+   ]
+  },
+  {
+   "key": "pyatnitsa_blyat",
+   "title": "пятница, блядь!",
+   "emoji": "🍻",
+   "emotions": [
+    "joy",
+    "party"
+   ],
+   "synonyms": [
+    "пятница",
+    "выходные",
+    "наконец",
+    "отдых",
+    "ура"
+   ]
+  },
+  {
+   "key": "vse_pidory",
+   "title": "всё пидоры",
+   "emoji": "🤘",
+   "emotions": [
+    "cool",
+    "party"
+   ],
+   "synonyms": [
+    "все пидоры",
+    "рок",
+    "плевать",
+    "безразлично",
+    "жги"
+   ]
+  },
+  {
+   "key": "ebuchiy_stanok",
+   "title": "ебучий станок!",
+   "emoji": "🚨",
+   "emotions": [
+    "anger",
+    "tired"
+   ],
+   "synonyms": [
+    "станок",
+    "авария",
+    "сломался",
+    "сбой",
+    "ошибка"
+   ]
+  },
+  {
+   "key": "kak_est",
+   "title": "как есть...",
+   "emoji": "🤷",
+   "emotions": [
+    "cool",
+    "tired"
+   ],
+   "synonyms": [
+    "как есть",
+    "что поделать",
+    "развёл руками",
+    "так вышло",
+    "бывает"
+   ]
+  },
+  {
+   "key": "nu_kak_to_tak",
+   "title": "ну как-то так",
+   "emoji": "☕",
+   "emotions": [
+    "cool",
+    "think"
+   ],
+   "synonyms": [
+    "как-то так",
+    "вот так",
+    "примерно",
+    "кофе",
+    "итого"
+   ]
+  },
+  {
+   "key": "ty_serezno",
+   "title": "ты серьёзно?!",
+   "emoji": "🤨",
+   "emotions": [
+    "surprise",
+    "anger"
+   ],
+   "synonyms": [
+    "серьёзно",
+    "правда",
+    "всерьёз",
+    "не может быть",
+    "что с тобой"
+   ]
+  },
+  {
+   "key": "vot_i_popali",
+   "title": "вот и попали",
+   "emoji": "🤦",
+   "emotions": [
+    "sad",
+    "tired"
+   ],
+   "synonyms": [
+    "попали",
+    "приплыли",
+    "влипли",
+    "засада",
+    "позор"
+   ]
+  },
+  {
+   "key": "spat_blyat",
+   "title": "спать, блядь...",
+   "emoji": "😴",
+   "emotions": [
+    "tired",
+    "sad"
+   ],
+   "synonyms": [
+    "спать",
+    "сон",
+    "засыпаю",
+    "устал",
+    "спокойной ночи"
+   ]
+  },
+  {
+   "key": "vnimanie",
+   "title": "внимание, ебать!",
+   "emoji": "☝️",
+   "emotions": [
+    "anger",
+    "cool"
+   ],
+   "synonyms": [
+    "внимание",
+    "слушай",
+    "важно",
+    "запомни",
+    "учти"
+   ]
+  },
+  {
+   "key": "da_kak_tak_to",
+   "title": "да как так-то?!",
+   "emoji": "😤",
+   "emotions": [
+    "anger",
+    "surprise"
+   ],
+   "synonyms": [
+    "как так",
+    "почему",
+    "не понимаю",
+    "возмущён",
+    "как же"
+   ]
+  },
+  {
+   "key": "poka_blyat",
+   "title": "пока, блядь!",
+   "emoji": "✌️",
+   "emotions": [
+    "greet",
+    "cool"
+   ],
+   "synonyms": [
+    "пока",
+    "прощай",
+    "увидимся",
+    "ушёл",
+    "бывай"
+   ]
+  }
+ ]
+}

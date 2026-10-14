@@ -1,0 +1,204 @@
+{
+ "into": "stanochnik",
+ "sheet": "sheets/stanochnik_3.png",
+ "grid": [
+  4,
+  3
+ ],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {
+   "key": "shchas_popravim",
+   "title": "щас поправим",
+   "emoji": "⌨️",
+   "emotions": [
+    "cool",
+    "think"
+   ],
+   "synonyms": [
+    "поправим",
+    "починим",
+    "исправлю",
+    "сейчас",
+    "сделаю"
+   ]
+  },
+  {
+   "key": "kto_napisal",
+   "title": "кто это написал?",
+   "emoji": "📄",
+   "emotions": [
+    "anger",
+    "surprise"
+   ],
+   "synonyms": [
+    "кто написал",
+    "программа",
+    "ошибки",
+    "накосячил",
+    "кто это"
+   ]
+  },
+  {
+   "key": "hands_off",
+   "title": "не трогай",
+   "emoji": "✋",
+   "emotions": [
+    "anger",
+    "cool"
+   ],
+   "synonyms": [
+    "не трогай",
+    "руки",
+    "не лезь",
+    "нельзя",
+    "стоп"
+   ]
+  },
+  {
+   "key": "nol_ne_tam",
+   "title": "у тебя нуль не там",
+   "emoji": "📏",
+   "emotions": [
+    "think",
+    "anger"
+   ],
+   "synonyms": [
+    "нуль",
+    "ноль",
+    "привязка",
+    "координаты",
+    "ошибся"
+   ]
+  },
+  {
+   "key": "absolyutno_normalno",
+   "title": "абсолютно нормально",
+   "emoji": "😌",
+   "emotions": [
+    "cool",
+    "joy"
+   ],
+   "synonyms": [
+    "абсолютно",
+    "нормально",
+    "стружка",
+    "порядок",
+    "штатно"
+   ]
+  },
+  {
+   "key": "postav_normalno",
+   "title": "поставь нормально",
+   "emoji": "🔩",
+   "emotions": [
+    "anger",
+    "think"
+   ],
+   "synonyms": [
+    "поставь",
+    "ровно",
+    "как надо",
+    "переставь",
+    "закрепи"
+   ]
+  },
+  {
+   "key": "gde_razmer",
+   "title": "где размер?",
+   "emoji": "❓",
+   "emotions": [
+    "think",
+    "surprise"
+   ],
+   "synonyms": [
+    "размер",
+    "чертёж",
+    "где",
+    "не указан",
+    "потерял"
+   ]
+  },
+  {
+   "key": "ne_lez_v_parametry",
+   "title": "не лезь в параметры",
+   "emoji": "🛑",
+   "emotions": [
+    "fear",
+    "anger"
+   ],
+   "synonyms": [
+    "параметры",
+    "настройки",
+    "не лезь",
+    "не трогай",
+    "сломаешь"
+   ]
+  },
+  {
+   "key": "pervyy_progon",
+   "title": "первый прогон",
+   "emoji": "🤞",
+   "emotions": [
+    "fear",
+    "think"
+   ],
+   "synonyms": [
+    "прогон",
+    "запуск",
+    "страшно",
+    "первый раз",
+    "пробуем"
+   ]
+  },
+  {
+   "key": "vot_teper_normalno",
+   "title": "вот теперь нормально",
+   "emoji": "✨",
+   "emotions": [
+    "joy",
+    "cool"
+   ],
+   "synonyms": [
+    "теперь нормально",
+    "готово",
+    "красота",
+    "получилось",
+    "идеально"
+   ]
+  },
+  {
+   "key": "dopusk_001",
+   "title": "0.01 мм, говоришь?",
+   "emoji": "🔬",
+   "emotions": [
+    "think",
+    "surprise"
+   ],
+   "synonyms": [
+    "допуск",
+    "микрон",
+    "точность",
+    "сотка",
+    "говоришь"
+   ]
+  },
+  {
+   "key": "zavtra_dopilim",
+   "title": "завтра допилим",
+   "emoji": "🌙",
+   "emotions": [
+    "tired",
+    "cool"
+   ],
+   "synonyms": [
+    "завтра",
+    "допилим",
+    "потом",
+    "отложим",
+    "хватит на сегодня"
+   ]
+  }
+ ]
+}
