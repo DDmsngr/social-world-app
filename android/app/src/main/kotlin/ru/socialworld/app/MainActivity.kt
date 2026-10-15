@@ -92,6 +92,13 @@ class MainActivity : FlutterActivity() {
         val files = ArrayList<Map<String, Any?>>()
         var skipped = 0
         for ((index, uri) in uris.withIndex()) {
+            // Только чужие content://. Иначе другое приложение «поделилось» бы
+            // file:///data/data/ru.socialworld.app/… (там сессия Supabase) или
+            // ссылкой на наш же провайдер, и файл ушёл бы собеседнику.
+            if (uri.scheme != "content" || uri.authority?.startsWith(packageName) == true) {
+                skipped++
+                continue
+            }
             try {
                 var name: String? = null
                 var size = -1L

@@ -8,3 +8,9 @@
 
 revoke all on public.spatial_ref_sys from public, anon, authenticated;
 grant select on public.spatial_ref_sys to authenticated;
+
+-- Второй рубеж: даже если права вернутся (обновление PostGIS, расширений),
+-- писать в справочник нельзя, а читать можно.
+alter table public.spatial_ref_sys enable row level security;
+create policy spatial_ref_sys_read on public.spatial_ref_sys
+  for select to authenticated using (true);
