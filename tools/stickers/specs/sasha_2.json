@@ -1,0 +1,365 @@
+{
+ "into": "sasha",
+ "sheet": "sheets/sasha_2.png",
+ "grid": [
+  6,
+  4
+ ],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {
+   "key": "smena_poshla",
+   "title": "смена пошла",
+   "emoji": "🔧",
+   "emotions": [
+    "energy"
+   ],
+   "synonyms": [
+    "смена",
+    "на работе",
+    "работаю",
+    "начали"
+   ]
+  },
+  {
+   "key": "shchas_sdelaem",
+   "title": "щас сделаем",
+   "emoji": "🛠",
+   "emotions": [
+    "energy",
+    "cool"
+   ],
+   "synonyms": [
+    "сделаем",
+    "щас",
+    "сейчас сделаю",
+    "без проблем"
+   ]
+  },
+  {
+   "key": "gde_shtangen",
+   "title": "где штанген",
+   "emoji": "📏",
+   "emotions": [
+    "surprise",
+    "think"
+   ],
+   "synonyms": [
+    "штангенциркуль",
+    "штанген",
+    "куда делся",
+    "потерял"
+   ]
+  },
+  {
+   "key": "na_glaz_norm",
+   "title": "на глаз норм",
+   "emoji": "🧐",
+   "emotions": [
+    "cool",
+    "think"
+   ],
+   "synonyms": [
+    "на глаз",
+    "примерно",
+    "сойдёт",
+    "нормас"
+   ]
+  },
+  {
+   "key": "perekur",
+   "title": "перекур",
+   "emoji": "☕",
+   "emotions": [
+    "tired",
+    "food"
+   ],
+   "synonyms": [
+    "перекур",
+    "покурим",
+    "выйдем",
+    "передохнём"
+   ]
+  },
+  {
+   "key": "che_za_dopusk",
+   "title": "чё за допуск",
+   "emoji": "📐",
+   "emotions": [
+    "surprise",
+    "think"
+   ],
+   "synonyms": [
+    "допуск",
+    "чертёж",
+    "размер",
+    "что за"
+   ]
+  },
+  {
+   "key": "tak_i_bylo",
+   "title": "так и было",
+   "emoji": "🤷",
+   "emotions": [
+    "cool",
+    "surprise"
+   ],
+   "synonyms": [
+    "так и было",
+    "не я",
+    "само",
+    "ничего не трогал"
+   ]
+  },
+  {
+   "key": "eshche_projdus",
+   "title": "ещё пройдусь",
+   "emoji": "🪚",
+   "emotions": [
+    "energy",
+    "think"
+   ],
+   "synonyms": [
+    "доделаю",
+    "пройдусь",
+    "поправлю",
+    "дошлифую"
+   ]
+  },
+  {
+   "key": "mikron_reshaet",
+   "title": "микрон решает",
+   "emoji": "🔬",
+   "emotions": [
+    "think",
+    "cool"
+   ],
+   "synonyms": [
+    "микрон",
+    "точность",
+    "микрометр",
+    "точно"
+   ]
+  },
+  {
+   "key": "ne_trogaj",
+   "title": "не трогай",
+   "emoji": "✋",
+   "emotions": [
+    "anger"
+   ],
+   "synonyms": [
+    "не трогай",
+    "стоп",
+    "руки убрал",
+    "нельзя"
+   ]
+  },
+  {
+   "key": "po_chertezhu",
+   "title": "всё по чертежу",
+   "emoji": "📄",
+   "emotions": [
+    "cool"
+   ],
+   "synonyms": [
+    "по чертежу",
+    "как надо",
+    "всё верно",
+    "правильно"
+   ]
+  },
+  {
+   "key": "gde_moj_klyuch",
+   "title": "где мой ключ",
+   "emoji": "🔧",
+   "emotions": [
+    "surprise",
+    "anger"
+   ],
+   "synonyms": [
+    "ключ",
+    "кто взял",
+    "где мой",
+    "пропал"
+   ]
+  },
+  {
+   "key": "master_idyot",
+   "title": "мастер идёт",
+   "emoji": "👀",
+   "emotions": [
+    "fear"
+   ],
+   "synonyms": [
+    "мастер идёт",
+    "начальник",
+    "шухер",
+    "атас"
+   ]
+  },
+  {
+   "key": "ne_moya_detal",
+   "title": "не моя деталь",
+   "emoji": "🙅",
+   "emotions": [
+    "cool",
+    "anger"
+   ],
+   "synonyms": [
+    "не моя",
+    "не ко мне",
+    "не я делал",
+    "не моё"
+   ]
+  },
+  {
+   "key": "zarplata",
+   "title": "зарплата пришла",
+   "emoji": "💸",
+   "emotions": [
+    "joy",
+    "party"
+   ],
+   "synonyms": [
+    "зарплата",
+    "получка",
+    "деньги пришли",
+    "аванс"
+   ]
+  },
+  {
+   "key": "premiya_gde",
+   "title": "премия где",
+   "emoji": "🧾",
+   "emotions": [
+    "sad",
+    "surprise"
+   ],
+   "synonyms": [
+    "премия",
+    "где деньги",
+    "денег нет",
+    "обманули"
+   ]
+  },
+  {
+   "key": "eshche_odna",
+   "title": "ещё одна деталь",
+   "emoji": "⏰",
+   "emotions": [
+    "tired"
+   ],
+   "synonyms": [
+    "ещё одна",
+    "последняя",
+    "задержусь",
+    "переработка"
+   ]
+  },
+  {
+   "key": "ya_uzhe_doma",
+   "title": "я уже дома",
+   "emoji": "🛋",
+   "emotions": [
+    "tired",
+    "think"
+   ],
+   "synonyms": [
+    "домой",
+    "хочу домой",
+    "мечтаю",
+    "скорее бы"
+   ]
+  },
+  {
+   "key": "vsyo_v_dopuske",
+   "title": "всё в допуске",
+   "emoji": "👍",
+   "emotions": [
+    "joy",
+    "cool"
+   ],
+   "synonyms": [
+    "в допуске",
+    "годно",
+    "принято",
+    "прошло"
+   ]
+  },
+  {
+   "key": "ya_master",
+   "title": "я мастер",
+   "emoji": "😎",
+   "emotions": [
+    "cool"
+   ],
+   "synonyms": [
+    "я мастер",
+    "умею",
+    "профи",
+    "могу"
+   ]
+  },
+  {
+   "key": "kto_tochil",
+   "title": "кто это точил",
+   "emoji": "🔍",
+   "emotions": [
+    "anger",
+    "surprise"
+   ],
+   "synonyms": [
+    "кто точил",
+    "кто делал",
+    "брак",
+    "криво"
+   ]
+  },
+  {
+   "key": "ne_zovite",
+   "title": "меня не зовите",
+   "emoji": "🙈",
+   "emotions": [
+    "tired",
+    "fear"
+   ],
+   "synonyms": [
+    "не зовите",
+    "меня нет",
+    "спрятался",
+    "занят"
+   ]
+  },
+  {
+   "key": "ruki_pomnyat",
+   "title": "руки помнят",
+   "emoji": "🙌",
+   "emotions": [
+    "cool",
+    "joy"
+   ],
+   "synonyms": [
+    "руки помнят",
+    "опыт",
+    "умею",
+    "помню"
+   ]
+  },
+  {
+   "key": "ladno_pognali",
+   "title": "ладно, погнали",
+   "emoji": "🥽",
+   "emotions": [
+    "energy"
+   ],
+   "synonyms": [
+    "ладно",
+    "погнали",
+    "приступаем",
+    "работаем"
+   ]
+  }
+ ]
+}

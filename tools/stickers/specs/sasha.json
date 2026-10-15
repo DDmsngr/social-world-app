@@ -1,0 +1,247 @@
+{
+ "id": "sasha",
+ "title": "Дядя Саша",
+ "description": "Слесарь-энтузиаст: «доброе, но не рано», «щас сделаем» и «кто это точил?». Смена, допуски и зарплата по расписанию.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 130,
+ "version": 1,
+ "sheet": "sheets/sasha.png",
+ "grid": [
+  5,
+  3
+ ],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {
+   "key": "privet",
+   "title": "привет",
+   "emoji": "👋",
+   "emotions": [
+    "greet"
+   ],
+   "synonyms": [
+    "здравствуй",
+    "здорово",
+    "приветик",
+    "салют"
+   ]
+  },
+  {
+   "key": "dobroe_utro",
+   "title": "доброе утро",
+   "emoji": "☕",
+   "emotions": [
+    "greet",
+    "energy"
+   ],
+   "synonyms": [
+    "доброе утро",
+    "утро",
+    "кофе",
+    "проснулся"
+   ]
+  },
+  {
+   "key": "s_utrechkom",
+   "title": "с утречком",
+   "emoji": "🌅",
+   "emotions": [
+    "greet",
+    "joy"
+   ],
+   "synonyms": [
+    "утречко",
+    "с утречком",
+    "утро доброе",
+    "встал"
+   ]
+  },
+  {
+   "key": "ne_rano",
+   "title": "не рано",
+   "emoji": "😴",
+   "emotions": [
+    "tired"
+   ],
+   "synonyms": [
+    "рано",
+    "не выспался",
+    "спать хочу",
+    "зеваю",
+    "сонный"
+   ]
+  },
+  {
+   "key": "vsyo_budet",
+   "title": "всё будет",
+   "emoji": "👍",
+   "emotions": [
+    "cool",
+    "friend"
+   ],
+   "synonyms": [
+    "всё будет",
+    "прорвёмся",
+    "не переживай",
+    "справимся"
+   ]
+  },
+  {
+   "key": "ponyal",
+   "title": "понял",
+   "emoji": "✅",
+   "emotions": [
+    "chat"
+   ],
+   "synonyms": [
+    "понял",
+    "принял",
+    "ясно",
+    "услышал",
+    "договорились"
+   ]
+  },
+  {
+   "key": "ok",
+   "title": "окей",
+   "emoji": "👌",
+   "emotions": [
+    "chat",
+    "cool"
+   ],
+   "synonyms": [
+    "окей",
+    "хорошо",
+    "ладно",
+    "годится",
+    "лады"
+   ]
+  },
+  {
+   "key": "pognali",
+   "title": "ну чё, погнали",
+   "emoji": "🚀",
+   "emotions": [
+    "energy",
+    "party"
+   ],
+   "synonyms": [
+    "погнали",
+    "поехали",
+    "вперёд",
+    "начинаем"
+   ]
+  },
+  {
+   "key": "poka",
+   "title": "пока",
+   "emoji": "✋",
+   "emotions": [
+    "greet"
+   ],
+   "synonyms": [
+    "пока",
+    "до встречи",
+    "давай",
+    "до связи",
+    "бывай"
+   ]
+  },
+  {
+   "key": "spasibo",
+   "title": "спасибо",
+   "emoji": "🫶",
+   "emotions": [
+    "thanks",
+    "love"
+   ],
+   "synonyms": [
+    "спасибо",
+    "благодарю",
+    "спс",
+    "мерси",
+    "выручил"
+   ]
+  },
+  {
+   "key": "vsyo_normalno",
+   "title": "всё нормально",
+   "emoji": "👍",
+   "emotions": [
+    "cool"
+   ],
+   "synonyms": [
+    "нормально",
+    "норм",
+    "всё хорошо",
+    "порядок"
+   ]
+  },
+  {
+   "key": "nu_da",
+   "title": "ну да",
+   "emoji": "🤷",
+   "emotions": [
+    "think",
+    "surprise"
+   ],
+   "synonyms": [
+    "бывает",
+    "ну да",
+    "как есть",
+    "что поделать"
+   ]
+  },
+  {
+   "key": "khoroshego_dnya",
+   "title": "хорошего дня",
+   "emoji": "😊",
+   "emotions": [
+    "greet",
+    "joy"
+   ],
+   "synonyms": [
+    "хорошего дня",
+    "удачи",
+    "добрый день",
+    "всего хорошего"
+   ]
+  },
+  {
+   "key": "pereryv",
+   "title": "перерыв",
+   "emoji": "🍵",
+   "emotions": [
+    "food",
+    "tired"
+   ],
+   "synonyms": [
+    "перерыв",
+    "чай",
+    "обед",
+    "отдыхаю",
+    "пауза"
+   ]
+  },
+  {
+   "key": "derzhus",
+   "title": "держусь",
+   "emoji": "🪫",
+   "emotions": [
+    "tired",
+    "sad"
+   ],
+   "synonyms": [
+    "держусь",
+    "устал",
+    "сил нет",
+    "еле живой",
+    "выдохся"
+   ]
+  }
+ ]
+}
