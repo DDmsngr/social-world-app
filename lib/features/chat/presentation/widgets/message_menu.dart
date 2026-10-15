@@ -625,7 +625,7 @@ Future<void> _showInfo(
             : '${(size / 1024).ceil()} КБ',
       ),
     if (conversation != null)
-      ('Защита', conversation.isDirect ? 'Сквозное шифрование' : 'Без сквозного шифрования'),
+      ('Защита', conversation.isDirect ? 'Шифрование' : 'Без шифрования'),
   ];
   return showDialog<void>(
     context: context,

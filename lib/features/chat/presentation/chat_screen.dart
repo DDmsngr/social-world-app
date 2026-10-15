@@ -781,8 +781,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       padding: const EdgeInsets.all(AppSpacing.gutter),
                       child: Text(
                         isDirect
-                            ? 'Напишите первое сообщение. Переписка защищена '
-                                  'сквозным шифрованием.'
+                            ? 'Напишите первое сообщение. Переписка хранится '
+                                  'в зашифрованном виде.'
                             : 'Сообщений пока нет.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium,
