@@ -287,7 +287,10 @@ class _Meta extends StatelessWidget {
         if (mine) ...[
           const SizedBox(width: 4),
           Icon(
-            message.status == MessageStatus.read ? Icons.done_all : Icons.done,
+            // Одна галочка — ушло, две серые — доставлено, две цветные — прочитано.
+            message.status == MessageStatus.read || message.status == MessageStatus.delivered
+                ? Icons.done_all
+                : Icons.done,
             size: 13,
             // Прочитанное — единственное место с акцентом в пузыре.
             color: message.status == MessageStatus.read

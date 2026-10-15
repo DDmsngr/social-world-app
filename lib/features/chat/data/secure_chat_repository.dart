@@ -102,6 +102,7 @@ class SecureChatRepository implements ChatRepository {
 
   @override
   Future<List<Conversation>> loadConversations() async {
+    unawaited(_markDelivered());
     await _ready;
     final rows = await _client.rpc('my_chats') as List<dynamic>;
     return Future.wait([
@@ -277,10 +278,11 @@ class SecureChatRepository implements ChatRepository {
         .order('sent_at', ascending: false)
         .limit(_historyLimit),
     fetch: (feed) async {
+      unawaited(_markDelivered());
       if (feed.direct) {
-        feed.peerLastReadAt = await _peerLastReadAt(
-          conversationId,
-        ).timeout(_netTimeout);
+        final receipts = await _peerReceipts(conversationId).timeout(_netTimeout);
+        feed.peerLastReadAt = receipts.read;
+        feed.peerDeliveredAt = receipts.delivered;
       } else {
         feed.peerLastReadAt = await _groupLastReadAt(conversationId);
       }
@@ -295,7 +297,7 @@ class SecureChatRepository implements ChatRepository {
     },
     decode: (rows, feed) => _decodeBatch(rows, feed, conversationId),
     signature: (rows, feed) =>
-        '${feed.peerLastReadAt?.millisecondsSinceEpoch}|'
+        '${feed.peerLastReadAt?.millisecondsSinceEpoch}|${feed.peerDeliveredAt?.millisecondsSinceEpoch}|'
         // edited_at — чтобы правка сообщения перерисовала ленту.
         '${rows.map((r) => '${r['id']}:${r['deleted_at'] ?? ''}:${r['edited_at'] ?? ''}').join(',')}',
     firstPoll: _firstPoll,
@@ -333,10 +335,8 @@ class SecureChatRepository implements ChatRepository {
       if (keys == null) {
         throw StateError('Собеседник ещё не опубликовал ключи шифрования');
       }
-      return _Feed.direct(
-        keys,
-        await _peerLastReadAt(conversationId).timeout(_netTimeout),
-      );
+      final receipts = await _peerReceipts(conversationId).timeout(_netTimeout);
+      return _Feed.direct(keys, receipts.read, receipts.delivered);
     }
     final members = await loadMembers(conversationId).timeout(_netTimeout);
     return _Feed.group({for (final member in members) member.id: member.name})
@@ -386,6 +386,11 @@ class SecureChatRepository implements ChatRepository {
         final at = DateTime.tryParse('${row['sent_at']}');
         if (at != null && (peerSeen == null || at.isAfter(peerSeen))) peerSeen = at;
       }
+      // Прочитанное всегда и доставлено.
+      var peerDelivered = feed.peerDeliveredAt;
+      if (peerSeen != null && (peerDelivered == null || peerSeen.isAfter(peerDelivered))) {
+        peerDelivered = peerSeen;
+      }
       return Future.wait([
         for (final row in rows)
           _decodeDirect(
@@ -393,6 +398,7 @@ class SecureChatRepository implements ChatRepository {
             conversationId: conversationId,
             peerKeys: feed.keys!,
             peerLastReadAt: peerSeen,
+            peerDeliveredAt: peerDelivered,
           ),
       ]);
     }
@@ -1084,6 +1090,7 @@ class SecureChatRepository implements ChatRepository {
     required String conversationId,
     required ChatPublicKeys peerKeys,
     required DateTime? peerLastReadAt,
+    DateTime? peerDeliveredAt,
   }) async {
     final crypto = await _ready;
     final myKeys = await crypto.publicKeys;
@@ -1123,7 +1130,7 @@ class SecureChatRepository implements ChatRepository {
             senderId: senderId,
             sentAt: sentAt,
             text: unavailableMessageText,
-            status: _status(sentAt, peerLastReadAt),
+            status: _status(sentAt, peerLastReadAt, peerDeliveredAt),
           );
         }
       }
@@ -1150,7 +1157,7 @@ class SecureChatRepository implements ChatRepository {
         kind: kind,
         text: text,
         attachment: attachment,
-        status: _status(sentAt, peerLastReadAt),
+        status: _status(sentAt, peerLastReadAt, peerDeliveredAt),
         signatureValid: decrypted.signatureValid,
         replyTo: meta.reply,
         forwardedFrom: meta.forwardedFrom,
@@ -1350,15 +1357,45 @@ class SecureChatRepository implements ChatRepository {
 
   final _peerIds = <String, String>{};
 
-  Future<DateTime?> _peerLastReadAt(String conversationId) async {
-    final row = await _client
+  /// Без миграции 0092 колонки доставки нет: тогда читаем только прочтение.
+  bool _deliverySupported = true;
+
+  Future<({DateTime? read, DateTime? delivered})> _peerReceipts(String conversationId) async {
+    Future<Map<String, dynamic>?> fetch(String columns) => _client
         .from('chat_members')
-        .select('last_read_at')
+        .select(columns)
         .eq('conversation_id', conversationId)
         .neq('profile_id', currentUserId)
         .limit(1)
         .maybeSingle();
-    return _date(row?['last_read_at']);
+    if (_deliverySupported) {
+      try {
+        final row = await fetch('last_read_at, last_delivered_at');
+        return (read: _date(row?['last_read_at']), delivered: _date(row?['last_delivered_at']));
+      } catch (error) {
+        if (!'$error'.contains('last_delivered_at')) rethrow;
+        _deliverySupported = false;
+      }
+    }
+    final row = await fetch('last_read_at');
+    return (read: _date(row?['last_read_at']), delivered: null);
+  }
+
+  DateTime _deliveredPingAt = DateTime(2000);
+  bool _deliveryPingSupported = true;
+
+  /// Телефон получателя сообщает серверу, что получил сообщения: не чаще раза
+  /// в 15 секунд, без шума в логе, если миграции 0092 на сервере ещё нет.
+  Future<void> _markDelivered() async {
+    if (!_deliveryPingSupported) return;
+    final now = DateTime.now();
+    if (now.difference(_deliveredPingAt) < const Duration(seconds: 15)) return;
+    _deliveredPingAt = now;
+    try {
+      await _client.rpc('mark_delivered');
+    } catch (error) {
+      if ('$error'.contains('mark_delivered')) _deliveryPingSupported = false;
+    }
   }
 
   /// Ключ собеседника перечитываем не реже раза в минуту: он меняется при
@@ -1458,21 +1495,25 @@ class SecureChatRepository implements ChatRepository {
   DateTime? _date(Object? value) =>
       value == null ? null : DateTime.parse(value as String).toLocal();
 
-  MessageStatus _status(DateTime sentAt, DateTime? peerLastReadAt) =>
-      peerLastReadAt != null && !peerLastReadAt.isBefore(sentAt)
-      ? MessageStatus.read
-      : MessageStatus.sent;
+  MessageStatus _status(DateTime sentAt, DateTime? peerLastReadAt, [DateTime? peerDeliveredAt]) {
+    if (peerLastReadAt != null && !peerLastReadAt.isBefore(sentAt)) return MessageStatus.read;
+    if (peerDeliveredAt != null && !peerDeliveredAt.isBefore(sentAt)) return MessageStatus.delivered;
+    return MessageStatus.sent;
+  }
 }
 
 /// Контекст открытой переписки: ключи собеседника и время его прочтения для
 /// личного диалога, имена участников для группы.
 class _Feed {
-  _Feed.direct(this.keys, this.peerLastReadAt) : names = null;
+  _Feed.direct(this.keys, this.peerLastReadAt, [this.peerDeliveredAt]) : names = null;
   _Feed.group(this.names) : keys = null, peerLastReadAt = null;
 
   final ChatPublicKeys? keys;
   final Map<String, String>? names;
   DateTime? peerLastReadAt;
+
+  /// Когда телефон собеседника в последний раз получил наши сообщения (0092).
+  DateTime? peerDeliveredAt;
 
   bool get direct => keys != null;
 }
