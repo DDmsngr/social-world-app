@@ -14,6 +14,16 @@ final _urlPattern = RegExp(r'https?://[^\s<>"]+', caseSensitive: false);
 /// Ссылка с подписью: `[Википедия](https://ru.wikipedia.org/…)`.
 final _namedLink = RegExp(r'\[([^\]\n]{1,80})\]\((https?://[^)\s]+)\)', caseSensitive: false);
 
+/// Адрес для показа человеку: `%D0%A1…` превращается обратно в буквы. Открывается
+/// по-прежнему исходный адрес.
+String readableUrl(String url) {
+  try {
+    return Uri.decodeFull(url);
+  } catch (_) {
+    return url;
+  }
+}
+
 /// Знаки, которыми предложение заканчивается после ссылки, но к ней не относятся.
 const _trailing = '.,;:!?)]}»…';
 
@@ -84,7 +94,7 @@ class _LinkTextState extends State<LinkText> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Открыть ссылку?'),
-        content: Text(uri.toString(), style: const TextStyle(fontSize: 13)),
+        content: Text(readableUrl(uri.toString()), style: const TextStyle(fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),

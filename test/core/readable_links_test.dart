@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:social_world/core/widgets/link_text.dart';
 
 void main() {
+  urlTests();
   Widget host(String text) => MaterialApp(
     home: Scaffold(body: LinkText(text, readableLinks: true, hashtags: true)),
   );
@@ -18,5 +19,12 @@ void main() {
     await tester.pumpWidget(host('Смотрите https://www.example.com/very/long/path?x=1 сегодня.'));
     final text = tester.widget<RichText>(find.byType(RichText).last).text.toPlainText();
     expect(text, 'Смотрите example.com сегодня.');
+  });
+}
+
+void urlTests() {
+  test('адрес в диалоге показывается буквами, битый остаётся как есть', () {
+    expect(readableUrl('https://ru.wikipedia.org/wiki/%D0%A1%D0%BE%D1%87%D0%B8'), 'https://ru.wikipedia.org/wiki/Сочи');
+    expect(readableUrl('https://x.org/%E0%A4%A'), 'https://x.org/%E0%A4%A');
   });
 }
