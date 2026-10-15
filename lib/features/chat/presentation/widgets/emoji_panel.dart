@@ -55,6 +55,7 @@ class EmojiPanel extends StatefulWidget {
     required this.onBackspace,
     this.stickerPacks = const [],
     this.onSticker,
+    this.emojiPacks,
     this.onCustomEmoji,
     this.onOpenStore,
     this.onPackLongPress,
@@ -71,6 +72,10 @@ class EmojiPanel extends StatefulWidget {
   /// Установленные паки стикеров — вкладками перед эмодзи.
   final List<StickerPack> stickerPacks;
   final ValueChanged<Sticker>? onSticker;
+
+  /// Паки для режима эмодзи, в нужном порядке. null — те же, что стикеры.
+  /// Персонажи сюда не попадают: они уходят только стикерами.
+  final List<StickerPack>? emojiPacks;
   final ValueChanged<Sticker>? onCustomEmoji;
 
   /// Вкладка «+» в конце: магазин стикеров.
@@ -110,7 +115,7 @@ class _EmojiPanelState extends State<EmojiPanel> {
   @override
   Widget build(BuildContext context) {
     final packs = [
-      for (final pack in widget.stickerPacks)
+      for (final pack in _stickerMode ? widget.stickerPacks : (widget.emojiPacks ?? widget.stickerPacks))
         if (pack.stickers.isNotEmpty) pack,
     ];
     if (packs.isEmpty) {
@@ -162,7 +167,8 @@ class _EmojiPanelState extends State<EmojiPanel> {
       if (tab == 'pack:${p.id}') pack = p;
     }
     // Обычный эмодзи стикером не отправить: в режиме стикеров его вкладки нет.
-    if (stickerMode && pack == null) pack = packs.first;
+    // В режиме эмодзи вкладка прежнего режима (персонаж) пропала — берём первый пак-смайл.
+    if (pack == null && (stickerMode || _tab != 'emoji')) pack = packs.first;
 
     return Container(
       height: widget.height,

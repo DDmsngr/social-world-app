@@ -296,11 +296,16 @@ void main() {
       await tester.tap(find.byTooltip('Эмодзи'));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('sticker-basic.smile')), findsOneWidget);
-      final lastPack = tester.getCenter(
-        find.byKey(const ValueKey('sticker-pack-chao')),
-      );
+      // В режиме эмодзи только паки-смайлы, в порядке каталога; персонажи
+      // (Чао) здесь не показываются, они уходят только стикерами.
+      final basic = tester.getCenter(find.byKey(const ValueKey('sticker-pack-basic')));
+      final more = tester.getCenter(find.byKey(const ValueKey('sticker-pack-more')));
+      final city = tester.getCenter(find.byKey(const ValueKey('sticker-pack-city')));
       final recent = tester.getCenter(find.byKey(const ValueKey('emoji-tab')));
-      expect(lastPack.dx, lessThan(recent.dx));
+      expect(basic.dx, lessThan(more.dx));
+      expect(more.dx, lessThan(city.dx));
+      expect(city.dx, lessThan(recent.dx));
+      expect(find.byKey(const ValueKey('sticker-pack-chao')), findsNothing);
     });
 
     testWidgets('паки стикеров — вкладками в панели эмодзи', (tester) async {
@@ -427,9 +432,9 @@ void main() {
       await tester.enterText(find.byType(TextField), 'Привет');
       await tester.tap(find.byTooltip('Эмодзи'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('sticker-pack-chao')));
+      await tester.tap(find.byKey(const ValueKey('sticker-pack-more')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('sticker-chao.wave')));
+      await tester.tap(find.byKey(const ValueKey('sticker-more.hug')));
       await tester.pumpAndSettle();
 
       // Ничего не отправлено, в поле — картинка.
@@ -437,7 +442,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(TextField),
-          matching: _stickerImage('https://test/stickers/chao/thumb/wave.webp'),
+          matching: _stickerImage('https://test/stickers/more/thumb/hug.webp'),
         ),
         findsOneWidget,
       );
@@ -447,10 +452,11 @@ void main() {
       await tester.tap(find.byIcon(Icons.send));
       await tester.pumpAndSettle();
       final (text, kind, options) = repository.sent.single;
-      expect(text, 'Привет👋');
+      final hug = catalog.byId('more.hug')!.emoji;
+      expect(text, 'Привет$hug');
       expect(kind, MessageKind.text);
-      expect(options.customEmoji, const [
-        CustomEmoji(offset: 6, text: '👋', sticker: 'chao.wave'),
+      expect(options.customEmoji, [
+        CustomEmoji(offset: 6, text: hug, sticker: 'more.hug'),
       ]);
     });
 

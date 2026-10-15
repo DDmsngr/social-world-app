@@ -94,6 +94,10 @@ class StickerPack {
 
   bool get isPublished => status == StickerPackStatus.published;
 
+  /// Паки-смайлы (категории «эмоции» и «город») можно вставлять в текст как
+  /// эмодзи. Остальные, персонажи и мемы, уходят только стикером.
+  bool get inlineEmoji => category == 'эмоции' || category == 'город';
+
   String? get coverUrl => cover != null
       ? StickerUrls.file(cover!)
       : stickers.isEmpty

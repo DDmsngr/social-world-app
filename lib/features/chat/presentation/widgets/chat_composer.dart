@@ -227,6 +227,16 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     setState(() {});
   }
 
+  /// Паки для режима эмодзи: только смайлы (не персонажи), в порядке каталога.
+  List<StickerPack> _emojiPacks(List<StickerPack> mine) {
+    final order = ref.read(stickerCatalogProvider).value?.packs ?? const <StickerPack>[];
+    final byId = {for (final p in mine) p.id: p};
+    return [
+      for (final p in order)
+        if (p.inlineEmoji && byId[p.id] != null) byId[p.id]!,
+    ];
+  }
+
   /// Свой смайл в текст: символ-заместитель, который поле рисует картинкой.
   void _insertCustomEmoji(Sticker sticker) {
     final catalog = ref.read(stickerCatalogProvider).value;
@@ -922,6 +932,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
                   onPick: _insertEmoji,
                   onBackspace: _backspace,
                   stickerPacks: myPacks,
+                  emojiPacks: _emojiPacks(myPacks),
                   onSticker: _sendSticker,
                   onCustomEmoji: _insertCustomEmoji,
                   onOpenStore: _openStickerStore,
