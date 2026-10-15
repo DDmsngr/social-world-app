@@ -1,0 +1,202 @@
+{
+ "into": "viking",
+ "sheet": "sheets/viking_3.png",
+ "grid": [
+  4,
+  3
+ ],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {
+   "key": "privet",
+   "title": "привет",
+   "emoji": "👋",
+   "emotions": [
+    "greet"
+   ],
+   "synonyms": [
+    "здравствуй",
+    "здорово",
+    "приветик",
+    "хай",
+    "салют"
+   ]
+  },
+  {
+   "key": "poka",
+   "title": "пока",
+   "emoji": "😘",
+   "emotions": [
+    "greet"
+   ],
+   "synonyms": [
+    "до свидания",
+    "бай",
+    "чао",
+    "до встречи",
+    "целую"
+   ]
+  },
+  {
+   "key": "dobroe_utro",
+   "title": "с добрым утром",
+   "emoji": "☕",
+   "emotions": [
+    "greet",
+    "joy"
+   ],
+   "synonyms": [
+    "доброе утро",
+    "утро",
+    "кофе",
+    "проснулась",
+    "солнце"
+   ]
+  },
+  {
+   "key": "sladkih_snov",
+   "title": "сладких снов",
+   "emoji": "😴",
+   "emotions": [
+    "greet",
+    "tired"
+   ],
+   "synonyms": [
+    "спокойной ночи",
+    "спать",
+    "ночи",
+    "подушка",
+    "снов"
+   ]
+  },
+  {
+   "key": "kak_dela",
+   "title": "как дела",
+   "emoji": "😎",
+   "emotions": [
+    "greet",
+    "chat"
+   ],
+   "synonyms": [
+    "как жизнь",
+    "как сам",
+    "как ты",
+    "что нового",
+    "как оно"
+   ]
+  },
+  {
+   "key": "ustala",
+   "title": "устала",
+   "emoji": "😩",
+   "emotions": [
+    "tired",
+    "sad"
+   ],
+   "synonyms": [
+    "нет сил",
+    "замоталась",
+    "выдохлась",
+    "тяжело",
+    "хватит"
+   ]
+  },
+  {
+   "key": "vse_ok",
+   "title": "всё хорошо",
+   "emoji": "🤘",
+   "emotions": [
+    "joy",
+    "cool"
+   ],
+   "synonyms": [
+    "норм",
+    "порядок",
+    "отлично",
+    "супер",
+    "класс"
+   ]
+  },
+  {
+   "key": "tishina",
+   "title": "тишина",
+   "emoji": "🤫",
+   "emotions": [
+    "cool",
+    "think"
+   ],
+   "synonyms": [
+    "тихо",
+    "молчу",
+    "шшш",
+    "секрет",
+    "молчание"
+   ]
+  },
+  {
+   "key": "spasibo",
+   "title": "спасибо",
+   "emoji": "🥰",
+   "emotions": [
+    "thanks",
+    "love"
+   ],
+   "synonyms": [
+    "благодарю",
+    "спасибочки",
+    "мерси",
+    "благодарность",
+    "сердечко"
+   ]
+  },
+  {
+   "key": "priyatnogo_appetita",
+   "title": "приятного аппетита",
+   "emoji": "🍕",
+   "emotions": [
+    "food",
+    "joy"
+   ],
+   "synonyms": [
+    "аппетит",
+    "пицца",
+    "кушай",
+    "обед",
+    "ужин"
+   ]
+  },
+  {
+   "key": "davai_ty_mozhesh",
+   "title": "давай, ты можешь",
+   "emoji": "👍",
+   "emotions": [
+    "energy",
+    "friend"
+   ],
+   "synonyms": [
+    "вперёд",
+    "поддержка",
+    "справишься",
+    "верю",
+    "так держать"
+   ]
+  },
+  {
+   "key": "bodrogo_dnya",
+   "title": "бодрого дня",
+   "emoji": "⚡",
+   "emotions": [
+    "energy",
+    "joy"
+   ],
+   "synonyms": [
+    "бодрость",
+    "энергия",
+    "энергетик",
+    "заряд",
+    "хорошего дня"
+   ]
+  }
+ ]
+}

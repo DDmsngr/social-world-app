@@ -726,6 +726,384 @@
     "tired",
     "love"
    ]
+  },
+  {
+   "key": "snova_subboty",
+   "title": "снова эти субботы",
+   "emoji": "😎",
+   "synonyms": [
+    "суббота",
+    "работа",
+    "выходные",
+    "кружка",
+    "надоело"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  },
+  {
+   "key": "kot_ponyatno",
+   "title": "понятно, спасибо",
+   "emoji": "😸",
+   "synonyms": [
+    "кот",
+    "котик",
+    "очки",
+    "понятно",
+    "благодарю"
+   ],
+   "emotions": [
+    "thanks",
+    "cool"
+   ]
+  },
+  {
+   "key": "nu_kak_tak_to",
+   "title": "ну как так-то",
+   "emoji": "🤨",
+   "synonyms": [
+    "как так",
+    "не понимаю",
+    "почему",
+    "недоумение",
+    "задумалась"
+   ],
+   "emotions": [
+    "think",
+    "sad"
+   ]
+  },
+  {
+   "key": "enot_i_che",
+   "title": "и чё",
+   "emoji": "🦝",
+   "synonyms": [
+    "енот",
+    "и что",
+    "ну и",
+    "пожимаю плечами",
+    "подумаешь"
+   ],
+   "emotions": [
+    "cool",
+    "surprise"
+   ]
+  },
+  {
+   "key": "ya_podumayu",
+   "title": "я подумаю",
+   "emoji": "🤔",
+   "synonyms": [
+    "подумаю",
+    "размышляю",
+    "не уверена",
+    "посмотрим",
+    "капюшон"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "gus_v_dele",
+   "title": "я в деле",
+   "emoji": "🦆",
+   "synonyms": [
+    "гусь",
+    "утка",
+    "в деле",
+    "участвую",
+    "очки"
+   ],
+   "emotions": [
+    "cool",
+    "energy"
+   ]
+  },
+  {
+   "key": "ty_zhe_znaesh",
+   "title": "ты же знаешь",
+   "emoji": "👉",
+   "synonyms": [
+    "знаешь",
+    "в курсе",
+    "ты знаешь",
+    "кепка",
+    "сам понимаешь"
+   ],
+   "emotions": [
+    "friend",
+    "cool"
+   ]
+  },
+  {
+   "key": "kot_ne_segodnya",
+   "title": "не сегодня",
+   "emoji": "😾",
+   "synonyms": [
+    "не хочу",
+    "потом",
+    "завтра",
+    "плед",
+    "кот"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "serezno_ochki",
+   "title": "серьёзно",
+   "emoji": "🧐",
+   "synonyms": [
+    "правда",
+    "очки",
+    "не верю",
+    "да ладно",
+    "неужели"
+   ],
+   "emotions": [
+    "think",
+    "surprise"
+   ]
+  },
+  {
+   "key": "vse_ploho",
+   "title": "всё плохо",
+   "emoji": "😭",
+   "synonyms": [
+    "плохо",
+    "плачу",
+    "слёзы",
+    "грустно",
+    "беда"
+   ],
+   "emotions": [
+    "sad"
+   ]
+  },
+  {
+   "key": "net",
+   "title": "нет",
+   "emoji": "🙅",
+   "synonyms": [
+    "не буду",
+    "отказ",
+    "никогда",
+    "ладонь",
+    "стоп"
+   ],
+   "emotions": [
+    "cool",
+    "anger"
+   ]
+  },
+  {
+   "key": "ustala_v_krovati",
+   "title": "я устала",
+   "emoji": "😪",
+   "synonyms": [
+    "устала",
+    "кровать",
+    "спать",
+    "нет сил",
+    "подушка"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "ogo_ruki",
+   "title": "ого",
+   "emoji": "😲",
+   "synonyms": [
+    "вау",
+    "ничего себе",
+    "удивление",
+    "шок",
+    "не может быть"
+   ],
+   "emotions": [
+    "surprise"
+   ]
+  },
+  {
+   "key": "kot_pod_kontrolem",
+   "title": "всё под контролем",
+   "emoji": "😼",
+   "synonyms": [
+    "контроль",
+    "кот",
+    "справляюсь",
+    "спокойно",
+    "порядок"
+   ],
+   "emotions": [
+    "cool",
+    "think"
+   ]
+  },
+  {
+   "key": "koroleva_korona",
+   "title": "я королева",
+   "emoji": "👑",
+   "synonyms": [
+    "королева",
+    "корона",
+    "лучшая",
+    "царица",
+    "красавица"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "na_prirodu",
+   "title": "на природу",
+   "emoji": "🌲",
+   "synonyms": [
+    "природа",
+    "поход",
+    "лес",
+    "прогулка",
+    "капюшон"
+   ],
+   "emotions": [
+    "joy",
+    "energy"
+   ]
+  },
+  {
+   "key": "utenok_davai",
+   "title": "давай",
+   "emoji": "🐥",
+   "synonyms": [
+    "утёнок",
+    "цыплёнок",
+    "вперёд",
+    "поехали",
+    "ура"
+   ],
+   "emotions": [
+    "energy",
+    "joy"
+   ]
+  },
+  {
+   "key": "oy_vse",
+   "title": "ой, всё",
+   "emoji": "🤷",
+   "synonyms": [
+    "отстань",
+    "надоело",
+    "хватит",
+    "пожимаю плечами",
+    "ладно"
+   ],
+   "emotions": [
+    "tired",
+    "cool"
+   ]
+  },
+  {
+   "key": "glavnoe_poest",
+   "title": "главное поесть",
+   "emoji": "🍜",
+   "synonyms": [
+    "лапша",
+    "еда",
+    "обед",
+    "голодная",
+    "вкусно"
+   ],
+   "emotions": [
+    "food",
+    "joy"
+   ]
+  },
+  {
+   "key": "ponedelnik",
+   "title": "понедельник",
+   "emoji": "😵",
+   "synonyms": [
+    "начало недели",
+    "работа",
+    "утро",
+    "не хочу",
+    "тяжело"
+   ],
+   "emotions": [
+    "tired",
+    "sad"
+   ]
+  },
+  {
+   "key": "kot_krasivo_zhit",
+   "title": "красиво жить не запретишь",
+   "emoji": "😻",
+   "synonyms": [
+    "красиво жить",
+    "корона",
+    "кот",
+    "роскошь",
+    "шик"
+   ],
+   "emotions": [
+    "cool",
+    "joy"
+   ]
+  },
+  {
+   "key": "spasibo_serdce",
+   "title": "спасибо",
+   "emoji": "💖",
+   "synonyms": [
+    "благодарю",
+    "сердечко",
+    "спасибочки",
+    "мерси",
+    "люблю"
+   ],
+   "emotions": [
+    "thanks",
+    "love"
+   ]
+  },
+  {
+   "key": "vse_budet_horosho",
+   "title": "всё будет хорошо",
+   "emoji": "🎒",
+   "synonyms": [
+    "не переживай",
+    "поддержка",
+    "будет хорошо",
+    "рюкзак",
+    "держись"
+   ],
+   "emotions": [
+    "friend",
+    "joy"
+   ]
+  },
+  {
+   "key": "o_kak",
+   "title": "о как",
+   "emoji": "😮",
+   "synonyms": [
+    "вот это да",
+    "надо же",
+    "ноутбук",
+    "удивлена",
+    "ничего себе"
+   ],
+   "emotions": [
+    "surprise"
+   ]
   }
  ]
 }

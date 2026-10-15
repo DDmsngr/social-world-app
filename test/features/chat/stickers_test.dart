@@ -58,10 +58,10 @@ void main() {
   List<String> ids(List<Sticker> stickers) => [for (final s in stickers) s.id];
 
   group('каталог', () {
-    test('355 стикеров (4 пака по 35, «Алекса» 47, «Жиза» и «Палыч» по 24, «Викинг» 16, «Станочник» 12, «Наладчик» 28, «Артурио» 32, «Мираж» 32), id уникальны, у каждого есть картинка', () {
+    test('391 стикер (4 пака по 35, «Алекса» 71, «Жиза» и «Палыч» по 24, «Викинг» 28, «Станочник» 12, «Наладчик» 28, «Артурио» 32, «Мираж» 32), id уникальны, у каждого есть картинка', () {
       final all = [for (final p in catalog.packs) ...p.stickers];
-      expect(all, hasLength(355));
-      expect(ids(all).toSet(), hasLength(355));
+      expect(all, hasLength(391));
+      expect(ids(all).toSet(), hasLength(391));
       for (final sticker in all) {
         expect(
           File('tools/stickers/packs/${sticker.packId}/${sticker.key}.webp').existsSync(),

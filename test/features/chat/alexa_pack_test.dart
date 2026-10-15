@@ -35,27 +35,27 @@ void main() {
     }
   });
 
-  test('пак «Викинг»: два листа по 8, помечен 18+, у каждого есть файл', () {
+  test('пак «Викинг»: три листа (8 + 8 + 12), помечен 18+, у каждого есть файл', () {
     final viking = packs.firstWhere((p) => p['id'] == 'viking');
     expect(viking['title'], 'Викинг');
     expect(viking['description'], contains('18+'));
     final stickers = (viking['stickers'] as List).cast<Map<String, dynamic>>();
-    expect(stickers, hasLength(16));
+    expect(stickers, hasLength(28));
     expect(stickers.first['key'], 'vse_pod_kontrolem');
-    expect(stickers.last['key'], 'nu_davay_udivi');
+    expect(stickers.last['key'], 'bodrogo_dnya');
     for (final s in stickers) {
       expect(File('${root.path}/viking/${s['key']}.webp').existsSync(), isTrue, reason: s['key']);
     }
   });
 
-  test('пак «Алекса»: два листа (23 + 24), без «победы», у каждого есть файл', () {
+  test('пак «Алекса»: три листа (23 + 24 + 24), без «победы», у каждого есть файл', () {
     final alexa = packs.firstWhere((p) => p['id'] == 'alexa');
     expect(alexa['title'], 'Алекса');
     final stickers = (alexa['stickers'] as List).cast<Map<String, dynamic>>();
-    expect(stickers, hasLength(47));
+    expect(stickers, hasLength(71));
     // Первый лист — без подписей, второй дописан в конец.
     expect(stickers.first['key'], 'wave');
-    expect(stickers.last['key'], 'spokoynoy_nochi');
+    expect(stickers.last['key'], 'o_kak');
     expect(stickers.map((s) => s['key']), isNot(contains('victory')));
     expect(File('${root.path}/alexa/victory.webp').existsSync(), isFalse);
     for (final s in stickers) {
