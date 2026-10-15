@@ -285,6 +285,9 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       _sendingText = true;
       _error = null;
     });
+    // Щелчок в момент нажатия, а не после ответа сервера: на медленной сети
+    // отправка идёт секунды, и звук «опаздывал» или казался пропавшим.
+    SendSound.play();
     final messageId = _idFor(text);
     _unconfirmed = (text: text, id: messageId);
     try {
@@ -309,7 +312,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
       _controller.clear();
       ref.read(typingHubProvider(widget.conversationId))?.stop();
       widget.onReplyCleared?.call();
-      _afterSend();
+      _afterSend(sound: false);
     } on TimeoutException catch (error) {
       AppLog.add('Отправка не дождалась ответа: $error');
       final vpn = await isVpnActive();
@@ -347,6 +350,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   Future<void> _sendSticker(Sticker sticker, {bool clearText = false}) async {
     if (_sendingText) return;
     HapticFeedback.selectionClick();
+    SendSound.play();
     setState(() {
       _sendingText = true;
       _error = null;
@@ -370,7 +374,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
         ref.read(typingHubProvider(widget.conversationId))?.stop();
       }
       widget.onReplyCleared?.call();
-      _afterSend();
+      _afterSend(sound: false);
     } on TimeoutException catch (error) {
       AppLog.add('Стикер не дождался ответа: $error');
       if (!mounted) return;
@@ -823,8 +827,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
 
   // ── общее ────────────────────────────────────────────────────────────────
 
-  void _afterSend() {
-    SendSound.play();
+  void _afterSend({bool sound = true}) {
+    if (sound) SendSound.play();
     // Новый личный диалог появляется в списке только после первого сообщения.
     ref.invalidate(conversationsProvider);
   }
