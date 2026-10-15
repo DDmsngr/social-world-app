@@ -66,7 +66,7 @@ def check(item, body):
         problems.append(f'длина текста {len(body)}')
     if len(re.findall(r'#\w{2,}', item.get('tags', ''))) < 2:
         problems.append('нужно 2–3 хэштега')
-    if re.search(r'https?://', item['body']):
+    if re.search(r'(?<!\]\()https?://', item['body']):
         problems.append('в тексте голые ссылки (они добавляются сами)')
     return problems
 
