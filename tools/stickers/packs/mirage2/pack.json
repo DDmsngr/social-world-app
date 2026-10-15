@@ -1,0 +1,391 @@
+{
+ "id": "mirage2",
+ "title": "Мираж",
+ "description": "Мастер на все руки: лазер, гибка, сварка, чертежи и обед по расписанию. Привет, ща сделаем и смена окончена.",
+ "publisher": "Команда ChaWo",
+ "category": "мемы",
+ "status": "published",
+ "is_default": false,
+ "sort_order": 120,
+ "version": 1,
+ "stickers": [
+  {
+   "key": "privet",
+   "title": "привет",
+   "emoji": "👋",
+   "synonyms": [
+    "здравствуй",
+    "здорово",
+    "приветик",
+    "хай",
+    "салют"
+   ],
+   "emotions": [
+    "greet"
+   ]
+  },
+  {
+   "key": "poka",
+   "title": "пока",
+   "emoji": "👋",
+   "synonyms": [
+    "до свидания",
+    "бай",
+    "чао",
+    "до встречи",
+    "удачи"
+   ],
+   "emotions": [
+    "greet"
+   ]
+  },
+  {
+   "key": "dobroe_utro",
+   "title": "с добрым утром",
+   "emoji": "☕",
+   "synonyms": [
+    "доброе утро",
+    "утро",
+    "кофе",
+    "проснулся",
+    "чудеса"
+   ],
+   "emotions": [
+    "greet",
+    "joy"
+   ]
+  },
+  {
+   "key": "sladkih_snov",
+   "title": "сладких снов",
+   "emoji": "😴",
+   "synonyms": [
+    "спокойной ночи",
+    "спать",
+    "ночи",
+    "подушка",
+    "снов"
+   ],
+   "emotions": [
+    "greet",
+    "tired"
+   ]
+  },
+  {
+   "key": "vse_kak_nado",
+   "title": "всё будет как надо",
+   "emoji": "😎",
+   "synonyms": [
+    "как надо",
+    "порядок",
+    "сделаю",
+    "очки",
+    "не переживай"
+   ],
+   "emotions": [
+    "cool",
+    "energy"
+   ]
+  },
+  {
+   "key": "da_ladno",
+   "title": "да ладно",
+   "emoji": "🤨",
+   "synonyms": [
+    "правда",
+    "не верю",
+    "серьёзно",
+    "неужели",
+    "сомневаюсь"
+   ],
+   "emotions": [
+    "surprise",
+    "think"
+   ]
+  },
+  {
+   "key": "otlichno",
+   "title": "отлично",
+   "emoji": "👍",
+   "synonyms": [
+    "супер",
+    "класс",
+    "молодец",
+    "шлем",
+    "перчатка"
+   ],
+   "emotions": [
+    "joy",
+    "cool"
+   ]
+  },
+  {
+   "key": "podumaem",
+   "title": "подумаем",
+   "emoji": "🤔",
+   "synonyms": [
+    "думаю",
+    "размышляю",
+    "шестерёнки",
+    "соображаю",
+    "прикидываю"
+   ],
+   "emotions": [
+    "think"
+   ]
+  },
+  {
+   "key": "ustal",
+   "title": "устал",
+   "emoji": "😩",
+   "synonyms": [
+    "нет сил",
+    "замотался",
+    "выдохся",
+    "тяжело",
+    "голова"
+   ],
+   "emotions": [
+    "tired"
+   ]
+  },
+  {
+   "key": "delaem_delo",
+   "title": "делаем дело",
+   "emoji": "🔧",
+   "synonyms": [
+    "работаю",
+    "ключ",
+    "работа",
+    "за дело",
+    "чиню"
+   ],
+   "emotions": [
+    "energy",
+    "cool"
+   ]
+  },
+  {
+   "key": "ty_mozhesh",
+   "title": "ты можешь",
+   "emoji": "👉",
+   "synonyms": [
+    "вперёд",
+    "справишься",
+    "верю",
+    "поддержка",
+    "давай"
+   ],
+   "emotions": [
+    "energy",
+    "friend"
+   ]
+  },
+  {
+   "key": "vse_budet",
+   "title": "всё будет",
+   "emoji": "🤙",
+   "synonyms": [
+    "будет хорошо",
+    "не переживай",
+    "порядок",
+    "шлем",
+    "держись"
+   ],
+   "emotions": [
+    "joy",
+    "friend"
+   ]
+  },
+  {
+   "key": "zdarova",
+   "title": "здарова",
+   "emoji": "🖐️",
+   "synonyms": [
+    "привет",
+    "здорово",
+    "здравствуй",
+    "хай",
+    "приветствую"
+   ],
+   "emotions": [
+    "greet"
+   ]
+  },
+  {
+   "key": "scha_sdelaem",
+   "title": "ща сделаем",
+   "emoji": "👍",
+   "synonyms": [
+    "сделаем",
+    "сейчас",
+    "не вопрос",
+    "возьмусь",
+    "будет"
+   ],
+   "emotions": [
+    "energy",
+    "cool"
+   ]
+  },
+  {
+   "key": "gde_chertezh",
+   "title": "где чертёж",
+   "emoji": "🤷",
+   "synonyms": [
+    "чертёж",
+    "где",
+    "потерял",
+    "не вижу",
+    "лист"
+   ],
+   "emotions": [
+    "think",
+    "surprise"
+   ]
+  },
+  {
+   "key": "lazer_reshaet",
+   "title": "лазер решает",
+   "emoji": "⚡",
+   "synonyms": [
+    "лазер",
+    "резка",
+    "станок",
+    "искры",
+    "металл"
+   ],
+   "emotions": [
+    "energy",
+    "cool"
+   ]
+  },
+  {
+   "key": "gibka_poshla",
+   "title": "гибка пошла",
+   "emoji": "🛠️",
+   "synonyms": [
+    "гибка",
+    "пресс",
+    "станок",
+    "металл",
+    "работаю"
+   ],
+   "emotions": [
+    "energy"
+   ]
+  },
+  {
+   "key": "opyat_peredelyvat",
+   "title": "опять переделывать",
+   "emoji": "😮‍💨",
+   "synonyms": [
+    "переделывать",
+    "заново",
+    "чертёж",
+    "ошибка",
+    "надоело"
+   ],
+   "emotions": [
+    "tired",
+    "anger"
+   ]
+  },
+  {
+   "key": "scha_podvarim",
+   "title": "ща подварим",
+   "emoji": "🔥",
+   "synonyms": [
+    "сварка",
+    "варим",
+    "шов",
+    "маска",
+    "горелка"
+   ],
+   "emotions": [
+    "energy",
+    "cool"
+   ]
+  },
+  {
+   "key": "kto_eto_chertil",
+   "title": "кто это чертил",
+   "emoji": "😠",
+   "synonyms": [
+    "чертил",
+    "чертёж",
+    "кривой",
+    "ошибка",
+    "возмущён"
+   ],
+   "emotions": [
+    "anger",
+    "think"
+   ]
+  },
+  {
+   "key": "vse_po_tehnologii",
+   "title": "всё по технологии",
+   "emoji": "😌",
+   "synonyms": [
+    "технология",
+    "по правилам",
+    "порядок",
+    "стандарт",
+    "точно"
+   ],
+   "emotions": [
+    "cool",
+    "think"
+   ]
+  },
+  {
+   "key": "obed_svyatoe",
+   "title": "обед святое",
+   "emoji": "🍱",
+   "synonyms": [
+    "обед",
+    "еда",
+    "перерыв",
+    "кофе",
+    "контейнер"
+   ],
+   "emotions": [
+    "food",
+    "joy"
+   ]
+  },
+  {
+   "key": "ya_ne_tuplyu",
+   "title": "я не туплю я считаю",
+   "emoji": "🧮",
+   "synonyms": [
+    "считаю",
+    "штангенциркуль",
+    "думаю",
+    "замер",
+    "точность"
+   ],
+   "emotions": [
+    "think",
+    "cool"
+   ]
+  },
+  {
+   "key": "smena_okonchena",
+   "title": "смена окончена",
+   "emoji": "✌️",
+   "synonyms": [
+    "смена",
+    "домой",
+    "конец дня",
+    "отдыхаю",
+    "победа"
+   ],
+   "emotions": [
+    "joy",
+    "tired"
+   ]
+  }
+ ]
+}

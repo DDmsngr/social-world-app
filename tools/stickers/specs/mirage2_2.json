@@ -1,0 +1,203 @@
+{
+ "id": "mirage2_2",
+ "into": "mirage2",
+ "sheet": "sheets/mirage2_2.png",
+ "grid": [
+  4,
+  3
+ ],
+ "thr": 90,
+ "exclude": [],
+ "stickers": [
+  {
+   "key": "zdarova",
+   "title": "здарова",
+   "emoji": "🖐️",
+   "emotions": [
+    "greet"
+   ],
+   "synonyms": [
+    "привет",
+    "здорово",
+    "здравствуй",
+    "хай",
+    "приветствую"
+   ]
+  },
+  {
+   "key": "scha_sdelaem",
+   "title": "ща сделаем",
+   "emoji": "👍",
+   "emotions": [
+    "energy",
+    "cool"
+   ],
+   "synonyms": [
+    "сделаем",
+    "сейчас",
+    "не вопрос",
+    "возьмусь",
+    "будет"
+   ]
+  },
+  {
+   "key": "gde_chertezh",
+   "title": "где чертёж",
+   "emoji": "🤷",
+   "emotions": [
+    "think",
+    "surprise"
+   ],
+   "synonyms": [
+    "чертёж",
+    "где",
+    "потерял",
+    "не вижу",
+    "лист"
+   ]
+  },
+  {
+   "key": "lazer_reshaet",
+   "title": "лазер решает",
+   "emoji": "⚡",
+   "emotions": [
+    "energy",
+    "cool"
+   ],
+   "synonyms": [
+    "лазер",
+    "резка",
+    "станок",
+    "искры",
+    "металл"
+   ]
+  },
+  {
+   "key": "gibka_poshla",
+   "title": "гибка пошла",
+   "emoji": "🛠️",
+   "emotions": [
+    "energy"
+   ],
+   "synonyms": [
+    "гибка",
+    "пресс",
+    "станок",
+    "металл",
+    "работаю"
+   ]
+  },
+  {
+   "key": "opyat_peredelyvat",
+   "title": "опять переделывать",
+   "emoji": "😮‍💨",
+   "emotions": [
+    "tired",
+    "anger"
+   ],
+   "synonyms": [
+    "переделывать",
+    "заново",
+    "чертёж",
+    "ошибка",
+    "надоело"
+   ]
+  },
+  {
+   "key": "scha_podvarim",
+   "title": "ща подварим",
+   "emoji": "🔥",
+   "emotions": [
+    "energy",
+    "cool"
+   ],
+   "synonyms": [
+    "сварка",
+    "варим",
+    "шов",
+    "маска",
+    "горелка"
+   ]
+  },
+  {
+   "key": "kto_eto_chertil",
+   "title": "кто это чертил",
+   "emoji": "😠",
+   "emotions": [
+    "anger",
+    "think"
+   ],
+   "synonyms": [
+    "чертил",
+    "чертёж",
+    "кривой",
+    "ошибка",
+    "возмущён"
+   ]
+  },
+  {
+   "key": "vse_po_tehnologii",
+   "title": "всё по технологии",
+   "emoji": "😌",
+   "emotions": [
+    "cool",
+    "think"
+   ],
+   "synonyms": [
+    "технология",
+    "по правилам",
+    "порядок",
+    "стандарт",
+    "точно"
+   ]
+  },
+  {
+   "key": "obed_svyatoe",
+   "title": "обед святое",
+   "emoji": "🍱",
+   "emotions": [
+    "food",
+    "joy"
+   ],
+   "synonyms": [
+    "обед",
+    "еда",
+    "перерыв",
+    "кофе",
+    "контейнер"
+   ]
+  },
+  {
+   "key": "ya_ne_tuplyu",
+   "title": "я не туплю я считаю",
+   "emoji": "🧮",
+   "emotions": [
+    "think",
+    "cool"
+   ],
+   "synonyms": [
+    "считаю",
+    "штангенциркуль",
+    "думаю",
+    "замер",
+    "точность"
+   ]
+  },
+  {
+   "key": "smena_okonchena",
+   "title": "смена окончена",
+   "emoji": "✌️",
+   "emotions": [
+    "joy",
+    "tired"
+   ],
+   "synonyms": [
+    "смена",
+    "домой",
+    "конец дня",
+    "отдыхаю",
+    "победа"
+   ]
+  }
+ ]
+}
