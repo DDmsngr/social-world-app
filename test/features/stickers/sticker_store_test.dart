@@ -270,7 +270,7 @@ void main() {
     });
 
     testWidgets('пак по стикеру из переписки: стикер сверху и подсвечен, пак ставится', (tester) async {
-      tester.view.physicalSize = const Size(1080, 4000);
+      tester.view.physicalSize = const Size(1080, 9000);
       addTearDown(tester.view.resetPhysicalSize);
       await tester.pumpWidget(app(const StickerPackScreen(packId: 'alexa', highlight: 'cocoa')));
       await tester.pumpAndSettle();
@@ -408,12 +408,13 @@ void main() {
     });
 
     testWidgets('один свой смайл в поле уходит стикером, а смайл с текстом — текстом', (tester) async {
+      backend = FakeStickerBackend(installed: ['basic']);
       await tester.pumpWidget(app(const ChatComposer(conversationId: 'conv-1')));
       await tester.pumpAndSettle();
       // Панель открывается в режиме эмодзи: свой смайл встаёт в текст.
       await tester.tap(find.byTooltip('Эмодзи'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('sticker-alexa.wave')));
+      await tester.tap(find.byKey(const ValueKey('sticker-basic.smile')));
       await tester.pumpAndSettle();
       expect(repository.sent, isEmpty);
 
@@ -423,22 +424,22 @@ void main() {
       await tester.pumpAndSettle();
       final (text, kind, options) = repository.sent.single;
       expect(kind, MessageKind.sticker);
-      expect(options.sticker, 'alexa.wave');
-      expect(text, '👋');
+      expect(options.sticker, 'basic.smile');
+      expect(text, '🙂');
       expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, isEmpty);
 
       // Смайл плюс слово — обычное сообщение со своим эмодзи внутри.
       await tester.enterText(find.byType(TextField), 'Привет');
       await tester.tap(find.byTooltip('Эмодзи'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('sticker-alexa.wave')));
+      await tester.tap(find.byKey(const ValueKey('sticker-basic.smile')));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Клавиатура'));
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.send));
       await tester.pumpAndSettle();
       expect(repository.sent.last.$2, MessageKind.text);
-      expect(repository.sent.last.$1, 'Привет👋');
+      expect(repository.sent.last.$1, 'Привет🙂');
     });
 
     testWidgets('долгий тап по вкладке пака — убрать из своих и вернуть', (tester) async {
@@ -446,6 +447,9 @@ void main() {
       await tester.pumpWidget(app(const ChatComposer(conversationId: 'conv-1')));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Эмодзи'));
+      await tester.pumpAndSettle();
+      // Персонажи живут только в режиме стикеров.
+      await tester.tap(find.byKey(const ValueKey('panel-mode')));
       await tester.pumpAndSettle();
       await tester.longPress(find.byKey(const ValueKey('sticker-pack-alexa')));
       await tester.pumpAndSettle();

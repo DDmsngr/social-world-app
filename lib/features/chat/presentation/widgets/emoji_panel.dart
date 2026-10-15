@@ -118,6 +118,44 @@ class _EmojiPanelState extends State<EmojiPanel> {
       for (final pack in _stickerMode ? widget.stickerPacks : (widget.emojiPacks ?? widget.stickerPacks))
         if (pack.stickers.isNotEmpty) pack,
     ];
+    // Режим эмодзи, паков-смайлов нет, но стикеры есть (только персонажи):
+    // обычные эмодзи и кнопка перехода к стикерам.
+    final hasStickers = widget.stickerPacks.any((p) => p.stickers.isNotEmpty);
+    if (packs.isEmpty && !_stickerMode && hasStickers) {
+      return Container(
+        height: widget.height,
+        color: AppColors.ink2,
+        child: Column(
+          children: [
+            SizedBox(
+              height: _tabsHeight,
+              child: Row(
+                children: [
+                  const Spacer(),
+                  TextButton(
+                    key: const ValueKey('panel-mode'),
+                    onPressed: () => setState(() => _stickers = true),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primaryTint,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(0, 36),
+                    ),
+                    child: const Text('Стикеры'),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: AppColors.hair),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) => _picker(constraints.maxHeight),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     if (packs.isEmpty) {
       if (widget.startWithStickers || widget.onOpenStore == null) {
         return Container(

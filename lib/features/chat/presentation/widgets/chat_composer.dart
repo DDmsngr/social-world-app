@@ -114,6 +114,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   void initState() {
     super.initState();
     _focus.addListener(_onFocus);
+    _controller.addListener(_onTextTick);
     _loadMode();
   }
 
@@ -270,6 +271,8 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
         (_) => chatEmojiPanelOpen.value = false,
       );
     }
+    _suggestTimer?.cancel();
+    _controller.removeListener(_onTextTick);
     _focus.dispose();
     _ticker?.cancel();
     _recorder.dispose();
@@ -341,6 +344,51 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
   }
 
   // ── стикеры ───────────────────────────────────────────────────────────
+
+  bool _hadText = false;
+
+  /// Слушатель контроллера видит и набор, и программные правки (очистка после
+  /// отправки): панель перерисовывается, только когда текст появился или пропал.
+  void _onTextTick() {
+    final has = _controller.text.trim().isNotEmpty;
+    if (has != _hadText) {
+      _hadText = has;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Timer? _suggestTimer;
+  String? _suggestedText;
+  List<StickerPack>? _suggestedPacks;
+  List<Sticker> _suggested = const [];
+
+  /// Подсказки для текущего текста: пересчитываются только когда текст или
+  /// набор паков изменился.
+  List<Sticker> _cachedSuggestions(StickerCatalog? catalog, List<StickerPack> mine) {
+    final text = _controller.text;
+    if (text != _suggestedText || !identical(mine, _suggestedPacks)) {
+      _suggestedText = text;
+      _suggestedPacks = mine;
+      _suggested = _stickerSuggestions(catalog, mine);
+    }
+    return _suggested;
+  }
+
+  void _scheduleSuggestions() {
+    _suggestTimer?.cancel();
+    _suggestTimer = Timer(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      final before = _suggested;
+      final suggestions = _cachedSuggestions(
+        ref.read(stickerCatalogProvider).value,
+        ref.read(myStickerPacksProvider),
+      );
+      final same = before.length == suggestions.length &&
+          [for (var i = 0; i < before.length; i++) before[i].id == suggestions[i].id]
+              .every((e) => e);
+      if (!same) setState(() {});
+    });
+  }
 
   /// Подсказки стикеров к тому, что набрано: короткий запрос из 1–3 слов
   /// («любовь», «ржу», «😍»). Длинный текст — это сообщение, а не поиск.
@@ -859,7 +907,7 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
     final catalog = ref.watch(stickerCatalogProvider).value;
     final myPacks = ref.watch(myStickerPacksProvider);
     _controller.catalog = catalog;
-    final suggestions = _stickerSuggestions(catalog, myPacks);
+    final suggestions = _cachedSuggestions(catalog, myPacks);
 
     return SafeArea(
       top: false,
@@ -999,7 +1047,11 @@ class _ChatComposerState extends ConsumerState<ChatComposer> {
               controller: _controller,
               focusNode: _focus,
               onChanged: (value) {
-                setState(() {});
+                // Перерисовываем всю панель ввода только когда меняется то, что
+                // на ней видно (текст появился/пропал). Раньше каждая буква
+                // пересобирала её и искала подсказки стикеров: на слабых
+                // телефонах набор отставал. Подсказки считаются с задержкой.
+                _scheduleSuggestions();
                 // «Печатает…» у собеседника: только пока в поле есть текст.
                 final hub = ref.read(typingHubProvider(widget.conversationId));
                 if (value.trim().isNotEmpty) {
