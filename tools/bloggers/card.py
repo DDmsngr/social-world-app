@@ -151,4 +151,5 @@ def main():
     render(a.photo, a.title, a.author, a.credit, BRAND.get(a.key, BRAND['sonya']), a.out)
 
 
-main()
+if __name__ == '__main__':
+    main()

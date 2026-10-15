@@ -30,6 +30,13 @@ AUTHORS = [
     ('artem', 'artem_volna', 'Артём Волнов', 'Море, горы и погода простым языком, безопасно и бодро.'),
 ]
 
+# Новые авторы живут в authors_extra.json (ник, имя, описание, цвет карточки).
+_extra = os.path.join(HERE, 'authors_extra.json')
+if os.path.exists(_extra):
+    for _key, _v in json.load(open(_extra, encoding='utf-8')).items():
+        if not any(a[0] == _key for a in AUTHORS):
+            AUTHORS.append((_key, _v['nick'], _v['name'], _v['about']))
+
 
 def call(method, path, data=None, headers=None):
     req = urllib.request.Request(URL + path, data=data, method=method)

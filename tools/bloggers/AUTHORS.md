@@ -59,3 +59,19 @@
 2. Я завожу аккаунты: «Соня Прибрежная», ник `sonya_gid` и так далее, с описанием «Виртуальный автор ChaWo · ведёт редакция». Входа в них у людей нет.
 3. Пишу посты заранее, на 2–3 дня, каждый на найденном источнике, с картинкой и подписью автора фото. Кладу в очередь, они выходят как обычные посты в ленте от имени автора.
 4. Раз в день прохожу очередь и убираю то, что не подтвердилось или устарело.
+
+---
+
+## Вторая волна (15.10): ещё пять авторов, общие правила те же
+
+7. **Лика Страницына** — книги и кино: что почитать и посмотреть, факты без спойлеров. Цвет карточки золотой.
+8. **Глеб Космов** — космос, техника, изобретения: как это устроено. Цвет салатовый.
+9. **Нина Садова** — растения, сады, субтропики Сочи: что цветёт и как растёт. Цвет мятный.
+10. **Яков Маршрутов** — города и маршруты, Россия и мир, история мест. Цвет бронзовый.
+11. **Рита Азарова** — игры и головоломки: шахматы, настолки, логика. Цвет розовый.
+
+Промт на один лист с пятью аватарами (стиль тот же, что у первых шести):
+
+> One image, a grid of 5 square portrait avatars (3 on top, 2 on the bottom), each in a separate square tile with equal margins, illustrated digital art style with soft painterly shading, consistent style across all, centered faces with some space around, no text, no watermark. 1) a woman around 30 with a short dark bob and round glasses, cozy cardigan, stacks of books and a warm lamp softly blurred behind, gentle smile. 2) a man around 36 with short light-brown hair and a stubble, dark jacket with a small mission patch, a starry night sky and a faint rocket trail blurred behind, curious look. 3) a woman around 45 with a straw hat, gardening apron and green gloves, magnolia and palm leaves blurred behind, warm smile. 4) a man around 40 with a trimmed beard and a canvas backpack, a map in hand, old town rooftops and mountains blurred behind, relaxed smile. 5) a young woman around 25 with a high ponytail and a bright sweater, a chessboard and colorful dice softly blurred in front, playful smirk.
+
+Аватары сохранить как `lika.png`, `gleb.png`, `nina.png`, `yakov.png`, `rita.png` в `D:\temp\bloggers\avatars\`, остальное сделает `create_authors.ps1` (заведёт аккаунты) и `post_batch.py` (карточки и очередь).
