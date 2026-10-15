@@ -22,6 +22,21 @@ class _Spy extends LocalChatRepository {
   final sent = <_Sent>[];
   var downloads = 0;
 
+  /// true — «сервер скопировал файл сам»: пересылка не качает и не грузит.
+  bool serverCopy = false;
+  final copied = <String>[];
+
+  @override
+  Future<ChatMessage?> forwardAttachment({
+    required String conversationId,
+    required ChatMessage source,
+    SendOptions options = SendOptions.none,
+  }) async {
+    if (!serverCopy) return null;
+    copied.add(conversationId);
+    return source;
+  }
+
   @override
   Future<ChatMessage> send({
     required String conversationId,
@@ -152,6 +167,36 @@ void main() {
         authorOf: (_) => 'Саша',
       );
       expect(repo.sent.map((s) => s.text), ['раз', 'два']);
+    });
+  });
+
+  group('пересылка вложения', () {
+    test('файл копируется на сервере: ни скачивания, ни новой загрузки', () async {
+      final repo = _Spy()..serverCopy = true;
+      addTearDown(repo.dispose);
+      final result = await forwardMessages(
+        repository: repo,
+        messages: [photo],
+        targets: [alina, mark],
+        authorOf: (_) => 'Саша',
+      );
+      expect(result.allDelivered, isTrue);
+      expect(repo.copied, ['c-a', 'c-m']);
+      expect(repo.downloads, 0);
+      expect(repo.sent, isEmpty);
+    });
+
+    test('копия невозможна: файл качается один раз и уходит заново в каждый чат', () async {
+      final repo = _Spy();
+      addTearDown(repo.dispose);
+      await forwardMessages(
+        repository: repo,
+        messages: [photo],
+        targets: [alina, mark],
+        authorOf: (_) => 'Саша',
+      );
+      expect(repo.downloads, 1);
+      expect(repo.sent.map((s) => s.conversationId), ['c-a', 'c-m']);
     });
   });
 

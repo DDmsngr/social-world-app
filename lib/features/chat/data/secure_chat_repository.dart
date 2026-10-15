@@ -660,6 +660,95 @@ class SecureChatRepository implements ChatRepository {
     );
   }
 
+  /// Файлы переписки лежат как `<id чата>/<id сообщения>[-aN]`: только такие
+  /// можно скопировать на сервере; всё остальное (ссылки каналов) отправляется
+  /// заново.
+  static final _ownFile = RegExp(r'^[0-9a-f-]{36}/[0-9a-f-]{36}(-a\d+)?$');
+
+  @override
+  Future<ChatMessage?> forwardAttachment({
+    required String conversationId,
+    required ChatMessage source,
+    SendOptions options = SendOptions.none,
+  }) async {
+    final original = source.attachment;
+    if (original == null) return null;
+    final files = original.all;
+    if (files.length > maxAlbumPhotos) return null;
+    await _ready;
+    final direct = await _kind(conversationId) == ConversationKind.direct;
+    // Личные чаты хранят файл зашифрованным (ключ в сообщении), группы нет.
+    // Копия годится, только когда у файла и у чата-получателя одно и то же.
+    for (final file in files) {
+      if (!_ownFile.hasMatch(file.path) || (file.key != null) != direct) return null;
+    }
+    final id = _uuid.v4();
+    final copies = <ChatAttachment>[];
+    final paths = <String>[];
+    Future<void> cleanup() => _client.storage
+        .from(_bucket)
+        .remove(paths)
+        .then((_) {})
+        .catchError((_) {});
+    try {
+      for (var i = 0; i < files.length; i++) {
+        final file = files[i];
+        final to = '$conversationId/${i == 0 ? id : '$id-a$i'}';
+        await _client.storage.from(_bucket).copy(file.path, to);
+        paths.add(to);
+        copies.add(
+          ChatAttachment(
+            path: to,
+            size: file.size,
+            name: file.name,
+            mime: file.mime,
+            durationMs: file.durationMs,
+            waveform: file.waveform,
+            key: file.key,
+          ),
+        );
+      }
+      final first = copies.first;
+      final attachment = ChatAttachment(
+        path: first.path,
+        size: first.size,
+        name: first.name,
+        mime: first.mime,
+        durationMs: first.durationMs,
+        waveform: first.waveform,
+        key: first.key,
+        album: copies.skip(1).toList(),
+      );
+      final text = source.text?.trim();
+      await _insert(
+        id: id,
+        conversationId: conversationId,
+        kind: source.kind,
+        text: text == null || text.isEmpty ? null : text,
+        attachment: attachment,
+        options: options,
+      );
+      return ChatMessage(
+        id: id,
+        conversationId: conversationId,
+        senderId: currentUserId,
+        sentAt: DateTime.now(),
+        kind: source.kind,
+        text: text == null || text.isEmpty ? null : text,
+        attachment: attachment,
+        status: MessageStatus.sent,
+        signatureValid: true,
+        forwardedFrom: options.forwardedFrom,
+      );
+    } catch (error) {
+      // Копия не получилась (нет прав, файла уже нет): уберём, что успело
+      // скопироваться, а вызывающий отправит файл обычным путём.
+      AppLog.add('Копия вложения при пересылке не вышла: $error');
+      await cleanup();
+      return null;
+    }
+  }
+
   @override
   Future<ChatMessage> sendAlbum({
     required String conversationId,

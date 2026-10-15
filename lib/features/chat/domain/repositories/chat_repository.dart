@@ -82,6 +82,16 @@ abstract interface class ChatRepository {
   /// «изменено».
   Future<ChatMessage> editMessage(ChatMessage message, String text);
 
+  /// Пересылка вложения без скачивания и повторной загрузки: файл копируется
+  /// на сервере (хранилище делает копию само), ключ едет в новом сообщении.
+  /// null — так переслать нельзя (чужой источник файла, разное шифрование
+  /// у чатов, сервер отказал): вызывающий отправит файл заново.
+  Future<ChatMessage?> forwardAttachment({
+    required String conversationId,
+    required ChatMessage source,
+    SendOptions options = SendOptions.none,
+  }) async => null;
+
   /// Путь к файлу вложения на устройстве: скачивает и расшифровывает при
   /// первом обращении, дальше берёт из кэша.
   Future<String> attachmentFile(ChatMessage message);

@@ -118,6 +118,13 @@ class LocalChatRepository implements ChatRepository {
   );
 
   @override
+  Future<ChatMessage?> forwardAttachment({
+    required String conversationId,
+    required ChatMessage source,
+    SendOptions options = SendOptions.none,
+  }) async => null;
+
+  @override
   Future<ChatMessage> sendAlbum({
     required String conversationId,
     required List<String> filePaths,
