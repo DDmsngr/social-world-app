@@ -11,6 +11,9 @@ import 'markdown_view.dart' show isSafeLink;
 
 final _urlPattern = RegExp(r'https?://[^\s<>"]+', caseSensitive: false);
 
+/// Ссылка с подписью: `[Википедия](https://ru.wikipedia.org/…)`.
+final _namedLink = RegExp(r'\[([^\]\n]{1,80})\]\((https?://[^)\s]+)\)', caseSensitive: false);
+
 /// Знаки, которыми предложение заканчивается после ссылки, но к ней не относятся.
 const _trailing = '.,;:!?)]}»…';
 
@@ -24,6 +27,7 @@ class LinkText extends StatefulWidget {
     this.style,
     this.linkColor,
     this.hashtags = false,
+    this.readableLinks = false,
     this.selectable = false,
     this.maxLines,
     this.inline = const [],
@@ -37,6 +41,10 @@ class LinkText extends StatefulWidget {
   final TextStyle? style;
   final Color? linkColor;
   final bool hashtags;
+
+  /// Для постов: `[подпись](адрес)` показывается подписью, а длинный голый
+  /// адрес — коротким именем сайта (ru.wikipedia.org). Нажимаются оба.
+  final bool readableLinks;
   final bool selectable;
   final int? maxLines;
 
@@ -93,15 +101,28 @@ class _LinkTextState extends State<LinkText> {
   }
 
   /// Куски текста: обычные и нажимаемые (ссылка или тег).
-  List<({int start, int end, VoidCallback onTap})> _links() {
-    final found = <({int start, int end, VoidCallback onTap})>[];
+  List<({int start, int end, VoidCallback onTap, String? label})> _links() {
+    final found = <({int start, int end, VoidCallback onTap, String? label})>[];
+    if (widget.readableLinks) {
+      for (final m in _namedLink.allMatches(widget.text)) {
+        final url = m.group(2)!;
+        found.add((start: m.start, end: m.end, onTap: () => _open(url), label: m.group(1)));
+      }
+    }
     for (final m in _urlPattern.allMatches(widget.text)) {
+      if (found.any((f) => m.start >= f.start && m.start < f.end)) continue;
       var end = m.end;
       while (end > m.start + 1 && _trailing.contains(widget.text[end - 1])) {
         end--;
       }
       final url = widget.text.substring(m.start, end);
-      found.add((start: m.start, end: end, onTap: () => _open(url)));
+      final host = widget.readableLinks ? Uri.tryParse(url)?.host.replaceFirst('www.', '') : null;
+      found.add((
+        start: m.start,
+        end: end,
+        onTap: () => _open(url),
+        label: host == null || host.isEmpty ? null : host,
+      ));
     }
     if (widget.hashtags) {
       for (final m in hashtagPattern.allMatches(widget.text)) {
@@ -112,10 +133,11 @@ class _LinkTextState extends State<LinkText> {
           start: m.start,
           end: m.end,
           onTap: () => context.push('${Routes.hashtag}/${Uri.encodeComponent(tag)}'),
+          label: null,
         ));
       }
-      found.sort((a, b) => a.start.compareTo(b.start));
     }
+    found.sort((a, b) => a.start.compareTo(b.start));
     return found;
   }
 
@@ -145,7 +167,7 @@ class _LinkTextState extends State<LinkText> {
       _recognizers.add(recognizer);
       spans.add(
         TextSpan(
-          text: widget.text.substring(link.start, link.end),
+          text: link.label ?? widget.text.substring(link.start, link.end),
           style: TextStyle(color: color, decoration: TextDecoration.underline, decorationColor: color),
           recognizer: recognizer,
         ),

@@ -7,7 +7,7 @@ import '../../../../core/text/markdown_preview.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/widgets/hashtag_text.dart';
+import '../../../../core/widgets/link_text.dart';
 import '../../../../core/widgets/markdown_view.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../profile/domain/profile_models.dart';
@@ -330,7 +330,7 @@ class _Body extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: post.bodyFormat == BodyFormat.markdown
           ? MarkdownView(data: body)
-          : HashtagText(body, style: theme.textTheme.bodyLarge),
+          : LinkText(body, style: theme.textTheme.bodyLarge, hashtags: true, readableLinks: true),
     );
   }
 }
