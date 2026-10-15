@@ -299,7 +299,7 @@ async function forReaction(messageId: string, reactorId: string): Promise<Job[]>
 async function forNotification(notificationId: string): Promise<Job[]> {
   const { data: n } = await db
     .from("notifications")
-    .select("id, recipient_id, actor_id, kind, target_type, target_id, title")
+    .select("id, recipient_id, actor_id, kind, target_type, target_id, title, comment_id")
     .eq("id", notificationId)
     .maybeSingle();
   if (!n) return [];
@@ -328,6 +328,8 @@ async function forNotification(notificationId: string): Promise<Job[]> {
         notification_id: n.id,
         target_type: n.target_type ?? "",
         target_id: n.target_id ?? "",
+        // Тап по пушу о комментарии открывает пост на этом комментарии (0096).
+        comment_id: n.comment_id ?? "",
       },
     },
   }];

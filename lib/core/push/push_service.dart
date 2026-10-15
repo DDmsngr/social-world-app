@@ -309,7 +309,8 @@ class PushService {
         if (target == null || id == null || id.isEmpty) {
           router.push(Routes.notifications);
         } else {
-          final location = DeepLinks.locationFor(target, id);
+          final comment = data['comment_id'] as String?;
+          final location = DeepLinks.locationFor(target, id, comment: comment);
           location.startsWith('${Routes.chats}/')
               ? router.go(location)
               : router.push(location);

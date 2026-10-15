@@ -21,6 +21,7 @@ import 'features/discover/presentation/providers/city_provider.dart';
 import 'features/discover/presentation/providers/presence_publisher.dart';
 import 'features/calls/call_background.dart';
 import 'features/calls/call_kit.dart';
+import 'features/feed/presentation/providers/muted_hashtags.dart';
 
 Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -97,6 +98,8 @@ Future<void> main() async {
   // Город Pulse — до первого кадра: иначе карта открывается на пилотном
   // городе и только потом переезжает на выбранный.
   final city = await loadCity();
+  // Скрытые теги — до первого кадра, чтобы лента сразу пришла без них.
+  final mutedHashtags = await loadMutedHashtags();
 
   FlutterNativeSplash.remove();
 
@@ -106,6 +109,7 @@ Future<void> main() async {
         initialThemeChoiceProvider.overrideWithValue(themeChoice),
         initialPresenceEnabledProvider.overrideWithValue(presenceEnabled),
         initialCityProvider.overrideWithValue(city),
+        initialMutedHashtagsProvider.overrideWithValue(mutedHashtags),
       ],
       child: const SocialWorldApp(),
     ),

@@ -191,12 +191,15 @@ abstract final class DeepLinks {
     String id, {
     String? arrivalCode,
     String? inviteToken,
+    String? comment,
   }) =>
       switch (target) {
         LinkTarget.channel => inviteToken == null
             ? Routes.channel(id)
             : '${Routes.channel(id)}?invite=$inviteToken',
-        LinkTarget.post => '${Routes.posts}/$id',
+        LinkTarget.post => comment == null || comment.isEmpty
+            ? '${Routes.posts}/$id'
+            : '${Routes.posts}/$id?comment=$comment',
         LinkTarget.event => '${Routes.eventDetail}/$id',
         LinkTarget.place => '${Routes.places}/$id',
         LinkTarget.profile => '${Routes.user}/$id',

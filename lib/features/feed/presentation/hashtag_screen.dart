@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
+import '../../../core/text/hashtags.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
 import 'providers/feed_providers.dart';
+import 'providers/muted_hashtags.dart';
 import 'widgets/post_card.dart';
 
 /// Лента одного хэштега: все видимые мне посты с ним, новые сверху.
@@ -17,6 +19,7 @@ class HashtagScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final posts = ref.watch(hashtagFeedProvider(tag));
+    final muted = ref.watch(mutedHashtagsProvider).contains(normalizeHashtag(tag));
 
     return Scaffold(
       appBar: AppBar(
@@ -26,6 +29,28 @@ class HashtagScreen extends ConsumerWidget {
           tooltip: 'Назад',
           icon: const Icon(Icons.arrow_back),
         ),
+        actions: [
+          IconButton(
+            tooltip: muted ? 'Снова показывать в ленте' : 'Не показывать в ленте',
+            icon: Icon(muted ? Icons.visibility_off : Icons.visibility_outlined),
+            onPressed: () {
+              ref.read(mutedHashtagsProvider.notifier).toggle(tag);
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    persist: false,
+                    duration: const Duration(seconds: 3),
+                    content: Text(
+                      muted
+                          ? 'Посты с #$tag снова в ленте'
+                          : 'Посты с #$tag больше не покажутся в ленте. Вернуть: Настройки → Скрытые теги',
+                    ),
+                  ),
+                );
+            },
+          ),
+        ],
       ),
       body: posts.when(
         loading: () => const LoadingView(),

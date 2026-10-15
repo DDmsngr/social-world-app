@@ -11,6 +11,7 @@ import '../../data/local_feed_repository.dart';
 import '../../data/supabase_feed_repository.dart';
 import '../../domain/entities/post.dart';
 import '../../domain/repositories/feed_repository.dart';
+import 'muted_hashtags.dart';
 
 final feedRepositoryProvider = Provider<FeedRepository>((ref) {
   // keepAlive: у заглушки лента лежит в памяти, пересоздание стёрло бы
@@ -82,6 +83,15 @@ class FeedController extends AsyncNotifier<List<Post>> {
     // стрелять запросом без сессии — city_feed доступна только authenticated,
     // без охраны это была бы гарантированная ошибка ровно в момент логаута.
     if (ref.watch(currentUserProvider) == null) return const [];
+    // Тег скрыли — его посты уходят сразу; вернули — лента перезагружается,
+    // потому что убранных постов на руках уже нет.
+    ref.listen(mutedHashtagsProvider, (before, muted) {
+      if (before != null && before.difference(muted).isNotEmpty) {
+        refresh();
+      } else {
+        state = AsyncValue.data(_withoutHidden(state.value ?? const []));
+      }
+    });
     final posts = await ref.watch(feedRepositoryProvider).loadFeed(
       city: ref.watch(feedCityFilterProvider),
       forYou: ref.watch(feedScopeProvider) == FeedScope.forYou,
@@ -180,11 +190,14 @@ class FeedController extends AsyncNotifier<List<Post>> {
       ...ref.read(reportRepositoryProvider).hiddenTargetIds,
       ...?ref.read(blocksProvider).value?.keys,
     };
-    if (hidden.isEmpty) return posts;
+    final muted = ref.read(mutedHashtagsProvider);
+    if (hidden.isEmpty && muted.isEmpty) return posts;
     return posts
         .where(
           (post) =>
-              !hidden.contains(post.id) && !hidden.contains(post.authorId),
+              !hidden.contains(post.id) &&
+              !hidden.contains(post.authorId) &&
+              !hasMutedHashtag(post, muted),
         )
         .toList(growable: false);
   }

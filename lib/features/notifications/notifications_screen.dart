@@ -106,6 +106,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                       ? UserAvatar(
                           name: item.actorName!,
                           url: item.actorAvatarUrl,
+                          // Тап по строке ведёт к посту, поэтому аватар не
+                          // нажимается, но кайма автора видна.
+                          ringUserId: item.actorId,
                         )
                       : CircleAvatar(
                           backgroundColor: AppColors.ink2,

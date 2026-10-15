@@ -56,6 +56,7 @@ class AppNotification {
     this.actorId,
     this.actorName,
     this.actorAvatarUrl,
+    this.commentId,
     this.title,
     this.readAt,
   });
@@ -65,6 +66,9 @@ class AppNotification {
   final String? actorId;
   final String? actorName;
   final String? actorAvatarUrl;
+
+  /// Комментарий, к которому ведёт уведомление (0096): пост откроется на нём.
+  final String? commentId;
   final LinkTarget target;
   final String targetId;
   final String? title;
@@ -73,7 +77,7 @@ class AppNotification {
 
   bool get isUnread => readAt == null;
 
-  String get location => DeepLinks.locationFor(target, targetId);
+  String get location => DeepLinks.locationFor(target, targetId, comment: commentId);
 
   /// Готовая строка: «Алина подписалась на вас».
   String get text {
@@ -119,6 +123,7 @@ class AppNotification {
     actorId: actorId,
     actorName: actorName,
     actorAvatarUrl: actorAvatarUrl,
+    commentId: commentId,
     target: target,
     targetId: targetId,
     title: title,
@@ -161,6 +166,7 @@ class SupabaseNotificationsRepository implements NotificationsRepository {
       actorId: row['actor_id'] as String?,
       actorName: row['actor_name'] as String?,
       actorAvatarUrl: row['actor_avatar'] as String?,
+      commentId: row['comment_id'] as String?,
       target: target,
       targetId: row['target_id'] as String,
       title: row['title'] as String?,

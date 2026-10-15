@@ -1,11 +1,13 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/debug/app_log.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
@@ -23,9 +25,17 @@ import 'widgets/post_share_sheet.dart';
 
 /// Публикация и обсуждение под ней ветками.
 class PostDetailScreen extends ConsumerStatefulWidget {
-  const PostDetailScreen({super.key, required this.postId, this.post});
+  const PostDetailScreen({
+    super.key,
+    required this.postId,
+    this.post,
+    this.commentId,
+  });
 
   final String postId;
+
+  /// Открыть на этом комментарии и подсветить его (тап по уведомлению).
+  final String? commentId;
 
   /// Пост приходит из ленты, чтобы не ждать второго запроса ради шапки.
   /// По прямой ссылке его нет — тогда ищем в уже загруженной ленте.
@@ -41,6 +51,31 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   final _collapsed = <String>{};
   Comment? _replyTo;
   var _sending = false;
+
+  final _targetKey = GlobalKey();
+
+  /// Комментарий из уведомления: подсвечен, пока не погаснет.
+  String? _flash;
+  var _scrolled = false;
+
+  /// Когда ветка загрузилась — доехать до комментария и подсветить его.
+  void _scrollToTarget() {
+    if (_scrolled || widget.commentId == null) return;
+    _scrolled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final target = _targetKey.currentContext;
+      if (!mounted || target == null) return;
+      setState(() => _flash = widget.commentId);
+      await Scrollable.ensureVisible(
+        target,
+        alignment: 0.3,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      if (mounted) setState(() => _flash = null);
+    });
+  }
 
   @override
   void dispose() {
@@ -73,11 +108,15 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
   /// а лайка нет, пока не перезапустит приложение). Свежая версия заменяет и
   /// копию в ленте.
   Future<void> _fetchIfMissing() async {
-    final inFeed = ref.read(feedProvider).value?.any((p) => p.id == widget.postId) ?? false;
+    final inFeed =
+        ref.read(feedProvider).value?.any((p) => p.id == widget.postId) ??
+        false;
 
     if (!inFeed) setState(() => _fetching = true);
     try {
-      final post = await ref.read(feedRepositoryProvider).loadPost(widget.postId);
+      final post = await ref
+          .read(feedRepositoryProvider)
+          .loadPost(widget.postId);
       if (!mounted) return;
       if (inFeed) {
         if (post != null) ref.read(feedProvider.notifier).replacePost(post);
@@ -105,6 +144,7 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
     }
     return widget.post ?? _fetched;
   }
+
   /// Картинки, приложенные к будущему комментарию (пути на телефоне).
   final _media = <String>[];
   final _picker = ImagePicker();
@@ -246,8 +286,16 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
               ),
               data: (comments) {
                 final rows = visibleThread(comments, _collapsed);
+                if (rows.any((row) => row.comment.id == widget.commentId)) {
+                  _scrollToTarget();
+                }
 
                 return ListView(
+                  // Вся ветка строится сразу: иначе комментарий из уведомления
+                  // ниже экрана ещё не создан, и доехать до него нечем.
+                  scrollCacheExtent: widget.commentId == null
+                      ? null
+                      : const ScrollCacheExtent.pixels(100000),
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.gutter,
                     12,
@@ -271,26 +319,32 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
                         ),
                       ),
                     for (final row in rows)
-                      CommentTile(
-                        comment: row.comment,
-                        hiddenReplies: row.hiddenReplies,
-                        collapsed: row.collapsed,
-                        isMine: row.comment.authorId == myId,
-                        onLike: () => ref
-                            .read(commentsProvider(widget.postId).notifier)
-                            .toggleLike(row.comment),
-                        onDislike: () => ref
-                            .read(commentsProvider(widget.postId).notifier)
-                            .toggleDislike(row.comment),
-                        onReply: () => _reply(row.comment),
-                        onToggleCollapse: () => setState(() {
-                          if (!_collapsed.remove(row.comment.id)) {
-                            _collapsed.add(row.comment.id);
-                          }
-                        }),
-                        onDelete: () => ref
-                            .read(commentsProvider(widget.postId).notifier)
-                            .delete(row.comment),
+                      _Highlight(
+                        key: row.comment.id == widget.commentId
+                            ? _targetKey
+                            : null,
+                        on: row.comment.id == _flash,
+                        child: CommentTile(
+                          comment: row.comment,
+                          hiddenReplies: row.hiddenReplies,
+                          collapsed: row.collapsed,
+                          isMine: row.comment.authorId == myId,
+                          onLike: () => ref
+                              .read(commentsProvider(widget.postId).notifier)
+                              .toggleLike(row.comment),
+                          onDislike: () => ref
+                              .read(commentsProvider(widget.postId).notifier)
+                              .toggleDislike(row.comment),
+                          onReply: () => _reply(row.comment),
+                          onToggleCollapse: () => setState(() {
+                            if (!_collapsed.remove(row.comment.id)) {
+                              _collapsed.add(row.comment.id);
+                            }
+                          }),
+                          onDelete: () => ref
+                              .read(commentsProvider(widget.postId).notifier)
+                              .delete(row.comment),
+                        ),
                       ),
                   ],
                 );
@@ -307,10 +361,31 @@ class _PostDetailScreenState extends ConsumerState<PostDetailScreen> {
             attachments: _media,
             onPickPhotos: _pickPhotos,
             onPickGif: _pickGif,
-            onRemoveAttachment: (index) => setState(() => _media.removeAt(index)),
+            onRemoveAttachment: (index) =>
+                setState(() => _media.removeAt(index)),
           ),
         ],
       ),
     );
   }
+}
+
+/// Подложка комментария из уведомления: загорается и плавно гаснет.
+class _Highlight extends StatelessWidget {
+  const _Highlight({super.key, required this.on, required this.child});
+
+  final bool on;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedContainer(
+    duration: const Duration(milliseconds: 600),
+    decoration: BoxDecoration(
+      color: on
+          ? AppColors.primary.withValues(alpha: 0.14)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: child,
+  );
 }

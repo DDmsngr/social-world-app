@@ -312,6 +312,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => PostDetailScreen(
           postId: state.pathParameters['postId']!,
           post: state.extra as Post?,
+          commentId: state.uri.queryParameters['comment'],
         ),
       ),
       GoRoute(

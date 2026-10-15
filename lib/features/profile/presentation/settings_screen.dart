@@ -19,6 +19,7 @@ import '../../auth/presentation/providers/auth_providers.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
 import '../../discover/presentation/providers/map_start.dart';
 import '../../discover/presentation/providers/presence_publisher.dart';
+import '../../feed/presentation/providers/muted_hashtags.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -67,6 +68,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SectionLabel('Карта'),
           const SizedBox(height: 12),
           const _MapStartPicker(),
+          const SizedBox(height: 18),
+          const SectionLabel('Скрытые теги'),
+          const SizedBox(height: 12),
+          const _MutedHashtags(),
           const SizedBox(height: 18),
           const SectionLabel('Безопасность'),
           const SizedBox(height: 8),
@@ -741,6 +746,36 @@ class UpdateSettingsRow extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Теги, посты с которыми не показываются в ленте. Скрывают на экране тега.
+class _MutedHashtags extends ConsumerWidget {
+  const _MutedHashtags();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final muted = ref.watch(mutedHashtagsProvider).toList()..sort();
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: muted.isEmpty
+          ? Text(
+              'Нет. Чтобы скрыть тег, откройте его и нажмите на глаз вверху.',
+              style: TextStyle(color: AppColors.textFaint),
+            )
+          : Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final tag in muted)
+                  InputChip(
+                    label: Text('#$tag'),
+                    deleteButtonTooltipMessage: 'Снова показывать',
+                    onDeleted: () => ref.read(mutedHashtagsProvider.notifier).toggle(tag),
+                  ),
+              ],
+            ),
     );
   }
 }
