@@ -12,7 +12,11 @@ import 'markdown_view.dart' show isSafeLink;
 final _urlPattern = RegExp(r'https?://[^\s<>"]+', caseSensitive: false);
 
 /// Ссылка с подписью: `[Википедия](https://ru.wikipedia.org/…)`.
-final _namedLink = RegExp(r'\[([^\]\n]{1,80})\]\((https?://[^)\s]+)\)', caseSensitive: false);
+/// В адресе допустимы скобки парой: `…/Олимпийский_парк_(Сочи)`.
+final _namedLink = RegExp(
+  r'\[([^\]\n]{1,80})\]\((https?://(?:[^()\s]|\([^()\s]*\))+)\)',
+  caseSensitive: false,
+);
 
 /// Адрес для показа человеку: `%D0%A1…` превращается обратно в буквы. Открывается
 /// по-прежнему исходный адрес.

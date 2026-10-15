@@ -15,6 +15,12 @@ void main() {
     expect(find.textContaining('Источник: ', findRichText: true), findsOneWidget);
   });
 
+  testWidgets('скобки в адресе не обрывают ссылку', (tester) async {
+    await tester.pumpWidget(host('Источник: [Википедия](https://ru.wikipedia.org/wiki/Парк_(Сочи)) и всё'));
+    final text = tester.widget<RichText>(find.byType(RichText).last).text.toPlainText();
+    expect(text, 'Источник: Википедия и всё');
+  });
+
   testWidgets('голый длинный адрес сокращается до имени сайта', (tester) async {
     await tester.pumpWidget(host('Смотрите https://www.example.com/very/long/path?x=1 сегодня.'));
     final text = tester.widget<RichText>(find.byType(RichText).last).text.toPlainText();

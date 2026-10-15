@@ -82,6 +82,8 @@ def main(path):
         src_url = it.get('source_url') or meta.get('url')
         credit = it.get('photo_credit') or f"{meta.get('artist', 'автор не указан')}, {meta.get('license', '')}".strip(', ')
         photo_page = it.get('photo_page') or meta.get('commons')
+        # Скобки в адресе (…/Парк_(Сочи)) обрывали бы ссылку [подпись](адрес).
+        src_url, photo_page = (u and u.replace('(', '%28').replace(')', '%29') for u in (src_url, photo_page))
         body = (f"{it['title'].replace('*', '')}\n\n{it['body'].strip()}\n\n{it['tags']}\n\n"
                 f"Источник: [{src_name}]({src_url})\nФото: {credit}, [Wikimedia Commons]({photo_page})")
         problems = check(it, it['body'])
