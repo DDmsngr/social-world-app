@@ -58,3 +58,4 @@ ios/Runner/GoogleService-Info.plist
 
 # Python
 __pycache__/
+docs/legal/
