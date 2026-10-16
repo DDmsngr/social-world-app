@@ -1,0 +1,2 @@
+# Серверные скрипты запускает Linux: CRLF ломает shebang («not found»).
+tools/bloggers/server/* text eol=lf
