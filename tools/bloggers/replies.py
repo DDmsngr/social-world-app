@@ -181,6 +181,8 @@ def claude(text):
     req = urllib.request.Request(base + '/v1/messages',
                                  data=json.dumps(body).encode(), method='POST')
     req.add_header('x-api-key', key)
+    # Cloudflare отбивает стандартный «Python-urllib» ошибкой 1010.
+    req.add_header('User-Agent', 'chawo-replies/1.0')
     if os.environ.get('ANTHROPIC_PROXY_TOKEN'):
         req.add_header('x-proxy-token', os.environ['ANTHROPIC_PROXY_TOKEN'])
     req.add_header('anthropic-version', '2023-06-01')
