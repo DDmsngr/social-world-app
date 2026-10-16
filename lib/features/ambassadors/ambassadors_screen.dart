@@ -173,6 +173,9 @@ const _months = [
   'декабря',
 ];
 
+/// Цвет амбассадорских отметок — золото читается и в светлой, и в тёмной теме.
+const _gold = Color(0xFFC9A227);
+
 String _day(DateTime d) => '${d.day} ${_months[d.month - 1]}';
 
 String _ap(int n) => n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ' ');
@@ -456,10 +459,7 @@ class _RatingTile extends StatelessWidget {
               width: 26,
               child: Text(
                 leading == null ? '${row.place}' : '',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: row.place == 1 ? AppColors.champagne : AppColors.textDim,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w700, color: row.place == 1 ? _gold : AppColors.textDim),
               ),
             ),
             UserAvatar(name: row.name, url: row.avatarUrl, radius: 20),
@@ -467,7 +467,7 @@ class _RatingTile extends StatelessWidget {
         ),
       ),
       title: Text(leading ?? row.name),
-      subtitle: Text([if (leading != null) row.name, ?badge].join(' · ')),
+      subtitle: leading == null && badge == null ? null : Text([if (leading != null) row.name, ?badge].join(' · ')),
       trailing: Text(
         '${_ap(row.points)} $unit',
         style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryTint),
@@ -517,26 +517,29 @@ class AmbassadorBadge extends ConsumerWidget {
     if (status == null) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: InkWell(
-        onTap: () => context.push(Routes.ambassadors),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.champagne.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.champagne.withValues(alpha: 0.6)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.workspace_premium, size: 16, color: AppColors.champagne),
-              const SizedBox(width: 6),
-              Text(
-                '${status.acting ? 'Врио амбассадора' : 'Амбассадор'} · ${status.city}',
-                style: TextStyle(color: AppColors.champagne, fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-            ],
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: InkWell(
+          onTap: () => context.push(Routes.ambassadors),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: _gold.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _gold.withValues(alpha: 0.6)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.workspace_premium, size: 16, color: _gold),
+                const SizedBox(width: 6),
+                Text(
+                  '${status.acting ? 'Врио амбассадора' : 'Амбассадор'} · ${status.city}',
+                  style: TextStyle(color: _gold, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -611,13 +614,13 @@ class AmbassadorBlock extends ConsumerWidget {
                     children: [
                       Text(
                         block.acting ? 'ОТ ВРИО АМБАССАДОРА' : 'ОТ АМБАССАДОРА',
-                        style: TextStyle(color: AppColors.champagne, fontSize: 11.5, letterSpacing: 1.2),
+                        style: TextStyle(color: _gold, fontSize: 11.5, letterSpacing: 1.2),
                       ),
                       Text(block.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                     ],
                   ),
                 ),
-                Icon(Icons.workspace_premium, color: AppColors.champagne),
+                Icon(Icons.workspace_premium, color: _gold),
               ],
             ),
           ),
@@ -626,7 +629,7 @@ class AmbassadorBlock extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Text(
-                'Скоро здесь появятся события и квесты амбассадора $city.',
+                'Скоро здесь появятся события и квесты амбассадора.',
                 style: TextStyle(color: AppColors.textDim),
               ),
             ),
