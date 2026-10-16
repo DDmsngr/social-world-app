@@ -20,6 +20,7 @@ import '../../../feed/domain/entities/post.dart';
 import '../../../feed/presentation/providers/feed_providers.dart';
 import '../../domain/entities/nearby_person.dart';
 import '../../domain/entities/place.dart';
+import '../../domain/entities/city.dart';
 import '../providers/discover_providers.dart';
 
 /// Универсальная карточка объекта на карте. Тап по метке открывает лист с
@@ -189,6 +190,7 @@ class _EventSheet extends ConsumerWidget {
                   title: event.title,
                   details: '${_when(event.startsAt)}'
                       '${event.placeTitle == null ? '' : ' · ${event.placeTitle}'}',
+                  city: Cities.nameNear(event.latitude, event.longitude),
                 ),
                 tooltip: 'Поделиться',
                 icon: const Icon(Icons.ios_share),
@@ -287,6 +289,7 @@ class _PlaceSheet extends ConsumerWidget {
                   id: place.id,
                   title: place.title,
                   details: place.category,
+                  city: Cities.nameNear(place.latitude, place.longitude),
                 ),
                 tooltip: 'Поделиться',
                 icon: const Icon(Icons.ios_share),

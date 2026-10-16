@@ -16,6 +16,7 @@ import '../../../core/widgets/state_message.dart';
 import '../../../core/widgets/sw_widgets.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/presentation/providers/auth_providers.dart';
+import '../../discover/domain/entities/city.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
 import '../../feed/presentation/post_actions.dart';
 import '../../moderation/domain/entities/report_reason.dart';
@@ -170,6 +171,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             id: event.id,
             title: event.title,
             details: _shareDetails(event),
+            city: Cities.nameNear(event.latitude, event.longitude),
           ),
           tooltip: 'Поделиться',
           icon: const Icon(Icons.ios_share),

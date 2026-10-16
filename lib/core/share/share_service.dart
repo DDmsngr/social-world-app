@@ -15,11 +15,11 @@ abstract final class ShareService {
     required String id,
     required String title,
     String? details,
-    String city = 'Сочи',
+    String? city,
   }) {
     final lines = [
       'ChaWo',
-      '📍 $city',
+      if (city != null && city.trim().isNotEmpty) '📍 ${city.trim()}',
       title.trim(),
       if (details != null && details.trim().isNotEmpty) details.trim(),
       '',
@@ -34,6 +34,7 @@ abstract final class ShareService {
     required String id,
     required String title,
     String? details,
+    String? city,
   }) {
     // iPad требует, от какого места экрана раскрывать лист.
     final box = context.findRenderObject() as RenderBox?;
@@ -43,7 +44,7 @@ abstract final class ShareService {
 
     return SharePlus.instance.share(
       ShareParams(
-        text: message(target: target, id: id, title: title, details: details),
+        text: message(target: target, id: id, title: title, details: details, city: city),
         subject: title,
         sharePositionOrigin: origin,
       ),

@@ -1,4 +1,5 @@
 import 'package:yandex_maps_mapkit/init.dart' as ymk_init;
+import 'package:yandex_maps_mapkit/mapkit_factory.dart';
 
 import '../debug/app_log.dart';
 
@@ -28,5 +29,20 @@ abstract final class MapkitBoot {
       status = 'error: $e';
       AppLog.add('MapkitBoot: initMapkit упал — $e');
     }
+  }
+
+  static int _users = 0;
+
+  /// MapKit один на всё приложение, а карт бывает несколько сразу: Pulse под
+  /// открытым поверх маршрутом или вторая карта из «На карте». Каждая карта
+  /// берёт и отдаёт его по счётчику: иначе закрытие любой из них останавливало
+  /// MapKit и оставшаяся карта чернела.
+  static void acquire() {
+    if (_users++ == 0) mapkit.onStart();
+  }
+
+  static void release() {
+    if (_users == 0) return;
+    if (--_users == 0) mapkit.onStop();
   }
 }

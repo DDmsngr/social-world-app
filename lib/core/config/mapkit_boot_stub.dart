@@ -5,4 +5,8 @@ abstract final class MapkitBoot {
   static bool get isReady => false;
 
   static Future<void> init(String apiKey) async {}
+
+  static void acquire() {}
+
+  static void release() {}
 }

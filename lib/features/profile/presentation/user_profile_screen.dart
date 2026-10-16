@@ -143,6 +143,7 @@ class UserProfileScreen extends ConsumerWidget {
                   id: profile!.id,
                   title: profile.displayName,
                   details: profile.city,
+                  city: profile.city,
                 ),
                 tooltip: 'Поделиться',
                 icon: const Icon(Icons.ios_share),

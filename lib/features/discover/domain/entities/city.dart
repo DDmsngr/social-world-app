@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 /// Город, вокруг которого показывается Pulse.
 ///
 /// Pulse обязан работать, даже когда геолокация запрещена или человек далеко
@@ -85,6 +87,16 @@ abstract final class Cities {
       for (final city in all)
         if (city.name.toLowerCase().contains(needle)) city,
     ];
+  }
+
+  /// Название города из списка, в пределах [maxKm] от точки; иначе null —
+  /// подписывать точку чужим городом хуже, чем не подписывать вовсе.
+  static String? nameNear(double? latitude, double? longitude, {double maxKm = 60}) {
+    if (latitude == null || longitude == null) return null;
+    final city = nearestTo(latitude, longitude);
+    final dLat = (city.latitude - latitude) * 111.0;
+    final dLng = (city.longitude - longitude) * 111.0 * math.cos(latitude * math.pi / 180);
+    return dLat * dLat + dLng * dLng <= maxKm * maxKm ? city.name : null;
   }
 
   /// Ближайший город к точке — чем пользоваться, когда позиция устройства

@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:yandex_maps_mapkit/image.dart' as ymi;
 import 'package:yandex_maps_mapkit/mapkit.dart' as ymk;
-import 'package:yandex_maps_mapkit/mapkit_factory.dart';
 import 'package:yandex_maps_mapkit/yandex_map.dart';
 
 import '../../../core/config/mapkit_boot.dart';
@@ -59,13 +58,13 @@ class _LiveMapState extends State<LiveMap> {
   void _startMapkit() {
     if (_mapkitRunning) return;
     _mapkitRunning = true;
-    mapkit.onStart();
+    MapkitBoot.acquire();
   }
 
   void _stopMapkit() {
     if (!_mapkitRunning) return;
     _mapkitRunning = false;
-    mapkit.onStop();
+    MapkitBoot.release();
   }
 
   void _onMapCreated(ymk.MapWindow window) {

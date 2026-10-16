@@ -17,6 +17,7 @@ import '../../feed/presentation/providers/feed_providers.dart';
 import '../../feed/presentation/widgets/post_card.dart';
 import '../../saved/saved.dart';
 import '../domain/entities/place.dart';
+import '../domain/entities/city.dart';
 import 'providers/discover_providers.dart';
 
 /// Место по id: сначала из уже загруженной выборки, иначе адресно.
@@ -63,6 +64,7 @@ class PlaceScreen extends ConsumerWidget {
                       id: place.value!.id,
                       title: place.value!.title,
                       details: place.value!.category,
+                      city: Cities.nameNear(place.value!.latitude, place.value!.longitude),
                     ),
                     tooltip: 'Поделиться',
                     icon: const Icon(Icons.ios_share),

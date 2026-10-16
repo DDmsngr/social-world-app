@@ -330,6 +330,7 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.ink2,
       builder: (context) => SafeArea(
         child: SingleChildScrollView(

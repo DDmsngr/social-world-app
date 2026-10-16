@@ -185,14 +185,14 @@ class _DiscoverMapState extends State<DiscoverMap> {
   void _startMapkit() {
     if (_mapkitRunning) return;
     _mapkitRunning = true;
-    mapkit.onStart();
+    MapkitBoot.acquire();
     AppLog.add('DiscoverMap: mapkit.onStart()');
   }
 
   void _stopMapkit() {
     if (!_mapkitRunning) return;
     _mapkitRunning = false;
-    mapkit.onStop();
+    MapkitBoot.release();
     AppLog.add('DiscoverMap: mapkit.onStop()');
   }
 
@@ -207,7 +207,14 @@ class _DiscoverMapState extends State<DiscoverMap> {
     _objects = window.map.mapObjects.addCollection();
     window.map.addInputListener(_inputListener);
 
-    _resetCamera(animated: false);
+    // Карту могли открыть ради точки («На карте» из поста или события): запрос
+    // пришёл раньше, чем она появилась, и центр города его бы перебил.
+    final focus = widget.focus;
+    if (focus != null) {
+      _moveTo(focus.latitude, focus.longitude, zoom: focus.zoom);
+    } else {
+      _resetCamera(animated: false);
+    }
     _rebuildObjects();
     _enableUserLocationLayer(window);
   }
