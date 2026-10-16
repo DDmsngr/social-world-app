@@ -21,8 +21,8 @@ class PointsLine {
   final int amount;
   final int count;
 
-  /// null — уже в балансе; pending / cancelled — реферальные, ещё не (или
-  /// уже не) в балансе.
+  /// null — уже в балансе; pending / cancelled — ещё не (или уже не) в
+  /// балансе: реферальные и начисления за активность до подтверждения.
   final String? status;
 
   String get title => pointsReasonLabel(reason);
@@ -35,7 +35,13 @@ String pointsReasonLabel(String reason) {
     return level == '1' ? 'Приглашённый друг' : 'Приглашение в вашей сети, уровень $level';
   }
   return switch (reason) {
-    'like' => 'Отметки «нравится» на ваших публикациях',
+    'post_like' || 'like' => 'Отметки «нравится» на ваших публикациях',
+    'post_comment' => 'Комментарии к вашим публикациям',
+    'event_visit' => 'Участие в событиях',
+    'event_host' => 'Ваши прошедшие события',
+    'quest_done' => 'Пройденные квесты',
+    'quest_host' => 'Участники прошли ваш квест',
+    // Правила до 16.10.2026 — остаются в истории.
     'like_bonus' => 'Бонус за активность',
     'comment_like' => 'Отметки «нравится» на ваших комментариях',
     'event_join' => 'Участники ваших событий',
@@ -89,10 +95,19 @@ final activityPointsProvider = FutureProvider.autoDispose<PointsData?>((ref) asy
         .inFilter('status', ['pending', 'cancelled'])
         .order('created_at', ascending: false)
         .limit(200),
+    // Начисления за активность сутки ждут проверки; отменённые не показываем —
+    // это снятые лайки и удалённые комментарии, в балансе их и не было.
+    client
+        .from('activity_awards')
+        .select('code, amount, status, created_at')
+        .eq('profile_id', me)
+        .eq('status', 'pending')
+        .order('created_at', ascending: false)
+        .limit(500),
   ]);
   final profile = results[0] as Map<String, dynamic>;
   final events = results[1] as List<dynamic>;
-  final txs = results[2] as List<dynamic>;
+  final txs = [...results[2] as List<dynamic>, ...results[3] as List<dynamic>];
   final raw = [
     for (final e in events)
       (
@@ -122,6 +137,66 @@ final activityPointsProvider = FutureProvider.autoDispose<PointsData?>((ref) asy
   );
 });
 
+/// Правила начисления за активность — из activity_rules и activity_settings,
+/// чтобы справка не расходилась с тем, что реально начисляет база.
+class ActivityRules {
+  const ActivityRules({
+    required this.amounts,
+    required this.limits,
+    required this.dailyCap,
+    required this.minGuests,
+    required this.perGuest,
+    required this.maxGuests,
+  });
+
+  final Map<String, int> amounts;
+  final Map<String, int?> limits;
+  final int dailyCap;
+  final int minGuests;
+  final int perGuest;
+  final int maxGuests;
+
+  /// Значения миграции 0099 — пока правила не загрузились или сервер старый.
+  static const fallback = ActivityRules(
+    amounts: {'post_like': 1, 'post_comment': 2, 'event_visit': 10, 'event_host': 30, 'quest_done': 20, 'quest_host': 5},
+    limits: {'post_like': 50, 'post_comment': 30, 'event_visit': 3, 'event_host': 1, 'quest_done': 3, 'quest_host': 20},
+    dailyCap: 300,
+    minGuests: 3,
+    perGuest: 5,
+    maxGuests: 20,
+  );
+
+  int amount(String code) => amounts[code] ?? fallback.amounts[code] ?? 0;
+
+  int? limit(String code) => limits.containsKey(code) ? limits[code] : fallback.limits[code];
+}
+
+final activityRulesProvider = FutureProvider.autoDispose<ActivityRules>((ref) async {
+  if (!Env.isConfigured) return ActivityRules.fallback;
+  final client = Supabase.instance.client;
+  final results = await Future.wait<dynamic>([
+    client.from('activity_rules').select('code, amount, daily_limit'),
+    client.from('activity_settings').select().maybeSingle(),
+  ]);
+  final rules = results[0] as List<dynamic>;
+  final s = results[1] as Map<String, dynamic>?;
+  const f = ActivityRules.fallback;
+  return ActivityRules(
+    amounts: {for (final r in rules) (r as Map)['code'] as String: (r['amount'] as num).toInt()},
+    limits: {for (final r in rules) (r as Map)['code'] as String: (r['daily_limit'] as num?)?.toInt()},
+    dailyCap: (s?['daily_cap'] as num?)?.toInt() ?? f.dailyCap,
+    minGuests: (s?['event_host_min_guests'] as num?)?.toInt() ?? f.minGuests,
+    perGuest: (s?['event_host_per_guest'] as num?)?.toInt() ?? f.perGuest,
+    maxGuests: (s?['event_host_max_guests'] as num?)?.toInt() ?? f.maxGuests,
+  );
+});
+
+String _perDay(int? n) => switch (n) {
+  null => '',
+  1 => ' — один раз в день',
+  _ => ' — до $n в день',
+};
+
 enum _Filter { all, plus, minus }
 
 /// Activity Points — «карма» как на Reddit: сколько и за что получено.
@@ -144,6 +219,7 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(activityPointsProvider);
+    final rules = ref.watch(activityRulesProvider).value ?? ActivityRules.fallback;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Activity Points'),
@@ -151,7 +227,7 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
           IconButton(
             tooltip: 'Как получить баллы',
             icon: const Icon(Icons.help_outline),
-            onPressed: () => _showHelp(context),
+            onPressed: () => _showHelp(context, rules),
           ),
         ],
       ),
@@ -248,7 +324,7 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
     return ListView(padding: const EdgeInsets.fromLTRB(20, 12, 20, 32), children: children);
   }
 
-  void _showHelp(BuildContext context) {
+  void _showHelp(BuildContext context, ActivityRules r) {
     final points = ref.read(referralOverviewProvider).value?.levelPoints ?? const [100, 50, 25, 15, 10];
     showModalBottomSheet<void>(
       context: context,
@@ -269,20 +345,54 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 14),
-              const _Rule(points: '+1', text: 'кто-то отметил «нравится» вашу публикацию'),
-              const _Rule(points: '+1', text: 'кто-то отметил «нравится» ваш комментарий'),
-              const _Rule(points: '+1', text: 'человек присоединился к вашему событию'),
+              Text('За активность', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              _Rule(
+                points: '+${r.amount('post_like')}',
+                text: 'кто-то отметил «нравится» вашу публикацию${_perDay(r.limit('post_like'))}',
+              ),
+              _Rule(
+                points: '+${r.amount('post_comment')}',
+                text: 'кто-то прокомментировал вашу публикацию — один раз с человека на публикацию'
+                    '${_perDay(r.limit('post_comment'))}',
+              ),
+              _Rule(
+                points: '+${r.amount('event_visit')}',
+                text: 'вы записались на событие до его начала, и оно состоялось${_perDay(r.limit('event_visit'))}',
+              ),
+              _Rule(
+                points: '+${r.amount('event_host')} и +${r.perGuest}',
+                text: 'ваше событие состоялось, и заранее на него записались не меньше ${r.minGuests} участников; '
+                    'плюс +${r.perGuest} за каждого участника, считая до ${r.maxGuests}${_perDay(r.limit('event_host'))}',
+              ),
+              _Rule(
+                points: '+${r.amount('quest_done')}',
+                text: 'вы прошли квест и отметились на месте по QR-коду организатора${_perDay(r.limit('quest_done'))}',
+              ),
+              _Rule(
+                points: '+${r.amount('quest_host')}',
+                text: 'участник прошёл ваш квест и отметился на месте${_perDay(r.limit('quest_host'))}',
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Баллы за активность приходят через сутки. Если за это время отметку снимут, '
+                'комментарий или публикацию удалят, а участие отменят, начисление отменится.\n'
+                'Засчитываются действия только людей с подтверждённым номером телефона. '
+                'Свои действия и действия виртуальных авторов не считаются.\n'
+                'За активность — не больше ${r.dailyCap} баллов в сутки, баллы за приглашения сверх этого.\n'
+                'Баллы записываются за город, указанный в вашем профиле в момент начисления: '
+                'по ним считается рейтинг города.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 14),
+              Text('За приглашения', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
               _Rule(points: '+${points.first}', text: 'друг зарегистрировался по вашему приглашению'),
               if (points.length > 1)
                 _Rule(
                   points: '+${points.skip(1).join('/')}',
                   text: 'приглашённые вашими друзьями — уровни 2–${points.length} вашей сети',
                 ),
-              const SizedBox(height: 10),
-              Text(
-                'Если отметку или участие отменят, балл уходит обратно.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
               const SizedBox(height: 22),
               Text('Как работает приглашение', style: AppTypography.serif(20)),
               const SizedBox(height: 10),

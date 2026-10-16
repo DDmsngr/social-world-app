@@ -34,4 +34,21 @@ void main() {
     expect(pointsReasonLabel('like_bonus'), 'Бонус за активность');
     expect(pointsReasonLabel('что-то новое'), 'Прочее');
   });
+
+  test('у каждого начисления за активность своя подпись', () {
+    for (final code in ActivityRules.fallback.amounts.keys) {
+      expect(pointsReasonLabel(code), isNot('Прочее'), reason: code);
+    }
+    expect(pointsReasonLabel('post_like'), pointsReasonLabel('like'));
+  });
+
+  test('ожидающие начисления за активность — отдельной строкой от подтверждённых', () {
+    final lines = groupPoints([
+      (at: DateTime(2026, 10, 17, 10), reason: 'post_like', delta: 1, status: null),
+      (at: DateTime(2026, 10, 17, 11), reason: 'post_like', delta: 1, status: 'pending'),
+      (at: DateTime(2026, 10, 17, 12), reason: 'post_like', delta: 1, status: 'pending'),
+    ]);
+    expect(lines, hasLength(2));
+    expect(lines.firstWhere((l) => l.status == 'pending').amount, 2);
+  });
 }
