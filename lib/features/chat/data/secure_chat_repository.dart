@@ -263,8 +263,13 @@ class SecureChatRepository implements ChatRepository {
   /// Реалтайм может молча отвалиться (спящий телефон, смена сети): тогда
   /// новые сообщения просто не приходят и ошибки нет. Обычный запрос раз в
   /// несколько секунд подхватывает то, что пропустил реалтайм.
-  static const _pollEvery = Duration(seconds: 15);
-  static const _firstPoll = Duration(seconds: 6);
+  ///
+  /// Тот же опрос приносит «доставлено» и «прочитано» от собеседника: подписки
+  /// на chat_members нет, поэтому галочки обновляются не чаще, чем он идёт.
+  /// Пока чат открыт, это раз в 5 секунд (15.10: «с отметками о прочтении
+  /// ещё беда»: при 15 секундах галочка отставала на глаз).
+  static const _pollEvery = Duration(seconds: 5);
+  static const _firstPoll = Duration(seconds: 3);
 
   @override
   Stream<List<ChatMessage>> watchMessages(

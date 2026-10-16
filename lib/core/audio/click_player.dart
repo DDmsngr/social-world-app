@@ -4,6 +4,19 @@ import 'package:audioplayers/audioplayers.dart';
 
 import '../debug/app_log.dart';
 
+/// Освобождает проигрыватель, когда звук доиграл, поток закрылся или прошло
+/// [timeout]. `.then<void>` нужен, чтобы onTimeout мог вернуть пустоту: без
+/// него `() {}` не подходил по типу, и каждый вызов падал ДО звука (журнал
+/// 15.10: «type '() => Null' is not a subtype … onTimeout»).
+Future<void> releaseWhenDone(
+  Stream<Object?> done,
+  FutureOr<void> Function() dispose, {
+  Duration timeout = const Duration(seconds: 4),
+}) => done.first
+    .then<void>((_) {}, onError: (Object _) {})
+    .timeout(timeout, onTimeout: () {})
+    .whenComplete(dispose);
+
 /// Короткие звуки интерфейса (щелчок отправки и входящего). Каждый раз новый
 /// проигрыватель, который сам закрывается: один долгоживущий после пары
 /// проигрываний у части телефонов молча переставал играть.
@@ -31,7 +44,7 @@ abstract final class ClickPlayer {
       );
       await player.setReleaseMode(ReleaseMode.release);
       final done = player;
-      unawaited(done.onPlayerComplete.first.timeout(const Duration(seconds: 4), onTimeout: () {}).whenComplete(done.dispose));
+      unawaited(releaseWhenDone(done.onPlayerComplete, done.dispose));
       await player.play(AssetSource(asset), volume: volume);
     } catch (error) {
       AppLog.add('Звук $asset: $error');

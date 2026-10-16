@@ -660,30 +660,42 @@ class CallController extends ChangeNotifier {
 
   // ── гудки ───────────────────────────────────────────────────────────────
 
+  /// Гудки играет свежий проигрыватель на каждый звонок и закрывается вместе с
+  /// ним: один долгоживущий после пары звонков молча переставал играть (та же
+  /// беда, что у щелчков в ClickPlayer). Из Помощника 15.10: «при звонке нет
+  /// гудков».
   Future<void> _playRingback() async {
     try {
-      final player = _ringback ??= AudioPlayer()
-        ..setAudioContext(
-          AudioContext(
-            android: const AudioContextAndroid(
-              audioFocus: AndroidAudioFocus.gainTransient,
-              usageType: AndroidUsageType.voiceCommunication,
-              contentType: AndroidContentType.speech,
-            ),
+      await _closeRingback();
+      final player = _ringback = AudioPlayer();
+      await player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            audioFocus: AndroidAudioFocus.gainTransient,
+            usageType: AndroidUsageType.voiceCommunication,
+            contentType: AndroidContentType.speech,
           ),
-        )
-        ..setReleaseMode(ReleaseMode.loop);
+        ),
+      );
+      await player.setReleaseMode(ReleaseMode.loop);
       await player.play(AssetSource('sounds/ringback.wav'), volume: 0.6);
+      AppLog.add('Гудки запущены');
     } catch (error) {
       AppLog.add('Гудки не играют: $error');
     }
   }
 
-  Future<void> _stopRingback() async {
+  Future<void> _closeRingback() async {
+    final player = _ringback;
+    _ringback = null;
+    if (player == null) return;
     try {
-      await _ringback?.stop();
+      await player.stop();
+      await player.dispose();
     } catch (_) {}
   }
+
+  Future<void> _stopRingback() => _closeRingback();
 
   // ── конец ───────────────────────────────────────────────────────────────
 

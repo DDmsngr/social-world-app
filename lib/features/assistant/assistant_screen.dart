@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/debug/app_log.dart';
 import '../../core/errors/friendly_error.dart';
@@ -62,7 +63,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
       final dir = await getTemporaryDirectory();
       await _recorder.start(
         const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000),
-        path: '${dir.path}/assistant_${DateTime.now().millisecondsSinceEpoch}.m4a',
+        path:
+            '${dir.path}/assistant_${DateTime.now().millisecondsSinceEpoch}.m4a',
       );
       setState(() => _recordingSince = DateTime.now());
       _recordTick = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -85,7 +87,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
       AppLog.add('Запись голосового не остановилась: $error');
     }
     if (!send || path == null) return;
-    if (since != null && DateTime.now().difference(since) < const Duration(seconds: 1)) {
+    if (since != null &&
+        DateTime.now().difference(since) < const Duration(seconds: 1)) {
       _toast('Слишком коротко');
       return;
     }
@@ -107,7 +110,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(error, fallback: 'Не отправилось'))),
+          SnackBar(
+            content: Text(friendlyError(error, fallback: 'Не отправилось')),
+          ),
         );
       }
     } finally {
@@ -140,7 +145,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
           if (VideoCompressor.shouldCompress(path, bytes)) {
             path = (await VideoCompressor.compress(path)).path;
           }
-          await repo.send(text: i == 0 ? text : null, imagePath: path, channel: widget.channel);
+          await repo.send(
+            text: i == 0 ? text : null,
+            imagePath: path,
+            channel: widget.channel,
+          );
         }
       }
       _text.clear();
@@ -150,7 +159,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final owner = ref.watch(widget.bugs ? isTesterProvider : isAssistantOwnerProvider);
+    final owner = ref.watch(
+      widget.bugs ? isTesterProvider : isAssistantOwnerProvider,
+    );
     final messages = ref.watch(assistantMessagesProvider(widget.channel));
 
     return Scaffold(
@@ -186,7 +197,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                 child: messages.when(
                   loading: () => const LoadingView(),
                   error: (_, _) => StateMessage.error(
-                    onAction: () => ref.invalidate(assistantMessagesProvider(widget.channel)),
+                    onAction: () => ref.invalidate(
+                      assistantMessagesProvider(widget.channel),
+                    ),
                   ),
                   data: (list) => list.isEmpty
                       ? StateMessage(
@@ -196,7 +209,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                                     'увидеть. Приложите скриншот. Раз в сутки баги забирают на разбор.'
                               : 'Пишите правки и прикладывайте скриншоты. '
                                     'Помощник заберёт их, когда будет на связи.',
-                          icon: widget.bugs ? Icons.bug_report_outlined : Icons.support_agent,
+                          icon: widget.bugs
+                              ? Icons.bug_report_outlined
+                              : Icons.support_agent,
                         )
                       : ListView.builder(
                           reverse: true,
@@ -224,7 +239,10 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                                   width: 72,
                                   height: 72,
                                   color: AppColors.card,
-                                  child: Icon(Icons.movie_outlined, color: AppColors.textDim),
+                                  child: Icon(
+                                    Icons.movie_outlined,
+                                    color: AppColors.textDim,
+                                  ),
                                 )
                               : Image.file(
                                   File(_pending[i]),
@@ -238,11 +256,17 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                           right: 0,
                           top: 0,
                           child: GestureDetector(
-                            onTap: _busy ? null : () => setState(() => _pending.removeAt(i)),
+                            onTap: _busy
+                                ? null
+                                : () => setState(() => _pending.removeAt(i)),
                             child: const CircleAvatar(
                               radius: 11,
                               backgroundColor: Colors.black54,
-                              child: Icon(Icons.close, size: 14, color: Colors.white),
+                              child: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -262,7 +286,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                               tooltip: 'Отмена',
                               icon: const Icon(Icons.delete_outline),
                             ),
-                            Icon(Icons.fiber_manual_record, color: AppColors.danger, size: 14),
+                            Icon(
+                              Icons.fiber_manual_record,
+                              color: AppColors.danger,
+                              size: 14,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -278,44 +306,54 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> {
                           ],
                         )
                       : Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: _busy ? null : _attach,
-                        tooltip: 'Скриншоты и видео',
-                        icon: const Icon(Icons.attach_file),
-                      ),
-                      Expanded(
-                        child: TextField(
-                          controller: _text,
-                          minLines: 1,
-                          maxLines: 6,
-                          maxLength: 4000,
-                          buildCounter: (_, {required currentLength, required isFocused, maxLength}) =>
-                              null,
-                          textCapitalization: TextCapitalization.sentences,
-                          decoration: const InputDecoration(hintText: 'Что поправить'),
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              onPressed: _busy ? null : _attach,
+                              tooltip: 'Скриншоты и видео',
+                              icon: const Icon(Icons.attach_file),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: _text,
+                                minLines: 1,
+                                maxLines: 6,
+                                maxLength: 4000,
+                                buildCounter:
+                                    (
+                                      _, {
+                                      required currentLength,
+                                      required isFocused,
+                                      maxLength,
+                                    }) => null,
+                                textCapitalization:
+                                    TextCapitalization.sentences,
+                                decoration: const InputDecoration(
+                                  hintText: 'Что поправить',
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              key: const Key('assistant-voice'),
+                              onPressed: _busy ? null : _startVoice,
+                              tooltip: 'Голосовое',
+                              icon: const Icon(Icons.mic_none),
+                            ),
+                            IconButton(
+                              onPressed: _busy ? null : _send,
+                              tooltip: 'Отправить',
+                              icon: _busy
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Icon(Icons.send, color: AppColors.primary),
+                            ),
+                          ],
                         ),
-                      ),
-                      IconButton(
-                        key: const Key('assistant-voice'),
-                        onPressed: _busy ? null : _startVoice,
-                        tooltip: 'Голосовое',
-                        icon: const Icon(Icons.mic_none),
-                      ),
-                      IconButton(
-                        onPressed: _busy ? null : _send,
-                        tooltip: 'Отправить',
-                        icon: _busy
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Icon(Icons.send, color: AppColors.primary),
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ],
@@ -350,7 +388,10 @@ class _Bubble extends ConsumerWidget {
           maxLength: 4000,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, controller.text),
             child: const Text('Сохранить'),
@@ -364,7 +405,9 @@ class _Bubble extends ConsumerWidget {
       await ref.read(assistantRepositoryProvider)!.edit(message.id, text);
     } catch (error) {
       AppLog.add('Сообщение Помощнику не изменилось: $error');
-      if (context.mounted) _toast(context, 'Не получилось — возможно, Помощник уже забрал его');
+      if (context.mounted) {
+        _toast(context, 'Не получилось — возможно, Помощник уже забрал его');
+      }
     }
   }
 
@@ -374,8 +417,14 @@ class _Bubble extends ConsumerWidget {
       builder: (context) => AlertDialog(
         title: const Text('Удалить сообщение?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить'),
+          ),
         ],
       ),
     );
@@ -384,7 +433,9 @@ class _Bubble extends ConsumerWidget {
       await ref.read(assistantRepositoryProvider)!.delete(message.id);
     } catch (error) {
       AppLog.add('Сообщение Помощнику не удалилось: $error');
-      if (context.mounted) _toast(context, 'Не получилось — возможно, Помощник уже забрал его');
+      if (context.mounted) {
+        _toast(context, 'Не получилось — возможно, Помощник уже забрал его');
+      }
     }
   }
 
@@ -399,9 +450,13 @@ class _Bubble extends ConsumerWidget {
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 3),
         padding: const EdgeInsets.all(10),
-        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width * 0.8,
+        ),
         decoration: BoxDecoration(
-          color: mine ? AppColors.primary.withValues(alpha: 0.16) : AppColors.card,
+          color: mine
+              ? AppColors.primary.withValues(alpha: 0.16)
+              : AppColors.card,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.hair),
         ),
@@ -411,11 +466,21 @@ class _Bubble extends ConsumerWidget {
           children: [
             if (path != null)
               if (_isAudio(path))
-                const _FileTile(icon: Icons.mic_none, label: 'Голосовое')
+                _FileTile(icon: Icons.mic_none, label: 'Голосовое', path: path)
               else if (isVideoPath(path))
-                const _FileTile(icon: Icons.movie_outlined, label: 'Видео')
+                _FileTile(
+                  icon: Icons.movie_outlined,
+                  label: 'Видео',
+                  path: path,
+                )
+              else if (_isImage(path))
+                _Shot(path: path)
               else
-                _Shot(path: path),
+                _FileTile(
+                  icon: _fileIcon(path),
+                  label: _fileLabel(path),
+                  path: path,
+                ),
             if (path != null && message.body != null) const SizedBox(height: 6),
             if (message.body != null) LinkText(message.body!, selectable: true),
             const SizedBox(height: 4),
@@ -427,7 +492,9 @@ class _Bubble extends ConsumerWidget {
                     _time(message.createdAt),
                     if (mine) message.handledAt == null ? 'ждёт' : 'забрал',
                   ].join(' · '),
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textFaint),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textFaint,
+                  ),
                 ),
                 // Пока Помощник не забрал сообщение, его можно поправить.
                 if (mine && message.handledAt == null) ...[
@@ -453,7 +520,11 @@ class _Bubble extends ConsumerWidget {
 }
 
 class _SmallAction extends StatelessWidget {
-  const _SmallAction({required this.icon, required this.tooltip, required this.onTap});
+  const _SmallAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   final IconData icon;
   final String tooltip;
@@ -476,24 +547,89 @@ class _SmallAction extends StatelessWidget {
 String _elapsed(Duration d) =>
     '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
 
-bool _isAudio(String path) => RegExp(r'\.(m4a|aac|mp3|ogg|wav|opus)$', caseSensitive: false).hasMatch(path);
+bool _isAudio(String path) => RegExp(
+  r'\.(m4a|aac|mp3|ogg|wav|opus)$',
+  caseSensitive: false,
+).hasMatch(path);
 
-/// Видео или голосовое в пузыре: Помощник забирает файл целиком, здесь
-/// достаточно видеть, что он ушёл.
-class _FileTile extends StatelessWidget {
-  const _FileTile({required this.icon, required this.label});
+bool _isImage(String path) => RegExp(
+  r'\.(jpe?g|png|webp|gif|heic|bmp)$',
+  caseSensitive: false,
+).hasMatch(path);
+
+IconData _fileIcon(String path) => switch (_ext(path)) {
+  'pdf' => Icons.picture_as_pdf_outlined,
+  'zip' || 'rar' || '7z' => Icons.folder_zip_outlined,
+  _ => Icons.insert_drive_file_outlined,
+};
+
+String _ext(String path) =>
+    path.contains('.') ? path.split('.').last.toLowerCase() : '';
+
+/// «PDF-файл», «Файл ZIP»: имя в хранилище служебное (claude_<время>.pdf),
+/// человеку важен тип.
+String _fileLabel(String path) => switch (_ext(path)) {
+  'pdf' => 'PDF-файл',
+  '' => 'Файл',
+  final e => 'Файл ${e.toUpperCase()}',
+};
+
+void _say(BuildContext context, String text) => ScaffoldMessenger.of(context)
+  ..hideCurrentSnackBar()
+  ..showSnackBar(
+    SnackBar(
+      persist: false,
+      duration: const Duration(seconds: 3),
+      content: Text(text),
+    ),
+  );
+
+/// Файл, видео или голосовое в пузыре. Тап открывает файл по временной
+/// ссылке в браузере или просмотрщике телефона: оттуда его можно сохранить.
+class _FileTile extends ConsumerWidget {
+  const _FileTile({
+    required this.icon,
+    required this.label,
+    required this.path,
+  });
 
   final IconData icon;
   final String label;
+  final String path;
+
+  Future<void> _open(BuildContext context, WidgetRef ref) async {
+    try {
+      final url = await ref.read(assistantRepositoryProvider)!.signedUrl(path);
+      final ok = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!ok && context.mounted) {
+        _say(context, 'Не нашлось приложения, которое откроет этот файл');
+      }
+    } catch (error) {
+      AppLog.add('Файл Помощника не открылся: $error');
+      if (context.mounted) _say(context, 'Не получилось открыть файл');
+    }
+  }
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, color: AppColors.textDim),
-      const SizedBox(width: 6),
-      Text(label),
-    ],
+  Widget build(BuildContext context, WidgetRef ref) => InkWell(
+    onTap: () => _open(context, ref),
+    borderRadius: BorderRadius.circular(10),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.primaryTint),
+          const SizedBox(width: 8),
+          Text(label),
+          const SizedBox(width: 8),
+          Icon(Icons.download_outlined, size: 18, color: AppColors.textDim),
+        ],
+      ),
+    ),
   );
 }
 
@@ -520,7 +656,10 @@ class _Shot extends ConsumerWidget {
             height: 120,
             child: Center(
               child: snap.hasError
-                  ? Icon(Icons.broken_image_outlined, color: AppColors.textFaint)
+                  ? Icon(
+                      Icons.broken_image_outlined,
+                      color: AppColors.textFaint,
+                    )
                   : const CircularProgressIndicator(strokeWidth: 2),
             ),
           );

@@ -465,8 +465,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     ref
         .read(chatRepositoryProvider)
         .markRead(widget.conversationId, upTo: newest)
-        .then((_) => ref.invalidate(conversationsProvider))
-        .catchError((Object error) => AppLog.add('Отметка прочтения: $error'));
+        .then((_) {
+          // Экран мог закрыться, пока уходила отметка: ref уже недоступен.
+          if (mounted) ref.invalidate(conversationsProvider);
+        })
+        .catchError((Object error) {
+          AppLog.add('Отметка прочтения: $error');
+        });
   }
 
   @override
