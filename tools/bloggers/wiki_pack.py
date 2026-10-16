@@ -26,7 +26,7 @@ def strip(s):
 
 
 def pack(title, out, n):
-    q = urllib.parse.urlencode({'action': 'query', 'format': 'json', 'prop': 'extracts|pageimages|info',
+    q = urllib.parse.urlencode({'action': 'query', 'format': 'json', 'prop': 'extracts|pageimages|info|coordinates',
                                 'explaintext': 1, 'titles': title,
                                 'piprop': 'original', 'inprop': 'url', 'redirects': 1})
     page = next(iter(get('https://ru.wikipedia.org/w/api.php?' + q)['query']['pages'].values()))
@@ -47,9 +47,14 @@ def pack(title, out, n):
     req = urllib.request.Request(info['thumburl'], headers=UA)
     with open(os.path.join(out, f'{n:02d}.jpg'), 'wb') as f:
         f.write(urllib.request.urlopen(req, timeout=60).read())
+    meta = {'title': page['title'], 'url': page['fullurl'], 'artist': artist, 'license': lic,
+            'commons': info['descriptionurl']}
+    # Координаты статьи о месте: пост получит точку на карте (миграция 0098).
+    coord = next(iter(page.get('coordinates') or []), None)
+    if coord and coord.get('globe', 'earth') == 'earth':
+        meta['lat'], meta['lon'] = coord['lat'], coord['lon']
     with open(os.path.join(out, f'{n:02d}.json'), 'w', encoding='utf-8') as f:
-        json.dump({'title': page['title'], 'url': page['fullurl'], 'artist': artist, 'license': lic,
-                   'commons': info['descriptionurl']}, f, ensure_ascii=False, indent=1)
+        json.dump(meta, f, ensure_ascii=False, indent=1)
     with open(os.path.join(out, f'{n:02d}.txt'), 'w', encoding='utf-8') as f:
         f.write(f"{page['title']}\n{page['fullurl']}\nФото: {artist}, {lic}\n\n{page.get('extract', '')}\n")
     return f'{n:02d} {page["title"]}: ок ({lic})'

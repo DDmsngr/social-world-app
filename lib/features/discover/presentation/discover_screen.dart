@@ -23,6 +23,7 @@ import 'providers/discover_providers.dart';
 import 'providers/city_provider.dart';
 import 'providers/map_start.dart';
 import 'providers/presence_publisher.dart';
+import 'show_on_map.dart';
 import 'widgets/city_picker.dart';
 import 'widgets/discover_map.dart';
 import 'widgets/map_controls.dart';
@@ -101,8 +102,28 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     }
   }
 
+  /// Место из поста («На карте»): камера уже наведена, открываем карточку.
+  /// Экран карты может быть ещё не создан, когда пост попросил место, поэтому
+  /// проверяем и при создании, и при каждом новом запросе.
+  void _openPendingPlace() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final place = ref.read(pendingPlaceProvider.notifier).take();
+      if (place != null) showPlaceSheet(context, place);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _openPendingPlace();
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(pendingPlaceProvider, (_, next) {
+      if (next != null) _openPendingPlace();
+    });
     // Пока открыта карта — обновляем свою размытую точку в `locations`.
     // Без этого «Рядом» на боевом бэкенде всегда пустой: читать чужие точки
     // приложение умело, а писать свою — нет.

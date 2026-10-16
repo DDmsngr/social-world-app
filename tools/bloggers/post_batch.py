@@ -13,6 +13,8 @@
 «Фото: автор, лицензия, [Wikimedia Commons](страница файла)» из meta.json
 (его пишет wiki_pack.py). Если источник другой, вместо meta — поля
 "source_name", "source_url", "photo_credit", "photo_page".
+Точка на карте: координаты статьи из meta.json сами (wiki_pack.py), либо
+"place": {"title", "lat", "lon"}, либо "place": false, если пост не о месте.
 Ничего не выдумывается: текст пишет человек по прочитанному источнику.
 """
 import datetime
@@ -71,6 +73,20 @@ def check(item, body):
     return problems
 
 
+def place_of(it, meta):
+    """Точка на карте для поста о месте (0098): из пачки ("place": {"title",
+    "lat", "lon"}) или из координат статьи Википедии в meta.json. "place": false —
+    пост не о месте (статья про море или явление тоже бывает с координатами)."""
+    p = it.get('place')
+    if p is False:
+        return None
+    if isinstance(p, dict):
+        return p['title'], float(p['lat']), float(p['lon'])
+    if meta.get('lat') is not None and meta.get('lon') is not None:
+        return meta['title'], float(meta['lat']), float(meta['lon'])
+    return None
+
+
 def main(path):
     items = json.load(open(path, encoding='utf-8'))
     os.makedirs(OUT, exist_ok=True)
@@ -111,6 +127,9 @@ def main(path):
         row = {'author_id': rows[0]['id'], 'source_ref': it['ref'], 'body': body,
                'media_urls': [f'{URL}/storage/v1/object/public/post-media/{remote}'],
                'publish_at': when.isoformat()}
+        place = place_of(it, meta)
+        if place:
+            row.update(place_title=place[0], place_lat=place[1], place_lon=place[2])
         status, resp = call('POST', '/rest/v1/author_post_queue?on_conflict=source_ref', json.dumps(row).encode(),
                             {'Content-Type': 'application/json',
                              'Prefer': 'resolution=merge-duplicates,return=minimal'})

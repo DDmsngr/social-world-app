@@ -10,6 +10,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/link_text.dart';
 import '../../../../core/widgets/markdown_view.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../discover/domain/entities/place.dart';
+import '../../../discover/presentation/show_on_map.dart';
 import '../../../profile/domain/profile_models.dart';
 import '../../../routes/presentation/widgets/route_post_preview.dart';
 import '../../../saved/saved.dart';
@@ -218,6 +220,7 @@ class PostCard extends ConsumerWidget {
             if (post.hasMedia || post.isRoute) const SizedBox(height: 12),
             _Body(post: post, full: full, onOpen: () => _openDetail(context)),
           ],
+          if (post.placeLatitude != null && post.placeLongitude != null) _PlaceRow(post: post),
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
             child: Row(
@@ -439,4 +442,55 @@ String _relativeTime(DateTime time) {
   if (diff.inHours < 24) return '${diff.inHours} ч назад';
   if (diff.inDays == 1) return 'вчера';
   return '${diff.inDays} дн назад';
+}
+
+/// Место, о котором пост: тап открывает эту точку на карте ChaWo с карточкой
+/// места.
+class _PlaceRow extends ConsumerWidget {
+  const _PlaceRow({required this.post});
+
+  final Post post;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final title = post.placeTitle ?? 'Место';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Material(
+        color: AppColors.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => showPlaceOnMap(
+            context,
+            ref,
+            Place(
+              id: post.placeId ?? 'post-${post.id}',
+              title: title,
+              latitude: post.placeLatitude!,
+              longitude: post.placeLongitude!,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(Icons.place, size: 20, color: AppColors.primaryTint),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'На карте',
+                  style: TextStyle(color: AppColors.primaryTint, fontWeight: FontWeight.w600),
+                ),
+                Icon(Icons.chevron_right, size: 18, color: AppColors.primaryTint),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
