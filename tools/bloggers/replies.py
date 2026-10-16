@@ -3,13 +3,14 @@
     powershell -File tools\\bloggers\\replies.ps1 list
     powershell -File tools\\bloggers\\replies.ps1 reply <comment_id> "текст ответа"
     powershell -File tools\\bloggers\\replies.ps1 skip <comment_id> "причина"
-    powershell -File tools\\bloggers\\replies.ps1 auto        # YandexGPT, когда будет ключ
+    powershell -File tools\\bloggers\\replies.ps1 auto [N]    # Claude Haiku 5.5, первые N из очереди
 
 list печатает очередь: кто автор, его характер, пост, вся ветка и комментарий,
 на который ждут ответ. До релиза отвечает редакция (Claude) по этому выводу
 раз в сутки, вместе с ночным разбором багов. auto делает то же самое через
-YandexGPT по тем же правилам (RULES и prompt()), чтобы потом перенести его на
-сервер без переделки: нужны YANDEX_API_KEY и YANDEX_FOLDER_ID.
+модель по тем же правилам (RULES и prompt()), чтобы потом перенести его на
+сервер без переделки. Модель выбирает REPLIES_LLM: haiku (по умолчанию, нужен
+ANTHROPIC_API_KEY) или yandexgpt (нужны YANDEX_API_KEY и YANDEX_FOLDER_ID).
 """
 import json
 import os
@@ -28,8 +29,9 @@ PERSONAS = json.load(open(os.path.join(HERE, 'personas.json'), encoding='utf-8')
 MAX_PER_THREAD = 3
 
 RULES = """Правила ответа:
-- Ты виртуальный автор ChaWo, тебя ведёт редакция. На прямой вопрос «ты бот?» честно отвечай, что ты виртуальный автор.
+- Ты виртуальный автор ChaWo, тебя ведёт редакция. На прямой вопрос «ты бот?» / «ты ИИ?» отвечай «да»: ты виртуальный автор, тексты пишет ИИ, а ведёт и проверяет редакция ChaWo. Никогда не говори, что ты человек.
 - Отвечай только по теме своего поста и того, что есть в посте и его источнике. Чего там нет, того не знаешь: так и скажи, не выдумывай факты, цифры, даты, цены и цитаты.
+- Если не знаешь, скажи коротко и по-человечески («тут не подскажу», «честно, не знаю»), без слов «пост», «источник», «информация» и без канцелярита.
 - Личного опыта у тебя нет: не пиши «я была», «я пробовал».
 - Не обсуждай политику, медицину, деньги, юридические вопросы: вежливо уйди от темы одной фразой.
 - Оскорбления, спам, провокации, реклама — не отвечай (действие skip).
@@ -159,16 +161,60 @@ def yandex(text):
     return json.loads(found.group(0)) if found else {'action': 'skip', 'reason': 'модель ответила не JSON'}
 
 
-def auto():
-    for item in pending():
+def claude(text):
+    key = os.environ.get('ANTHROPIC_API_KEY')
+    if not key:
+        sys.exit('Claude не подключён: нужен ANTHROPIC_API_KEY')
+    # Правила и персонаж в system, ветка в user. У Haiku 5.5 размышление включено
+    # по умолчанию и съело бы 400 токенов, поэтому выключено; temperature модель не принимает.
+    system, _, thread = text.partition('\n\nТвой пост:\n')
+    body = {
+        'model': 'claude-haiku-5-5',
+        'max_tokens': 400,
+        'thinking': {'type': 'disabled'},
+        'output_config': {'effort': 'low'},
+        'system': system,
+        'messages': [{'role': 'user', 'content': 'Твой пост:\n' + thread}],
+    }
+    req = urllib.request.Request('https://api.anthropic.com/v1/messages',
+                                 data=json.dumps(body).encode(), method='POST')
+    req.add_header('x-api-key', key)
+    req.add_header('anthropic-version', '2023-06-01')
+    req.add_header('Content-Type', 'application/json')
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            result = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        sys.exit(f'Claude: {e.code} {e.read().decode("utf-8", "replace")[:300]}')
+    usage = result.get('usage', {})
+    tokens_in, tokens_out = usage.get('input_tokens', 0), usage.get('output_tokens', 0)
+    # Haiku 5.5: $0.10 за 1M входных, $0.50 за 1M выходных токенов.
+    print(f'  расход: {tokens_in} вх + {tokens_out} вых ≈ ${(tokens_in * 0.10 + tokens_out * 0.50) / 1e6:.5f}')
+    if result.get('stop_reason') == 'refusal':
+        return {'action': 'skip', 'reason': 'модель отказалась отвечать'}
+    answer = ''.join(b['text'] for b in result.get('content', []) if b.get('type') == 'text')
+    found = re.search(r'\{.*\}', answer, re.S)
+    return json.loads(found.group(0)) if found else {'action': 'skip', 'reason': 'модель ответила не JSON'}
+
+
+# Какая модель отвечает в auto: REPLIES_LLM=haiku (по умолчанию) или yandexgpt.
+ENGINES = {'haiku': claude, 'yandexgpt': yandex}
+
+
+def auto(limit=None):
+    by = os.environ.get('REPLIES_LLM', 'haiku')
+    if by not in ENGINES:
+        sys.exit(f'REPLIES_LLM={by}: нужно {" или ".join(ENGINES)}')
+    for item in pending()[:limit]:
         if item['author_replies_in_thread'] >= MAX_PER_THREAD:
-            skip(item['comment_id'], 'лимит ответов в ветке', 'yandexgpt')
+            skip(item['comment_id'], 'лимит ответов в ветке', by)
             continue
-        decision = yandex(prompt(item))
+        decision = ENGINES[by](prompt(item))
+        print(f'{item["comment_id"]}: {json.dumps(decision, ensure_ascii=False)}')
         if decision.get('action') == 'reply' and decision.get('text'):
-            reply(item['comment_id'], decision['text'], 'yandexgpt')
+            reply(item['comment_id'], decision['text'], by)
         else:
-            skip(item['comment_id'], decision.get('reason') or 'модель пропустила', 'yandexgpt')
+            skip(item['comment_id'], decision.get('reason') or 'модель пропустила', by)
 
 
 def show():
@@ -195,6 +241,6 @@ if __name__ == '__main__':
     elif cmd == 'skip' and len(sys.argv) == 4:
         skip(sys.argv[2], sys.argv[3])
     elif cmd == 'auto':
-        auto()
+        auto(int(sys.argv[2]) if len(sys.argv) > 2 else None)
     else:
         sys.exit(__doc__)

@@ -12,9 +12,15 @@ $env:SUPABASE_SERVICE_KEY = ssh -i $key -o BatchMode=yes root@176.53.224.193 $re
 if ($LASTEXITCODE -ne 0 -or -not $env:SUPABASE_SERVICE_KEY) { throw 'Не удалось прочитать ключ на сервере' }
 $env:SUPABASE_URL = 'https://api-socialworld.deepdrift.tech'
 $env:PYTHONIOENCODING = 'utf-8'
+# Ключ Claude для auto: одна строка в файле вне репозитория, в окно не выводится.
+$anthropic = 'D:\Temp\anthropic.key'
+if ($args[0] -eq 'auto' -and (Test-Path $anthropic)) {
+  $env:ANTHROPIC_API_KEY = (Get-Content $anthropic -Raw).Trim()
+}
 try {
   python -I (Join-Path $PSScriptRoot 'replies.py') @args
   if ($LASTEXITCODE -ne 0) { throw 'replies.py завершился с ошибкой' }
 } finally {
   $env:SUPABASE_SERVICE_KEY = ''
+  $env:ANTHROPIC_API_KEY = ''
 }

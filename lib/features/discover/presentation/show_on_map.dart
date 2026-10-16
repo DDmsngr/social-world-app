@@ -32,8 +32,13 @@ final pendingPlaceProvider = NotifierProvider<PendingPlaceController, Place?>(
 );
 
 /// Открыть место на карте ChaWo: камера на точку, карточка места поверх.
+///
+/// `push`, не `go`: вызывается и с экранов вне нижних вкладок (например, с
+/// поста), которые `go` стёр бы из истории — тогда системная кнопка «назад»
+/// на Pulse упиралась бы в пустой стек и закрывала приложение, вместо того
+/// чтобы вернуть туда, откуда открыли карту.
 void showPlaceOnMap(BuildContext context, WidgetRef ref, Place place) {
   ref.read(mapFocusProvider.notifier).request(place.latitude, place.longitude, zoom: 16);
   ref.read(pendingPlaceProvider.notifier).show(place);
-  context.go(Routes.home);
+  context.push(Routes.home);
 }

@@ -1,0 +1,1 @@
+*/10 * * * * root /usr/local/bin/chawo-replies.sh >> /var/log/chawo-replies.log 2>&1

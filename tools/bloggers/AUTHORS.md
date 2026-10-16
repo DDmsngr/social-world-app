@@ -75,3 +75,34 @@
 > One image, a grid of 5 square portrait avatars (3 on top, 2 on the bottom), each in a separate square tile with equal margins, illustrated digital art style with soft painterly shading, consistent style across all, centered faces with some space around, no text, no watermark. 1) a woman around 30 with a short dark bob and round glasses, cozy cardigan, stacks of books and a warm lamp softly blurred behind, gentle smile. 2) a man around 36 with short light-brown hair and a stubble, dark jacket with a small mission patch, a starry night sky and a faint rocket trail blurred behind, curious look. 3) a woman around 45 with a straw hat, gardening apron and green gloves, magnolia and palm leaves blurred behind, warm smile. 4) a man around 40 with a trimmed beard and a canvas backpack, a map in hand, old town rooftops and mountains blurred behind, relaxed smile. 5) a young woman around 25 with a high ponytail and a bright sweater, a chessboard and colorful dice softly blurred in front, playful smirk.
 
 Аватары сохранить как `lika.png`, `gleb.png`, `nina.png`, `yakov.png`, `rita.png` в `D:\temp\bloggers\avatars\`, остальное сделает `create_authors.ps1` (заведёт аккаунты) и `post_batch.py` (карточки и очередь).
+
+---
+
+## Третья волна (16.10): видео-автор — другой конвейер
+
+12. **Матвей Клипов** — короткие видео и тренды: что сейчас снимают и смотрят в
+    Сочи. Постит найденные трендовые YouTube Shorts (`chawo-trending-shorts`),
+    переснятые в ленту ChaWo — не анонс со ссылкой, а сам ролик. Решение
+    Алексея 16.10: несём риск авторских прав сознательно, но держим минимум
+    уважения к источнику — в каждом посте обязательна строка «Видео: автор/канал»
+    и ссылка на оригинал. Цвет карточки малиновый (не используется для самих
+    видео-постов — карточка не рисуется, см. ниже).
+    Характер: лёгкий, короткие подписи, без умных слов, реагирует на тренд, а
+    не объясняет его.
+
+    **Промт аватара:** Square portrait avatar, illustrated digital art style
+    with soft painterly shading, a young man around 24 with messy dark hair,
+    wireless earbuds, casual hoodie, a phone with a vertical video frame
+    softly blurred in his hand, neon-pink rim light, energetic grin, centered
+    face, no text, no watermark, 1:1.
+
+    Аватар сохранить как `matvey.png` в `D:\temp\bloggers\avatars\`, завести
+    аккаунт `create_authors.ps1` как обычно (запись уже в `authors_extra.json`).
+
+    **Дальше не как у фото-авторов.** Пост кладёт `post_video.ps1`
+    (`post_video.py`) — скачивает сам ролик через `yt-dlp`, заливает .mp4 в
+    `post-media` (не рисует карточку `card.py` — она для фото), ставит в ту
+    же очередь `author_post_queue`. Тип поста (фото/видео) клиент определяет
+    по расширению файла в ссылке, а не по отдельному флагу — потому отдельная
+    миграция не понадобилась. Формат пачки и обязательные поля — в
+    докстринге `post_video.py`.
