@@ -543,3 +543,114 @@ class AmbassadorBadge extends ConsumerWidget {
     );
   }
 }
+
+/// Блок «От амбассадора» в ленте города — ambassador_city_block (0102).
+class AmbassadorCityBlock {
+  const AmbassadorCityBlock({
+    required this.profileId,
+    required this.name,
+    this.avatarUrl,
+    required this.acting,
+    required this.items,
+  });
+
+  factory AmbassadorCityBlock.fromJson(Map<String, dynamic> j) => AmbassadorCityBlock(
+    profileId: j['profile_id'] as String,
+    name: (j['name'] ?? 'Без имени') as String,
+    avatarUrl: j['avatar_url'] as String?,
+    acting: j['role'] == 'acting',
+    items: [
+      for (final i in (j['items'] as List<dynamic>? ?? const []))
+        (
+          kind: (i as Map)['kind'] as String,
+          id: i['id'] as String,
+          title: i['title'] as String,
+          startsAt: DateTime.parse(i['starts_at'] as String).toLocal(),
+        ),
+    ],
+  );
+
+  final String profileId;
+  final String name;
+  final String? avatarUrl;
+  final bool acting;
+  final List<({String kind, String id, String title, DateTime startsAt})> items;
+}
+
+final ambassadorBlockProvider = FutureProvider.autoDispose.family<AmbassadorCityBlock?, String>((ref, city) async {
+  if (!Env.isConfigured) return null;
+  final res = await Supabase.instance.client.rpc('ambassador_city_block', params: {'in_city': city});
+  return res == null ? null : AmbassadorCityBlock.fromJson((res as Map).cast<String, dynamic>());
+});
+
+/// Карточка амбассадора города над лентой: кто он и его ближайшие события и
+/// квесты. Нет амбассадора — блока нет.
+class AmbassadorBlock extends ConsumerWidget {
+  const AmbassadorBlock({super.key, required this.city});
+
+  final String city;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final block = ref.watch(ambassadorBlockProvider(city)).value;
+    if (block == null) return const SizedBox.shrink();
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => context.push('${Routes.user}/${block.profileId}'),
+            child: Row(
+              children: [
+                UserAvatar(name: block.name, url: block.avatarUrl, radius: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        block.acting ? 'ОТ ВРИО АМБАССАДОРА' : 'ОТ АМБАССАДОРА',
+                        style: TextStyle(color: AppColors.champagne, fontSize: 11.5, letterSpacing: 1.2),
+                      ),
+                      Text(block.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.workspace_premium, color: AppColors.champagne),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (block.items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                'Скоро здесь появятся события и квесты амбассадора $city.',
+                style: TextStyle(color: AppColors.textDim),
+              ),
+            ),
+          for (final i in block.items)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                i.kind == 'quest' ? Icons.flag_outlined : Icons.event_outlined,
+                color: AppColors.primaryTint,
+              ),
+              title: Text(i.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                '${i.kind == 'quest' ? 'Квест' : 'Событие'} · ${_day(i.startsAt)}, '
+                '${i.startsAt.hour.toString().padLeft(2, '0')}:${i.startsAt.minute.toString().padLeft(2, '0')}',
+              ),
+              onTap: () => context.push('${i.kind == 'quest' ? Routes.questDetail : Routes.eventDetail}/${i.id}'),
+            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(onPressed: () => context.push(Routes.ambassadors), child: const Text('Рейтинг города')),
+          ),
+        ],
+      ),
+    );
+  }
+}

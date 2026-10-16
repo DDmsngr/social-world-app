@@ -50,4 +50,20 @@ void main() {
     expect(e.role, 'acting');
     expect(e.active, isTrue);
   });
+
+  test('блок «От амбассадора» разбирает ответ ambassador_city_block', () {
+    final b = AmbassadorCityBlock.fromJson({
+      'name': 'Алексей',
+      'role': 'ambassador',
+      'items': [
+        {'kind': 'quest', 'id': 'q1', 'title': 'Прогулка', 'starts_at': '2026-10-20T15:00:00+00:00'},
+      ],
+      'username': 'mastershtorm',
+      'avatar_url': null,
+      'profile_id': '71b20b93-1d0f-4671-af42-576809d176f9',
+    });
+    expect(b.acting, isFalse);
+    expect(b.items.single.kind, 'quest');
+    expect(b.items.single.startsAt.toUtc(), DateTime.utc(2026, 10, 20, 15));
+  });
 }

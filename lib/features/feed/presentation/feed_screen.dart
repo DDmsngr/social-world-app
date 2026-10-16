@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/state_message.dart';
+import '../../ambassadors/ambassadors_screen.dart';
 import '../../discover/presentation/providers/city_provider.dart';
 import '../../notifications/notifications.dart';
 import '../../stories/stories.dart';
@@ -118,7 +119,17 @@ class FeedScreen extends ConsumerWidget {
                 if (index == 0) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 10),
-                    child: const StoryStrip(),
+                    child: Column(
+                      children: [
+                        const StoryStrip(),
+                        // Амбассадор города и его события — только в ленте города.
+                        if (scope == FeedScope.city)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 10, AppSpacing.gutter, 0),
+                            child: AmbassadorBlock(city: cityName),
+                          ),
+                      ],
+                    ),
                   );
                 }
                 return Padding(
