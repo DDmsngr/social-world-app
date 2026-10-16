@@ -43,7 +43,7 @@ def pack(title, out, n):
     lic = strip(m.get('LicenseShortName', {}).get('value'))
     if re.search(r'fair|non-?free|nc|nd', lic, re.I) and not re.search(r'public|cc0|cc by(-sa)?', lic, re.I):
         return f'{title}: лицензия {lic} не подходит'
-    artist = strip(m.get('Artist', {}).get('value')) or 'автор не указан'
+    artist = re.sub(r'\s+', ' ', strip(m.get('Artist', {}).get('value'))) or 'автор не указан'
     req = urllib.request.Request(info['thumburl'], headers=UA)
     with open(os.path.join(out, f'{n:02d}.jpg'), 'wb') as f:
         f.write(urllib.request.urlopen(req, timeout=60).read())

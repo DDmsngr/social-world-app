@@ -97,6 +97,8 @@ def main(path):
         src_name = it.get('source_name') or 'Википедия'
         src_url = it.get('source_url') or meta.get('url')
         credit = it.get('photo_credit') or f"{meta.get('artist', 'автор не указан')}, {meta.get('license', '')}".strip(', ')
+        # Подпись автора на Commons бывает в несколько строк: карточка такой текст не рисует.
+        credit = re.sub(r'\s+', ' ', credit).strip()
         photo_page = it.get('photo_page') or meta.get('commons')
         # Скобки в адресе (…/Парк_(Сочи)) обрывали бы ссылку [подпись](адрес).
         src_url, photo_page = (u and u.replace('(', '%28').replace(')', '%29') for u in (src_url, photo_page))
