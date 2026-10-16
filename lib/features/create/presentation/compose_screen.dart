@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -15,6 +16,7 @@ import '../../chat/presentation/widgets/schedule_picker.dart';
 import '../../discover/domain/entities/place.dart';
 import '../../discover/presentation/providers/discover_providers.dart';
 import '../../events/data/address_resolver.dart';
+import '../../events/domain/entities/event.dart';
 import '../../events/domain/entities/event_route.dart';
 import '../../events/presentation/providers/events_providers.dart';
 import '../../events/presentation/widgets/event_route_editor.dart';
@@ -107,6 +109,18 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
   final _tags = <String>[];
   var _recentTags = const <String>[];
 
+  /// Как попасть на событие и сколько мест (null — без лимита).
+  var _joinMode = EventJoinMode.free;
+  var _unlimited = true;
+  final _limitController = TextEditingController(text: '10');
+
+  /// Лимит участников из поля; null — без лимита или значение некорректно.
+  int? get _limit {
+    if (_unlimited) return null;
+    final n = int.tryParse(_limitController.text.trim());
+    return n != null && n >= 1 && n <= 10000 ? n : null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -151,6 +165,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
     _bodyController.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
+    _limitController.dispose();
     super.dispose();
   }
 
@@ -260,6 +275,8 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
       placeId: _selectedPlace?.id,
       placeTitle: _selectedPlace?.title,
       routePoints: _routePoints,
+      joinMode: _joinMode,
+      maxParticipants: _limit,
     );
 
     // Координаты места сервер отдаёт только в city_events — подставляем
@@ -358,7 +375,7 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
           _article.markdown.trim().length >= 20 &&
           _article.markdown.length <= ArticleController.maxLength,
     ComposeKind.event =>
-      _titleController.text.trim().length >= 3 && _startsAt != null,
+      _titleController.text.trim().length >= 3 && _startsAt != null && (_unlimited || _limit != null),
   };
 
   /// У момента и статьи нужно не меньше двух тегов: по ним другие люди
@@ -381,7 +398,9 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
           : 'Нужен текст статьи',
       ComposeKind.event => _titleController.text.trim().length < 3
           ? 'Нужно название'
-          : 'Выберите дату и время',
+          : _startsAt == null
+          ? 'Выберите дату и время'
+          : 'Лимит участников — число от 1 до 10 000',
     };
   }
 
@@ -763,6 +782,44 @@ class _ComposeScreenState extends ConsumerState<ComposeScreen> {
               ),
               onClear: _selectedPlace == null ? null : () => setState(() => _selectedPlace = null),
             ),
+            if (_kind == ComposeKind.event) ...[
+              const SizedBox(height: 10),
+              GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Кто может прийти', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 10),
+                    SegmentedButton<EventJoinMode>(
+                      showSelectedIcon: false,
+                      segments: [
+                        for (final m in EventJoinMode.values) ButtonSegment(value: m, label: Text(m.label, textAlign: TextAlign.center)),
+                      ],
+                      selected: {_joinMode},
+                      onSelectionChanged: (v) => setState(() => _joinMode = v.first),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(_joinMode.hint, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _unlimited,
+                      title: const Text('Без ограничений по числу участников'),
+                      onChanged: (v) => setState(() => _unlimited = v),
+                    ),
+                    if (!_unlimited)
+                      TextField(
+                        controller: _limitController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        maxLength: 5,
+                        decoration: const InputDecoration(labelText: 'Сколько человек', counterText: ''),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             if (_kind == ComposeKind.event) ...[
               const SizedBox(height: 10),
               Theme(

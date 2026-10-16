@@ -426,6 +426,10 @@ function notificationText(kind: string, who: string, title: string | null): stri
     case "event_join": return `${who} участвует в вашем событии${about}`;
     case "event_changed": return `Событие изменилось${about}`;
     case "event_cancelled": return `Событие отменено${about}`;
+    case "event_request": return `${who} просит принять на вашу встречу${about}`;
+    case "event_request_approved": return `Вас приняли на встречу${about}`;
+    case "event_request_rejected": return `Организатор не принял запрос на встречу${about}`;
+    case "event_invited": return `${who} зовёт вас на встречу${about}`;
     case "message": return `${who}: новое сообщение`;
     case "quest_request": return `${who} хочет в ваш квест${about}`;
     case "quest_join": return `${who} теперь в вашем квесте${about}`;

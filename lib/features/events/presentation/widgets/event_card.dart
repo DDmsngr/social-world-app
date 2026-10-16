@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/avatar_stack.dart';
 import '../../domain/entities/event.dart';
+import 'event_join.dart';
 
 class EventCard extends StatelessWidget {
   const EventCard({
@@ -123,7 +124,10 @@ class EventCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: onToggleJoin,
+                        // Свободный вход — сразу; запрос и приглашения — на экране события.
+                        onPressed: event.joinMode == EventJoinMode.free
+                            ? (eventJoinEnabled(event) ? onToggleJoin : null)
+                            : onTap,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: event.joinedByMe
                               ? AppColors.onPrimary
@@ -132,9 +136,7 @@ class EventCard extends StatelessWidget {
                               ? AppColors.primary
                               : Colors.transparent,
                         ),
-                        child: Text(
-                          event.joinedByMe ? 'Вы участвуете' : 'Участвовать',
-                        ),
+                        child: Text(eventJoinLabel(event), overflow: TextOverflow.ellipsis),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -147,7 +149,7 @@ class EventCard extends StatelessWidget {
                     if (event.participantsPreview.isNotEmpty)
                       const SizedBox(width: 8),
                     Text(
-                      '${event.participantCount} идёт',
+                      eventPeopleText(event),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],

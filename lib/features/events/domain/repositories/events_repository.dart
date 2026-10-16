@@ -19,6 +19,8 @@ abstract interface class EventsRepository {
     String? placeId,
     String? placeTitle,
     List<EventRoutePoint> routePoints = const [],
+    EventJoinMode joinMode = EventJoinMode.free,
+    int? maxParticipants,
   });
 
   /// Возвращает событие с обновлённым счётчиком, чтобы экран не пересчитывал сам.
@@ -28,4 +30,22 @@ abstract interface class EventsRepository {
 
   /// Отмена события организатором. Участники получают уведомление.
   Future<void> deleteEvent(String eventId);
+
+  /// Просьба принять на встречу «по запросу»: человек пишет о себе.
+  Future<void> requestJoin(String eventId, {required String about, String? message});
+
+  Future<void> withdrawRequest(String eventId);
+
+  /// Запросы к моей встрече: сначала ожидающие (только организатору).
+  Future<List<JoinRequest>> loadRequests(String eventId);
+
+  /// Принять или отклонить запрос; принятый сразу становится участником.
+  Future<void> decideRequest(String requestId, {required bool approve});
+
+  /// Друзья, которых можно позвать (ещё не участвуют).
+  Future<List<InviteCandidate>> loadInviteCandidates(String eventId, {String? query});
+
+  /// Позвать людей: они сразу становятся участниками. Возвращает, сколько
+  /// добавлено и сколько не поместилось из-за лимита.
+  Future<({int added, int full})> invite(String eventId, List<String> profileIds);
 }

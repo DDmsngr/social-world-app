@@ -28,6 +28,7 @@ import '../../routes/presentation/widgets/route_map_marker.dart';
 import '../../saved/saved.dart';
 import '../domain/entities/event.dart';
 import 'providers/events_providers.dart';
+import 'widgets/event_join.dart';
 
 /// Карточка события. Данные берутся из общего списка событий, а не из
 /// «снимка», с которым экран открыли: иначе после «Участвовать» кнопка и
@@ -260,16 +261,6 @@ class _EventDetailBody extends ConsumerWidget {
 
   final Event event;
 
-  Future<void> _toggleJoin(BuildContext context, WidgetRef ref) async {
-    final saved = await ref.read(eventsProvider.notifier).toggleJoin(event);
-    // Список участников зависит от того же действия — перечитываем его сразу.
-    ref.invalidate(eventParticipantsProvider(event.id));
-    if (saved || !context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Не удалось записаться — нет связи')),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final me = ref.watch(currentUserProvider)?.id;
@@ -351,13 +342,22 @@ class _EventDetailBody extends ConsumerWidget {
               const SizedBox(height: 10),
               _InfoRow(
                 icon: Icons.groups_outlined,
-                text: '${event.participantCount} идёт',
+                text: eventPeopleText(event),
+              ),
+              const SizedBox(height: 10),
+              _InfoRow(
+                icon: switch (event.joinMode) {
+                  EventJoinMode.free => Icons.lock_open_outlined,
+                  EventJoinMode.request => Icons.how_to_reg_outlined,
+                  EventJoinMode.invite => Icons.mail_outline,
+                },
+                text: '${event.joinMode.label}. ${event.joinMode.hint}',
               ),
             ],
           ),
         ),
         const SizedBox(height: 22),
-        if (isOwner)
+        if (isOwner) ...[
           GlassCard(
             child: Row(
               children: [
@@ -366,17 +366,30 @@ class _EventDetailBody extends ConsumerWidget {
                 const Expanded(child: Text('Вы организатор этого события')),
               ],
             ),
-          )
-        else
-          FilledButton(
-            onPressed: () => _toggleJoin(context, ref),
-            style: event.joinedByMe
-                ? FilledButton.styleFrom(
-                    backgroundColor: AppColors.card,
-                    foregroundColor: AppColors.primaryTint,
-                  )
-                : null,
-            child: Text(event.joinedByMe ? 'Вы участвуете' : 'Участвовать'),
+          ),
+          const SizedBox(height: 10),
+          if (!event.isPast)
+            OutlinedButton.icon(
+              onPressed: () => showInviteSheet(context, event),
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              label: const Text('Позвать друзей'),
+            ),
+          if (event.joinMode == EventJoinMode.request || event.pendingRequests > 0) ...[
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: () => showEventRequestsSheet(context, event),
+              icon: Badge(
+                isLabelVisible: event.pendingRequests > 0,
+                label: Text('${event.pendingRequests}'),
+                child: const Icon(Icons.how_to_reg_outlined),
+              ),
+              label: Text(event.pendingRequests > 0 ? 'Запросы на участие' : 'Запросы на участие (нет новых)'),
+            ),
+          ],
+        ] else
+          EventJoinButton(
+            event: event,
+            onChanged: () => ref.invalidate(eventParticipantsProvider(event.id)),
           ),
         if (event.hasRoute) ...[
           const SizedBox(height: 26),

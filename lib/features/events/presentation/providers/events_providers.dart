@@ -74,6 +74,24 @@ class EventsController extends AsyncNotifier<List<Event>> {
     }
   }
 
+  /// Просьба принять: пишет серверу и сразу показывает «запрос отправлен».
+  /// Бросает ошибку с кодом сервера — экран превращает её в понятное сообщение.
+  Future<void> requestJoin(Event event, {required String about, String? message}) async {
+    await ref.read(eventsRepositoryProvider).requestJoin(event.id, about: about, message: message);
+    _replace(event.copyWith(myRequestStatus: 'pending'));
+  }
+
+  Future<void> withdrawRequest(Event event) async {
+    await ref.read(eventsRepositoryProvider).withdrawRequest(event.id);
+    _replace(event.copyWith(myRequestStatus: 'withdrawn'));
+  }
+
+  /// После решения по запросу или приглашения счётчики берём у сервера.
+  Future<void> reload(String id) async {
+    final fresh = await ref.read(eventsRepositoryProvider).loadEvent(id);
+    if (fresh != null) _replace(fresh);
+  }
+
   void _replace(Event updated) {
     state = AsyncValue.data([
       for (final item in state.value ?? const <Event>[])
@@ -142,3 +160,28 @@ final eventParticipantsProvider = FutureProvider.autoDispose
     .family<List<EventParticipant>, String>((ref, eventId) {
       return ref.watch(eventsRepositoryProvider).loadParticipants(eventId);
     });
+
+/// Запросы к моей встрече (только организатору).
+final eventRequestsProvider = FutureProvider.autoDispose.family<List<JoinRequest>, String>((ref, eventId) {
+  return ref.watch(eventsRepositoryProvider).loadRequests(eventId);
+});
+
+/// Друзья, которых можно позвать, с поиском по имени.
+final inviteCandidatesProvider =
+    FutureProvider.autoDispose.family<List<InviteCandidate>, ({String eventId, String query})>((ref, args) {
+      return ref
+          .watch(eventsRepositoryProvider)
+          .loadInviteCandidates(args.eventId, query: args.query.isEmpty ? null : args.query);
+    });
+
+/// Понятная фраза по коду ошибки сервера (events 0104).
+String eventJoinErrorText(Object error) {
+  final text = error.toString();
+  if (text.contains('event_full')) return 'Мест уже нет';
+  if (text.contains('request_already_decided')) return 'По вашему запросу уже есть решение';
+  if (text.contains('too_many_requests')) return 'Слишком много запросов сразу — дождитесь ответов';
+  if (text.contains('event_over')) return 'Встреча уже закончилась';
+  if (text.contains('already_participant')) return 'Вы уже участвуете';
+  if (text.contains('event_not_accepting_requests')) return 'На эту встречу запросы не принимаются';
+  return 'Не получилось — нет связи';
+}

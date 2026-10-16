@@ -16,6 +16,7 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../events/domain/entities/event.dart';
 import '../../../events/presentation/providers/events_providers.dart';
+import '../../../events/presentation/widgets/event_join.dart';
 import '../../../feed/domain/entities/post.dart';
 import '../../../feed/presentation/providers/feed_providers.dart';
 import '../../domain/entities/nearby_person.dart';
@@ -157,27 +158,9 @@ class _EventSheet extends ConsumerWidget {
                       onPressed: null,
                       child: const Text('Вы организатор'),
                     )
-                  : FilledButton(
-                      onPressed: () async {
-                        final ok = await ref
-                            .read(eventsProvider.notifier)
-                            .toggleJoin(event);
-                        ref.invalidate(eventParticipantsProvider(event.id));
-                        if (!ok && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Не удалось записаться — нет связи'),
-                            ),
-                          );
-                        }
-                      },
-                      style: event.joinedByMe
-                          ? FilledButton.styleFrom(
-                              backgroundColor: AppColors.card,
-                              foregroundColor: AppColors.primaryTint,
-                            )
-                          : null,
-                      child: Text(event.joinedByMe ? 'Вы участвуете' : 'Участвовать'),
+                  : EventJoinButton(
+                      event: event,
+                      onChanged: () => ref.invalidate(eventParticipantsProvider(event.id)),
                     ),
             ),
             const SizedBox(width: 8),

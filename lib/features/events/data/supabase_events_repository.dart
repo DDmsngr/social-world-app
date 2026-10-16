@@ -46,6 +46,8 @@ class SupabaseEventsRepository implements EventsRepository {
     String? placeId,
     String? placeTitle,
     List<EventRoutePoint> routePoints = const [],
+    EventJoinMode joinMode = EventJoinMode.free,
+    int? maxParticipants,
   }) async {
     final userId = _userId;
     final row = await _client
@@ -60,6 +62,8 @@ class SupabaseEventsRepository implements EventsRepository {
           // Маршрут ложится той же записью, что и событие: нет состояния
           // «событие создано, а маршрут потерялся».
           'route_points': [for (final point in routePoints) point.toJson()],
+          'join_mode': joinMode.wire,
+          'max_participants': maxParticipants,
         })
         .select()
         .single();
@@ -93,6 +97,8 @@ class SupabaseEventsRepository implements EventsRepository {
       placeTitle: placeTitle,
       routePoints: EventRoutePoint.parseList(row['route_points']),
       createdAt: DateTime.parse(row['created_at'] as String),
+      joinMode: joinMode,
+      maxParticipants: maxParticipants,
     );
   }
 
@@ -163,6 +169,72 @@ class SupabaseEventsRepository implements EventsRepository {
     }
   }
 
+  @override
+  Future<void> requestJoin(String eventId, {required String about, String? message}) async {
+    await _client.rpc('event_request_join', params: {
+      'in_event': eventId,
+      'in_about': about,
+      'in_message': message,
+    });
+  }
+
+  @override
+  Future<void> withdrawRequest(String eventId) async {
+    await _client.rpc('event_withdraw_request', params: {'in_event': eventId});
+  }
+
+  @override
+  Future<List<JoinRequest>> loadRequests(String eventId) async {
+    final rows = await _client.rpc('event_requests_list', params: {'in_event': eventId}) as List<dynamic>;
+    return [
+      for (final raw in rows)
+        JoinRequest(
+          id: (raw as Map<String, dynamic>)['request_id'] as String,
+          profileId: raw['profile_id'] as String,
+          displayName: (raw['display_name'] as String?) ?? 'Без имени',
+          avatarUrl: raw['avatar_url'] as String?,
+          about: raw['about'] as String,
+          message: raw['message'] as String?,
+          status: raw['status'] as String,
+          createdAt: DateTime.parse(raw['created_at'] as String),
+        ),
+    ];
+  }
+
+  @override
+  Future<void> decideRequest(String requestId, {required bool approve}) async {
+    await _client.rpc('event_decide_request', params: {
+      'in_request': requestId,
+      'in_approve': approve,
+    });
+  }
+
+  @override
+  Future<List<InviteCandidate>> loadInviteCandidates(String eventId, {String? query}) async {
+    final rows = await _client.rpc('event_invite_candidates', params: {
+      'in_event': eventId,
+      'in_query': query,
+    }) as List<dynamic>;
+    return [
+      for (final raw in rows)
+        InviteCandidate(
+          profileId: (raw as Map<String, dynamic>)['profile_id'] as String,
+          displayName: (raw['display_name'] as String?) ?? 'Без имени',
+          username: raw['username'] as String?,
+          avatarUrl: raw['avatar_url'] as String?,
+        ),
+    ];
+  }
+
+  @override
+  Future<({int added, int full})> invite(String eventId, List<String> profileIds) async {
+    final res = await _client.rpc('event_invite', params: {
+      'in_event': eventId,
+      'in_profiles': profileIds,
+    }) as Map<String, dynamic>;
+    return (added: (res['added'] as num?)?.toInt() ?? 0, full: (res['full'] as num?)?.toInt() ?? 0);
+  }
+
   Event _fromRow(Map<String, dynamic> row) => Event(
     id: row['id'] as String,
     authorId: row['author_id'] as String,
@@ -181,6 +253,10 @@ class SupabaseEventsRepository implements EventsRepository {
     createdAt: DateTime.parse(row['created_at'] as String),
     participantCount: (row['participant_count'] as num?)?.toInt() ?? 0,
     joinedByMe: row['joined_by_me'] as bool? ?? false,
+    joinMode: EventJoinMode.parse(row['join_mode']),
+    maxParticipants: (row['max_participants'] as num?)?.toInt(),
+    myRequestStatus: row['my_request_status'] as String?,
+    pendingRequests: (row['pending_requests'] as num?)?.toInt() ?? 0,
     participantsPreview: [
       for (final raw in (row['participants_preview'] as List<dynamic>? ?? const []))
         EventParticipant(

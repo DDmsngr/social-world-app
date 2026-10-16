@@ -44,6 +44,8 @@ class LocalEventsRepository implements EventsRepository {
     String? placeId,
     String? placeTitle,
     List<EventRoutePoint> routePoints = const [],
+    EventJoinMode joinMode = EventJoinMode.free,
+    int? maxParticipants,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
     final event = Event(
@@ -58,6 +60,8 @@ class LocalEventsRepository implements EventsRepository {
       placeTitle: placeTitle,
       routePoints: routePoints,
       createdAt: DateTime.now(),
+      joinMode: joinMode,
+      maxParticipants: maxParticipants,
     );
     _events.add(event);
     return event;
@@ -85,6 +89,26 @@ class LocalEventsRepository implements EventsRepository {
     }
     return updated;
   }
+
+  // Запросы и приглашения живут на сервере; в демо-режиме без сети их нет.
+  @override
+  Future<void> requestJoin(String eventId, {required String about, String? message}) async {}
+
+  @override
+  Future<void> withdrawRequest(String eventId) async {}
+
+  @override
+  Future<List<JoinRequest>> loadRequests(String eventId) async => const [];
+
+  @override
+  Future<void> decideRequest(String requestId, {required bool approve}) async {}
+
+  @override
+  Future<List<InviteCandidate>> loadInviteCandidates(String eventId, {String? query}) async => const [];
+
+  @override
+  Future<({int added, int full})> invite(String eventId, List<String> profileIds) async =>
+      (added: 0, full: 0);
 
   @override
   Future<List<EventParticipant>> loadParticipants(String eventId) async {
