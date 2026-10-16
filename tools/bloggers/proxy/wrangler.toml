@@ -1,0 +1,9 @@
+name = "chawo-claude-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Исходящий запрос должен выходить не из российского узла Cloudflare, иначе
+# Anthropic снова ответит 403. Smart Placement переносит воркер ближе к
+# api.anthropic.com (США). Секрет: wrangler secret put PROXY_TOKEN
+[placement]
+mode = "smart"

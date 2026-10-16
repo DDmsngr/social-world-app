@@ -176,9 +176,13 @@ def claude(text):
         'system': system,
         'messages': [{'role': 'user', 'content': 'Твой пост:\n' + thread}],
     }
-    req = urllib.request.Request('https://api.anthropic.com/v1/messages',
+    # Из РФ Anthropic закрыт: на сервере ходим через прокси (proxy/worker.js).
+    base = os.environ.get('ANTHROPIC_PROXY_URL', 'https://api.anthropic.com').rstrip('/')
+    req = urllib.request.Request(base + '/v1/messages',
                                  data=json.dumps(body).encode(), method='POST')
     req.add_header('x-api-key', key)
+    if os.environ.get('ANTHROPIC_PROXY_TOKEN'):
+        req.add_header('x-proxy-token', os.environ['ANTHROPIC_PROXY_TOKEN'])
     req.add_header('anthropic-version', '2023-06-01')
     req.add_header('Content-Type', 'application/json')
     try:

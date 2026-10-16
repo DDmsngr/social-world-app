@@ -9,6 +9,8 @@ DIR=/opt/chawo-replies
 export SUPABASE_URL=https://api-socialworld.deepdrift.tech
 export SUPABASE_SERVICE_KEY="$(grep '^SERVICE_ROLE_KEY=' /opt/supabase/docker/.env | cut -d= -f2- | tr -d '\r\n')"
 export ANTHROPIC_API_KEY="$(tr -d '\r\n' < "$DIR/anthropic.key")"
+# Прокси к Anthropic (из РФ он закрыт): строки ANTHROPIC_PROXY_URL= и ANTHROPIC_PROXY_TOKEN=.
+if [ -f "$DIR/proxy.env" ]; then set -a; . "$DIR/proxy.env"; set +a; fi
 export REPLIES_LLM=haiku
 export PYTHONIOENCODING=utf-8
 
