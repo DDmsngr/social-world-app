@@ -10,6 +10,7 @@ import '../session/session_reset.dart';
 
 import '../../features/auth/domain/entities/app_user.dart';
 import '../../features/calls/call_screen.dart';
+import '../../features/ambassadors/ambassadors_screen.dart';
 import '../../features/points/activity_points_screen.dart';
 import '../../features/referrals/presentation/share_app_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
@@ -114,6 +115,7 @@ abstract final class Routes {
   static const inviteContacts = '/profile/invite-contacts';
   static const shareApp = '/profile/share-app';
   static const activityPoints = '/profile/points';
+  static const ambassadors = '/profile/ambassadors';
 
   /// Профиль любого человека: ${Routes.user}/id. Свой открывается тем же
   /// экраном и показывает действия владельца.
@@ -406,6 +408,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: Routes.shareApp, builder: (_, _) => const ShareAppScreen()),
       GoRoute(path: Routes.activityPoints, builder: (_, _) => const ActivityPointsScreen()),
+      GoRoute(path: Routes.ambassadors, builder: (_, _) => const AmbassadorsScreen()),
       GoRoute(
         path: Routes.inviteContacts,
         builder: (_, _) => const InviteContactsScreen(),

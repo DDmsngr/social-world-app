@@ -316,6 +316,12 @@ class _ActivityPointsScreenState extends ConsumerState<ActivityPointsScreen> {
       ));
     }
     children.add(const SizedBox(height: 16));
+    children.add(FilledButton.icon(
+      onPressed: () => context.push(Routes.ambassadors),
+      icon: const Icon(Icons.workspace_premium_outlined),
+      label: const Text('Рейтинг и амбассадоры'),
+    ));
+    children.add(const SizedBox(height: 8));
     children.add(OutlinedButton.icon(
       onPressed: () => context.push(Routes.shareApp),
       icon: const Icon(Icons.person_add_alt_1_outlined),

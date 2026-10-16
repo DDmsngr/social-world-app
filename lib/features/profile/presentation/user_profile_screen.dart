@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../ambassadors/ambassadors_screen.dart';
 import '../../assistant/assistant.dart';
 import '../../../core/config/feature_flags.dart';
 import '../../../core/debug/app_log.dart';
@@ -411,6 +412,7 @@ class _BodyState extends ConsumerState<_Body> {
           ),
         if (profile.city != null)
           Text(profile.city!, style: theme.textTheme.bodyMedium),
+        AmbassadorBadge(profileId: profile.id),
         if (profile.bio != null && profile.bio!.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(profile.bio!, style: theme.textTheme.bodyLarge),
